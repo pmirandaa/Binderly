@@ -116,8 +116,12 @@ fi
 LOG_DEPTH="${BINDERLY_MERGE_LOG_DEPTH:-200}"
 
 is_merged_by_title() {
+  # NB: do NOT use `grep -q` here — it closes stdin on first match, which
+  # SIGPIPEs `git log`, and `set -o pipefail` then reports the pipeline
+  # as failed. Drop the `-q` and discard grep's stdout so grep consumes
+  # the full stream.
   git -C "${REPO_ROOT}" log --format=%s "${MAIN_BRANCH}" -n "${LOG_DEPTH}" \
-    | grep -qE "^${TASK_ID}:"
+    | grep -E "^${TASK_ID}:" >/dev/null
 }
 
 # Fallback: maybe somebody merged with --no-ff and the title doesn't carry
