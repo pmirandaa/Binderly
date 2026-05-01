@@ -1,10 +1,11 @@
-# Build status — Phase 0 stalled at 6/10 on Q-002
+# Build status — Phase 0 stalled at 6/10 on Q-002 (end-of-day pause 2026-04-30)
 
 **Phase:** 0 — Foundation (60% merged; remainder gated on Q-002)
 **Merged:** 6 / 109 tasks
 **In progress:** 0
 **Blocked:** 4 (T-FN-DOCKER + 3 transitive: SUPABASE-LOCAL, DB-MIGRATIONS, ENV-CONVENTIONS)
-**Blocked on humans:** 2 (Q-001 gh auth, **Q-002 Docker Desktop — critical path**)
+**Blocked on humans:** 1 (**Q-002 Docker Desktop — critical path; diagnostic round 1 done, fix didn't take, see open-questions.md**)
+**Resolved this session:** Q-001 (gh auth re-verified, default branch swapped to `main` on origin, master deleted, `agent/T-FN-CI` branch tidied)
 
 ## Dispatch loop status: STALLED
 
@@ -29,22 +30,34 @@ T-FN-DOCKER. The dispatch loop is now idle until Q-002 resolves.
 Plus the entire Phase 1 data layer (every schema/source/pipeline task
 transitively requires T-FN-DB-MIGRATIONS).
 
-## What unblocks the build
+## What unblocks the build (resume tomorrow)
 
-1. **Pablo: start Docker Desktop**, wait for the whale icon to go solid.
-2. Tell the orchestrator → it re-dispatches T-FN-DOCKER into the
-   already-prepared worktree at `../binderly-wt-T-FN-DOCKER` (still
-   clean, ready to resume from step 2 of its workflow).
-3. After T-FN-DOCKER merges, SUPABASE-LOCAL and ENV-CONVENTIONS
-   become parallel-ready (2 tasks in flight).
-4. After SUPABASE-LOCAL merges, DB-MIGRATIONS unlocks → Phase 1
-   begins.
+1. **Pablo: reboot the Mac.** Diagnostic round 1 traced the bounce-quit
+   to stale `Docker Desktop` Electron zombies from a SIGKILL'd Apr-29
+   session; killing them in-session didn't stick. A clean reboot
+   guarantees launchd starts from zero.
+2. After reboot, run `pgrep -lf -i docker` — should show only
+   `com.docker.vmnetd` (system helper, harmless). Then `open -a Docker`.
+3. If Docker comes up: tell the orchestrator → re-dispatches T-FN-DOCKER
+   into the existing clean worktree at `../binderly-wt-T-FN-DOCKER`.
+4. After T-FN-DOCKER merges, SUPABASE-LOCAL and ENV-CONVENTIONS become
+   parallel-ready. After SUPABASE-LOCAL merges, DB-MIGRATIONS unlocks
+   → Phase 1 begins.
+
+If reboot doesn't fix it, see Q-002 in `open-questions.md` for the next
+escalation steps (Login Items audit → Docker reinstall).
 
 ## Tooling
 Both new orchestrator scripts now used in real dispatch:
 - `spawn_worktree.sh T-FN-CI` — clean spawn.
 - `cleanup_worktree.sh T-FN-CI` — clean cleanup with merge marker
   detection (post-hotfix).
+
+## Side note: 9 Dependabot PRs already opened
+T-FN-CI's `dependabot.yml` is alive — Dependabot has already scanned
+the lockfile + actions and opened 9 PRs on origin (visible via
+`git ls-remote --heads origin`). Triage when convenient; not blocking.
+Most are minor/patch bumps grouped per the config.
 
 ## Last 5 merges
 - T-FN-CI                   — `79805a3` (E-002 deviation approved: PR-title regex corrected; spec regex was buggy)

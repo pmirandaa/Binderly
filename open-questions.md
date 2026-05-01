@@ -78,6 +78,17 @@ swap + master deletion + `gh pr create` automation as soon as
 "open this URL to create a PR" loop continues; all 6 merged Phase-0
 PRs were opened that way and it's working.
 
+**RESOLVED 2026-04-30 (post-Q-001 re-auth round 2):**
+`gh auth status` clean — token `gho_…`, scopes `gist, read:org, repo,
+workflow`. Orchestrator executed the cleanup actions:
+- `gh repo edit pmirandaa/Binderly --default-branch main` ✓
+- `git ls-remote --heads origin` confirms no `master` ref (already
+  gone — likely cleared during the GH-side default-branch swap).
+- `git push origin --delete agent/T-FN-CI` ✓ (merged branch tidied).
+Default branch verified `main` via `gh repo view --json
+defaultBranchRef`. Future sub-agent dispatches will use
+`gh pr create --base main` automatically.
+
 ---
 
 ## Q-002 — Docker Desktop daemon not running; T-FN-DOCKER blocked
@@ -114,6 +125,47 @@ isn't resolved by the time the iteration-3/4 dispatch wants
 T-FN-SUPABASE-LOCAL.
 
 **Pablo's answer:** _(empty until answered)_
+
+**Diagnostic round 1 (2026-04-30, end-of-day):**
+A diagnostic sub-agent identified the root cause as stale
+`Docker Desktop` Electron zombies from a SIGKILL'd Apr-29 session
+(`[com.docker.backend] wait status: 9` in `supervisor.log`).
+`com.docker.backend` detects the leftover PIDs on every launch and
+silently spawns an invisible `--name=error-dialog` Electron
+(`suppressMacOSDockIcon: true`, 600x500, alwaysOnTop) instead of the
+real GUI — explaining the bounce-and-die. Ruled out: code-signing
+(`spctl: accepted, source=Notarized Developer ID`), quarantine
+(no `com.apple.quarantine` xattr), settings/VM state corruption.
+Docker Desktop 4.45.0 (build 203075), macOS 15.5 (24F74),
+MacBook Pro M1 Pro, 49 GB free.
+
+Sub-agent killed `com.docker.backend` + all leftover Docker
+Electrons; left `/Library/PrivilegedHelperTools/com.docker.vmnetd`
+running (harmless system LaunchDaemon). Pablo then ran the
+recommended `pkill` chain + `open -a Docker` and **it still didn't
+work**. Diagnostic files left in `/tmp/docker-bounce-trace.log` +
+`/tmp/docker-bounce-trace.pid` for the next session.
+
+**Recommended next step (next session):**
+1. Reboot the Mac. launchd will not respawn the zombie Electrons,
+   guaranteeing a clean process tree. This is the safest "did the
+   pkill miss something?" hammer before anything destructive.
+2. After reboot, `pgrep -lf -i docker` should show only
+   `com.docker.vmnetd`. Then `open -a Docker`.
+3. If it STILL bounces post-reboot: re-tail
+   `~/Library/Containers/com.docker.docker/Data/log/host/monitor.log`
+   immediately after the bounce and paste the `[main.bugsnag]
+   notifying bugsnag: [starting]` line. If pids of the form
+   "* pid <N>: Docker Desktop" reappear, something is auto-launching
+   them — check Login Items (System Settings → General → Login Items)
+   for stray Docker entries.
+4. If still broken: try Docker Desktop's built-in factory reset from
+   the GUI (which we can't reach right now, so this requires a
+   working app first), OR reinstall Docker Desktop 4.45.0 from
+   docker.com (clean download — current bundle on disk is
+   `/Applications/Docker.app`, intact and signed).
+
+T-FN-DOCKER stays `blocked`. The dispatch loop is parked.
 
 ---
 
