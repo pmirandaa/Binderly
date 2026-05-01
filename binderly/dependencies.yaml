@@ -1,0 +1,1116 @@
+# dependencies.yaml — Binderly build graph
+#
+# Source of truth for task readiness, ownership, and parallelism.
+# Only the orchestrator agent edits this file.
+#
+# Status values: pending | in_progress | in_review | merged | blocked
+# Effort: S (≤2h) | M (~half day) | L (~full day)
+# stub: true means task file is a placeholder and must be elaborated before
+#   dispatch (see AGENT_ORCHESTRATOR.md § 5).
+
+config:
+  max_parallel: 3
+  default_branch: main
+  branch_prefix: agent/
+
+tasks:
+  # ============================================================
+  # PHASE 0 — FOUNDATION (mostly serial)
+  # ============================================================
+  - id: T-FN-MONOREPO
+    stage: 00-foundation
+    title: Initialize Turborepo monorepo with pnpm
+    agent_role: devops
+    status: pending
+    depends_on: []
+    parallel_safe_with: []
+    provides: [monorepo:scaffold]
+    owns_paths: [package.json, pnpm-workspace.yaml, turbo.json, .gitignore, .nvmrc]
+    task_file: tasks/00-foundation/T-FN-MONOREPO.md
+    est_effort: S
+
+  - id: T-FN-TS-CONFIG
+    stage: 00-foundation
+    title: Shared TypeScript config package
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-MONOREPO]
+    parallel_safe_with: [T-FN-LINT-CONFIG]
+    provides: [config:typescript]
+    owns_paths: [packages/config/tsconfig/]
+    task_file: tasks/00-foundation/T-FN-TS-CONFIG.md
+    est_effort: S
+
+  - id: T-FN-LINT-CONFIG
+    stage: 00-foundation
+    title: Shared ESLint + Prettier config
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-MONOREPO]
+    parallel_safe_with: [T-FN-TS-CONFIG]
+    provides: [config:lint]
+    owns_paths: [packages/config/eslint/, packages/config/prettier/]
+    task_file: tasks/00-foundation/T-FN-LINT-CONFIG.md
+    est_effort: S
+
+  - id: T-FN-GITHUB
+    stage: 00-foundation
+    title: GitHub repo, branch protection, PR template
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-MONOREPO]
+    parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG]
+    provides: [github:repo]
+    owns_paths: [.github/]
+    task_file: tasks/00-foundation/T-FN-GITHUB.md
+    est_effort: S
+
+  - id: T-FN-CI
+    stage: 00-foundation
+    title: GitHub Actions CI skeleton (lint, typecheck, test)
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-MONOREPO, T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
+    parallel_safe_with: []
+    provides: [ci:skeleton]
+    owns_paths: [.github/workflows/]
+    task_file: tasks/00-foundation/T-FN-CI.md
+    est_effort: M
+
+  - id: T-FN-DOCKER
+    stage: 00-foundation
+    title: Docker Compose for local dev (Postgres, MinIO, Mailpit)
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-MONOREPO]
+    parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
+    provides: [infra:local-docker]
+    owns_paths: [infra/docker-compose.yml, infra/docker/, .env.example]
+    task_file: tasks/00-foundation/T-FN-DOCKER.md
+    est_effort: M
+
+  - id: T-FN-SUPABASE-LOCAL
+    stage: 00-foundation
+    title: Supabase local dev via supabase-cli
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-DOCKER]
+    parallel_safe_with: []
+    provides: [infra:supabase-local]
+    owns_paths: [infra/supabase/]
+    task_file: tasks/00-foundation/T-FN-SUPABASE-LOCAL.md
+    est_effort: M
+
+  - id: T-FN-DB-MIGRATIONS
+    stage: 00-foundation
+    title: Drizzle ORM + migration tooling
+    agent_role: backend
+    status: pending
+    depends_on: [T-FN-SUPABASE-LOCAL, T-FN-TS-CONFIG]
+    parallel_safe_with: []
+    provides: [db:migrations]
+    owns_paths: [packages/db/package.json, packages/db/drizzle.config.ts, packages/db/src/index.ts, packages/db/src/client.ts]
+    task_file: tasks/00-foundation/T-FN-DB-MIGRATIONS.md
+    est_effort: M
+
+  - id: T-FN-ORCHESTRATOR-SCRIPTS
+    stage: 00-foundation
+    title: Worktree spawn/cleanup scripts and orchestrator config
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-GITHUB]
+    parallel_safe_with: [T-FN-DOCKER, T-FN-CI]
+    provides: [orchestrator:scripts]
+    owns_paths: [scripts/spawn_worktree.sh, scripts/cleanup_worktree.sh, scripts/orchestrator.config.json, scripts/README.md]
+    task_file: tasks/00-foundation/T-FN-ORCHESTRATOR-SCRIPTS.md
+    est_effort: S
+
+  - id: T-FN-ENV-CONVENTIONS
+    stage: 00-foundation
+    title: Environment variable conventions and .env.example
+    agent_role: devops
+    status: pending
+    depends_on: [T-FN-DOCKER]
+    parallel_safe_with: [T-FN-SUPABASE-LOCAL, T-FN-ORCHESTRATOR-SCRIPTS]
+    provides: [config:env]
+    owns_paths: [.env.example, docs/env.md]
+    task_file: tasks/00-foundation/T-FN-ENV-CONVENTIONS.md
+    est_effort: S
+
+  # ============================================================
+  # PHASE 1 — DATA LAYER (parallel-heavy)
+  # ============================================================
+  - id: T-DL-SCHEMA-CARDS
+    stage: 01-data-layer
+    title: DB schema for sets, cards, printings
+    agent_role: backend
+    status: pending
+    depends_on: [T-FN-DB-MIGRATIONS]
+    parallel_safe_with: [T-DL-SCHEMA-USERS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
+    provides: [schema:cards, schema:sets, schema:printings]
+    owns_paths: [packages/db/src/schema/sets.ts, packages/db/src/schema/cards.ts, packages/db/src/schema/printings.ts]
+    task_file: tasks/01-data-layer/T-DL-SCHEMA-CARDS.md
+    est_effort: M
+
+  - id: T-DL-SCHEMA-USERS
+    stage: 01-data-layer
+    title: DB schema for profiles + subscriptions
+    agent_role: backend
+    status: pending
+    depends_on: [T-FN-DB-MIGRATIONS]
+    parallel_safe_with: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
+    provides: [schema:profiles, schema:subscriptions]
+    owns_paths: [packages/db/src/schema/profiles.ts, packages/db/src/schema/subscriptions.ts]
+    task_file: tasks/01-data-layer/T-DL-SCHEMA-USERS.md
+    est_effort: S
+
+  - id: T-DL-SCHEMA-COLLECTIONS
+    stage: 01-data-layer
+    title: DB schema for collection_items, custom_collections, smart rules, shareables
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-USERS]
+    parallel_safe_with: [T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
+    provides: [schema:collections, schema:smart_rules, schema:shareables]
+    owns_paths: [packages/db/src/schema/collections.ts, packages/db/src/schema/custom_collections.ts, packages/db/src/schema/smart_rules.ts, packages/db/src/schema/shareables.ts]
+    task_file: tasks/01-data-layer/T-DL-SCHEMA-COLLECTIONS.md
+    est_effort: M
+
+  - id: T-DL-SCHEMA-GRADING
+    stage: 01-data-layer
+    title: DB schema for grading_submissions and training data
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-SCHEMA-USERS]
+    parallel_safe_with: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-PRICING]
+    provides: [schema:grading]
+    owns_paths: [packages/db/src/schema/grading.ts]
+    task_file: tasks/01-data-layer/T-DL-SCHEMA-GRADING.md
+    est_effort: S
+    stub: true
+
+  - id: T-DL-SCHEMA-PRICING
+    stage: 01-data-layer
+    title: DB schema for prices and snapshots (scaffolded, gated)
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-SCHEMA-CARDS]
+    parallel_safe_with: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING]
+    provides: [schema:pricing]
+    owns_paths: [packages/db/src/schema/prices.ts, packages/db/src/schema/price_snapshots.ts]
+    task_file: tasks/01-data-layer/T-DL-SCHEMA-PRICING.md
+    est_effort: S
+    stub: true
+
+  - id: T-DL-RLS-POLICIES
+    stage: 01-data-layer
+    title: Supabase RLS policies for all user tables
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-USERS, T-DL-SCHEMA-GRADING]
+    parallel_safe_with: []
+    provides: [security:rls]
+    owns_paths: [packages/db/src/migrations/rls/]
+    task_file: tasks/01-data-layer/T-DL-RLS-POLICIES.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-SOURCE-INTERFACES
+    stage: 01-data-layer
+    title: Standardization layer — source adapter interfaces and resolver
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SCHEMA-CARDS]
+    parallel_safe_with: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
+    provides: [pipeline:interfaces, pipeline:resolver]
+    owns_paths: [data-pipeline/src/interfaces/, data-pipeline/src/resolver/, data-pipeline/src/types.ts]
+    task_file: tasks/01-data-layer/T-DL-SOURCE-INTERFACES.md
+    est_effort: M
+
+  - id: T-DL-SOURCE-TCGDEX-EN
+    stage: 01-data-layer
+    title: TCGdex EN adapter (primary English source)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: [T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
+    provides: [adapter:tcgdex-en]
+    owns_paths: [data-pipeline/src/adapters/tcgdex-en/]
+    task_file: tasks/01-data-layer/T-DL-SOURCE-TCGDEX-EN.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-SOURCE-PTCGIO
+    stage: 01-data-layer
+    title: pokemontcg.io adapter (validation source for English)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
+    provides: [adapter:ptcgio]
+    owns_paths: [data-pipeline/src/adapters/ptcgio/]
+    task_file: tasks/01-data-layer/T-DL-SOURCE-PTCGIO.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-SOURCE-BULBAPEDIA
+    stage: 01-data-layer
+    title: Bulbapedia adapter (validation/filler)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-TCGDEX-JP]
+    provides: [adapter:bulbapedia]
+    owns_paths: [data-pipeline/src/adapters/bulbapedia/]
+    task_file: tasks/01-data-layer/T-DL-SOURCE-BULBAPEDIA.md
+    est_effort: L
+    stub: true
+
+  - id: T-DL-SOURCE-TCGDEX-JP
+    stage: 01-data-layer
+    title: TCGdex JP adapter + Pokemon-Card.com fallback (Japanese primary)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA]
+    provides: [adapter:tcgdex-jp, adapter:pokemoncard-jp]
+    owns_paths: [data-pipeline/src/adapters/tcgdex-jp/, data-pipeline/src/adapters/pokemoncard-jp/]
+    task_file: tasks/01-data-layer/T-DL-SOURCE-TCGDEX-JP.md
+    est_effort: L
+    stub: true
+
+  - id: T-DL-PRICING-AGGREGATOR
+    stage: 01-data-layer
+    title: Pricing aggregator adapter (Layer 1 — eBay sold + Cardmarket via paid API)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING]
+    parallel_safe_with: [T-DL-PRICING-EBAY-BROWSE, T-DL-EBAY-LISTING-PARSER, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
+    provides: [adapter:pricing-aggregator]
+    owns_paths: [data-pipeline/src/adapters/pricing-aggregator/]
+    task_file: tasks/01-data-layer/T-DL-PRICING-AGGREGATOR.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-EBAY-LISTING-PARSER
+    stage: 01-data-layer
+    title: eBay listing title parser (slab + grade + condition + card identification)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-CARDS]
+    parallel_safe_with: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
+    provides: [util:ebay-listing-parser]
+    owns_paths: [data-pipeline/src/parsers/ebay-listing/]
+    task_file: tasks/01-data-layer/T-DL-EBAY-LISTING-PARSER.md
+    est_effort: L
+    stub: true
+
+  - id: T-DL-PRICING-EBAY-BROWSE
+    stage: 01-data-layer
+    title: eBay Browse API adapter (Layer 2 — active listings, free, no approval)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING, T-DL-EBAY-LISTING-PARSER]
+    parallel_safe_with: [T-DL-PRICING-AGGREGATOR]
+    provides: [adapter:pricing-ebay-browse]
+    owns_paths: [data-pipeline/src/adapters/pricing-ebay-browse/]
+    task_file: tasks/01-data-layer/T-DL-PRICING-EBAY-BROWSE.md
+    est_effort: L
+    stub: true
+
+  - id: T-DL-PRICING-ROLLUP
+    stage: 01-data-layer
+    title: Daily price observation -> aggregate rollup job (idempotent)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE]
+    parallel_safe_with: []
+    provides: [job:pricing-rollup]
+    owns_paths: [data-pipeline/src/jobs/pricing-rollup.ts]
+    task_file: tasks/01-data-layer/T-DL-PRICING-ROLLUP.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-FX-RATES
+    stage: 01-data-layer
+    title: Daily FX rate ingestion (Frankfurter / ECB) for display-time conversion
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SCHEMA-PRICING]
+    parallel_safe_with: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE, T-DL-EBAY-LISTING-PARSER, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
+    provides: [job:fx-rates]
+    owns_paths: [data-pipeline/src/jobs/fx-rates.ts, data-pipeline/src/adapters/fx/]
+    task_file: tasks/01-data-layer/T-DL-FX-RATES.md
+    est_effort: S
+    stub: true
+
+  - id: T-SP-PRICING-DISPLAY
+    stage: 03-shared-packages
+    title: Pricing display package — FX-aware price formatting (lookup rate of observation date)
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-FX-RATES, T-BE-API-CONTRACTS]
+    parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-SMART-DSL, T-SP-UI-TOKENS]
+    provides: [pkg:pricing-display]
+    owns_paths: [packages/pricing-display/]
+    task_file: tasks/03-shared-packages/T-SP-PRICING-DISPLAY.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-PRICING-CURRENT-VIEW
+    stage: 01-data-layer
+    title: mv_current_price materialized view + nightly refresh
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-PRICING-ROLLUP]
+    parallel_safe_with: []
+    provides: [view:current-price]
+    owns_paths: [packages/db/src/migrations/rls/, packages/db/src/views/]
+    task_file: tasks/01-data-layer/T-DL-PRICING-CURRENT-VIEW.md
+    est_effort: S
+    stub: true
+
+  - id: T-DL-MASTER-SET-RULES
+    stage: 01-data-layer
+    title: Master set rules engine — per-set flags + tests
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SCHEMA-CARDS, T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: []
+    provides: [logic:master-set-rules]
+    owns_paths: [data-pipeline/src/master-set/]
+    task_file: tasks/01-data-layer/T-DL-MASTER-SET-RULES.md
+    est_effort: M
+    stub: true
+
+  - id: T-DL-IMAGE-PIPELINE
+    stage: 01-data-layer
+    title: Image ingestion → R2 with WebP variants and provenance metadata
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
+    provides: [pipeline:images]
+    owns_paths: [data-pipeline/src/images/, infra/r2/]
+    task_file: tasks/01-data-layer/T-DL-IMAGE-PIPELINE.md
+    est_effort: L
+    stub: true
+
+  - id: T-DL-SEED-INGEST
+    stage: 01-data-layer
+    title: Initial bulk ingest job — runs adapters → resolver → DB → R2
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP, T-DL-MASTER-SET-RULES, T-DL-IMAGE-PIPELINE, T-DL-RLS-POLICIES]
+    parallel_safe_with: []
+    provides: [data:seeded]
+    owns_paths: [data-pipeline/src/jobs/seed.ts, data-pipeline/scripts/]
+    task_file: tasks/01-data-layer/T-DL-SEED-INGEST.md
+    est_effort: L
+    stub: true
+
+  # ============================================================
+  # PHASE 2 — BACKEND CORE
+  # ============================================================
+  - id: T-BE-AUTH
+    stage: 02-backend
+    title: Supabase Auth — Google, Apple, Discord, magic link
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-RLS-POLICIES]
+    parallel_safe_with: [T-BE-API-CONTRACTS]
+    provides: [auth:flows]
+    owns_paths: [packages/auth/, infra/supabase/auth/]
+    task_file: tasks/02-backend/T-BE-AUTH.md
+    est_effort: M
+    stub: true
+
+  - id: T-BE-API-CONTRACTS
+    stage: 02-backend
+    title: Shared API contracts package (zod + types)
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-SCHEMA-COLLECTIONS]
+    parallel_safe_with: [T-BE-AUTH]
+    provides: [api:contracts]
+    owns_paths: [packages/shared-types/]
+    task_file: tasks/02-backend/T-BE-API-CONTRACTS.md
+    est_effort: M
+    stub: true
+
+  - id: T-BE-API-CLIENT
+    stage: 02-backend
+    title: Typed API client used by web and mobile
+    agent_role: backend
+    status: pending
+    depends_on: [T-BE-API-CONTRACTS, T-BE-AUTH]
+    parallel_safe_with: []
+    provides: [api:client]
+    owns_paths: [packages/api-client/]
+    task_file: tasks/02-backend/T-BE-API-CLIENT.md
+    est_effort: M
+    stub: true
+
+  - id: T-BE-EDGE-FUNCTIONS
+    stage: 02-backend
+    title: Edge Functions for collection mutations + completion recompute
+    agent_role: backend
+    status: pending
+    depends_on: [T-BE-API-CONTRACTS, T-DL-RLS-POLICIES]
+    parallel_safe_with: []
+    provides: [api:edge]
+    owns_paths: [infra/supabase/functions/]
+    task_file: tasks/02-backend/T-BE-EDGE-FUNCTIONS.md
+    est_effort: L
+    stub: true
+
+  # ============================================================
+  # PHASE 3 — SHARED PACKAGES
+  # ============================================================
+  - id: T-SP-SET-COMPLETION
+    stage: 03-shared-packages
+    title: Set completion math package (Set %, Master %, All Pokémon %)
+    agent_role: backend
+    status: pending
+    depends_on: [T-BE-API-CONTRACTS, T-DL-MASTER-SET-RULES]
+    parallel_safe_with: [T-SP-SMART-DSL, T-SP-UI-TOKENS]
+    provides: [pkg:set-completion]
+    owns_paths: [packages/set-completion/]
+    task_file: tasks/03-shared-packages/T-SP-SET-COMPLETION.md
+    est_effort: M
+    stub: true
+
+  - id: T-SP-SMART-DSL
+    stage: 03-shared-packages
+    title: Smart Collection DSL — schema, parser, evaluator
+    agent_role: backend
+    status: pending
+    depends_on: [T-BE-API-CONTRACTS]
+    parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-UI-TOKENS]
+    provides: [pkg:smart-dsl]
+    owns_paths: [packages/smart-collection-dsl/]
+    task_file: tasks/03-shared-packages/T-SP-SMART-DSL.md
+    est_effort: L
+    stub: true
+
+  - id: T-SP-UI-TOKENS
+    stage: 03-shared-packages
+    title: Tamagui design tokens + base components
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-FN-MONOREPO]
+    parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-SMART-DSL]
+    provides: [pkg:ui]
+    owns_paths: [packages/ui/]
+    task_file: tasks/03-shared-packages/T-SP-UI-TOKENS.md
+    est_effort: L
+    stub: true
+
+  # ============================================================
+  # PHASE 4 — WEB APP
+  # ============================================================
+  - id: T-W-SHELL
+    stage: 04-web
+    title: Next.js app shell, routing, layout, theme
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-SP-UI-TOKENS, T-BE-API-CLIENT]
+    parallel_safe_with: []
+    provides: [web:shell]
+    owns_paths: [apps/web/]
+    task_file: tasks/04-web/T-W-SHELL.md
+    est_effort: M
+    stub: true
+
+  - id: T-W-AUTH
+    stage: 04-web
+    title: Web auth pages and session handling
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-SHELL, T-BE-AUTH]
+    parallel_safe_with: [T-W-BROWSE]
+    provides: [web:auth]
+    owns_paths: [apps/web/app/auth/, apps/web/lib/auth/]
+    task_file: tasks/04-web/T-W-AUTH.md
+    est_effort: M
+    stub: true
+
+  - id: T-W-BROWSE
+    stage: 04-web
+    title: Browse + search (sets ordered by release desc, filters, full-text)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-SHELL, T-BE-API-CLIENT, T-DL-SEED-INGEST]
+    parallel_safe_with: [T-W-AUTH]
+    provides: [web:browse]
+    owns_paths: [apps/web/app/browse/, apps/web/app/sets/, apps/web/app/cards/]
+    task_file: tasks/04-web/T-W-BROWSE.md
+    est_effort: L
+    stub: true
+
+  - id: T-W-COLLECTION
+    stage: 04-web
+    title: Web collection home + per-set progress views
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-AUTH, T-SP-SET-COMPLETION]
+    parallel_safe_with: [T-W-CUSTOM, T-W-SMART]
+    provides: [web:collection]
+    owns_paths: [apps/web/app/collection/]
+    task_file: tasks/04-web/T-W-COLLECTION.md
+    est_effort: L
+    stub: true
+
+  - id: T-W-CUSTOM
+    stage: 04-web
+    title: Web manual custom collections (3-cap on free)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-COLLECTION]
+    parallel_safe_with: [T-W-SMART]
+    provides: [web:custom-collections]
+    owns_paths: [apps/web/app/collections/custom/]
+    task_file: tasks/04-web/T-W-CUSTOM.md
+    est_effort: M
+    stub: true
+
+  - id: T-W-SMART
+    stage: 04-web
+    title: Web smart collections (search free, save paid; gated UI)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-COLLECTION, T-SP-SMART-DSL]
+    parallel_safe_with: [T-W-CUSTOM]
+    provides: [web:smart-collections]
+    owns_paths: [apps/web/app/collections/smart/]
+    task_file: tasks/04-web/T-W-SMART.md
+    est_effort: L
+    stub: true
+
+  - id: T-W-SHAREABLE-PUBLIC
+    stage: 04-web
+    title: Public shareable pages (SSR, OG images)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-COLLECTION]
+    parallel_safe_with: []
+    provides: [web:public-shareable]
+    owns_paths: [apps/web/app/c/]
+    task_file: tasks/04-web/T-W-SHAREABLE-PUBLIC.md
+    est_effort: L
+    stub: true
+
+  - id: T-W-AFFILIATE-LINKS
+    stage: 04-web
+    title: TCGplayer affiliate "Buy" CTAs on card detail (web + mobile)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-BROWSE]
+    parallel_safe_with: []
+    provides: [web:affiliate-links]
+    owns_paths: [apps/web/lib/affiliate/, apps/web/components/buy-cta/, apps/mobile/src/components/buy-cta/]
+    task_file: tasks/04-web/T-W-AFFILIATE-LINKS.md
+    est_effort: S
+    stub: true
+
+  # ============================================================
+  # PHASE 5 — MOBILE APP
+  # ============================================================
+  - id: T-M-SHELL
+    stage: 05-mobile
+    title: Expo app shell — navigation, tabs, theme
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-SP-UI-TOKENS, T-BE-API-CLIENT]
+    parallel_safe_with: []
+    provides: [mobile:shell]
+    owns_paths: [apps/mobile/]
+    task_file: tasks/05-mobile/T-M-SHELL.md
+    est_effort: M
+    stub: true
+
+  - id: T-M-AUTH
+    stage: 05-mobile
+    title: Mobile auth flows (Google, Apple, Discord, magic link)
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-SHELL, T-BE-AUTH]
+    parallel_safe_with: [T-M-BROWSE]
+    provides: [mobile:auth]
+    owns_paths: [apps/mobile/src/screens/auth/, apps/mobile/src/lib/auth/]
+    task_file: tasks/05-mobile/T-M-AUTH.md
+    est_effort: M
+    stub: true
+
+  - id: T-M-BROWSE
+    stage: 05-mobile
+    title: Mobile browse, set, card detail
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-SHELL, T-DL-SEED-INGEST]
+    parallel_safe_with: [T-M-AUTH]
+    provides: [mobile:browse]
+    owns_paths: [apps/mobile/src/screens/browse/, apps/mobile/src/screens/set/, apps/mobile/src/screens/card/]
+    task_file: tasks/05-mobile/T-M-BROWSE.md
+    est_effort: L
+    stub: true
+
+  - id: T-M-COLLECTION
+    stage: 05-mobile
+    title: Mobile collection home + per-set progress
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-AUTH, T-SP-SET-COMPLETION]
+    parallel_safe_with: [T-M-CUSTOM]
+    provides: [mobile:collection]
+    owns_paths: [apps/mobile/src/screens/collection/]
+    task_file: tasks/05-mobile/T-M-COLLECTION.md
+    est_effort: L
+    stub: true
+
+  - id: T-M-CUSTOM
+    stage: 05-mobile
+    title: Mobile custom + smart collections (with gating)
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-COLLECTION, T-SP-SMART-DSL]
+    parallel_safe_with: []
+    provides: [mobile:custom-collections]
+    owns_paths: [apps/mobile/src/screens/collections/]
+    task_file: tasks/05-mobile/T-M-CUSTOM.md
+    est_effort: L
+    stub: true
+
+  # ============================================================
+  # PHASE 6 — SCANNER
+  # ============================================================
+  - id: T-SC-CAMERA
+    stage: 06-scanner
+    title: Camera + frame processor infrastructure (vision-camera)
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-SHELL]
+    parallel_safe_with: [T-SC-EMBED-MODEL]
+    provides: [scanner:camera]
+    owns_paths: [apps/mobile/src/scanner/camera/]
+    task_file: tasks/06-scanner/T-SC-CAMERA.md
+    est_effort: M
+    stub: true
+
+  - id: T-SC-DETECT
+    stage: 06-scanner
+    title: Card rectangle detection + perspective correction
+    agent_role: ml
+    status: pending
+    depends_on: [T-SC-CAMERA]
+    parallel_safe_with: [T-SC-EMBED-MODEL]
+    provides: [scanner:detect]
+    owns_paths: [apps/mobile/src/scanner/detect/]
+    task_file: tasks/06-scanner/T-SC-DETECT.md
+    est_effort: L
+    stub: true
+
+  - id: T-SC-EMBED-MODEL
+    stage: 06-scanner
+    title: Choose + bundle embedding model (TFLite)
+    agent_role: ml
+    status: pending
+    depends_on: [T-DL-IMAGE-PIPELINE]
+    parallel_safe_with: [T-SC-CAMERA, T-SC-DETECT]
+    provides: [scanner:embed-model]
+    owns_paths: [apps/api-python/embeddings/, apps/mobile/src/scanner/embed/]
+    task_file: tasks/06-scanner/T-SC-EMBED-MODEL.md
+    est_effort: L
+    stub: true
+
+  - id: T-SC-ANN-INDEX
+    stage: 06-scanner
+    title: ANN index build (server) + on-device load
+    agent_role: ml
+    status: pending
+    depends_on: [T-SC-EMBED-MODEL]
+    parallel_safe_with: []
+    provides: [scanner:ann-index]
+    owns_paths: [apps/api-python/ann/, apps/mobile/src/scanner/ann/]
+    task_file: tasks/06-scanner/T-SC-ANN-INDEX.md
+    est_effort: L
+    stub: true
+
+  - id: T-SC-MATCH
+    stage: 06-scanner
+    title: On-device match pipeline + confidence calibration
+    agent_role: ml
+    status: pending
+    depends_on: [T-SC-DETECT, T-SC-ANN-INDEX]
+    parallel_safe_with: []
+    provides: [scanner:match]
+    owns_paths: [apps/mobile/src/scanner/match/]
+    task_file: tasks/06-scanner/T-SC-MATCH.md
+    est_effort: L
+    stub: true
+
+  - id: T-SC-UX
+    stage: 06-scanner
+    title: Continuous scan UX — auto-add, disambiguation, undo, session footer
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-SC-MATCH, T-M-COLLECTION]
+    parallel_safe_with: []
+    provides: [scanner:ux]
+    owns_paths: [apps/mobile/src/scanner/ui/, apps/mobile/src/screens/scan/]
+    task_file: tasks/06-scanner/T-SC-UX.md
+    est_effort: L
+    stub: true
+
+  # ============================================================
+  # PHASE 7 — GRADING
+  # ============================================================
+  - id: T-GR-CAPTURE-UX
+    stage: 07-grading
+    title: Multi-shot guided capture flow
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-SC-CAMERA]
+    parallel_safe_with: [T-GR-CENTERING, T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
+    provides: [grading:capture-ux]
+    owns_paths: [apps/mobile/src/grading/capture/]
+    task_file: tasks/07-grading/T-GR-CAPTURE-UX.md
+    est_effort: L
+    stub: true
+
+  - id: T-GR-CENTERING
+    stage: 07-grading
+    title: Centering measurement (geometric, deterministic)
+    agent_role: ml
+    status: pending
+    depends_on: [T-GR-CAPTURE-UX]
+    parallel_safe_with: [T-GR-CORNERS, T-GR-EDGES, T-GR-SURFACE]
+    provides: [grading:centering]
+    owns_paths: [apps/api-python/grading/centering/, apps/mobile/src/grading/centering/]
+    task_file: tasks/07-grading/T-GR-CENTERING.md
+    est_effort: M
+    stub: true
+
+  - id: T-GR-DATA-PSA
+    stage: 07-grading
+    title: PSA cert lookup scraper (rate-limited, ToS-aware)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SCHEMA-GRADING]
+    parallel_safe_with: [T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS, T-GR-CAPTURE-UX]
+    provides: [grading:data-psa]
+    owns_paths: [apps/api-python/grading/scrapers/psa/]
+    task_file: tasks/07-grading/T-GR-DATA-PSA.md
+    est_effort: L
+    stub: true
+
+  - id: T-GR-DATA-EBAY
+    stage: 07-grading
+    title: eBay sold listings scraper for graded slabs
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SCHEMA-GRADING]
+    parallel_safe_with: [T-GR-DATA-PSA, T-GR-DATA-AUCTIONS, T-GR-CAPTURE-UX]
+    provides: [grading:data-ebay]
+    owns_paths: [apps/api-python/grading/scrapers/ebay/]
+    task_file: tasks/07-grading/T-GR-DATA-EBAY.md
+    est_effort: L
+    stub: true
+
+  - id: T-GR-DATA-AUCTIONS
+    stage: 07-grading
+    title: PWCC + Goldin auction archive scrapers
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-SCHEMA-GRADING]
+    parallel_safe_with: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-CAPTURE-UX]
+    provides: [grading:data-auctions]
+    owns_paths: [apps/api-python/grading/scrapers/auctions/]
+    task_file: tasks/07-grading/T-GR-DATA-AUCTIONS.md
+    est_effort: M
+    stub: true
+
+  - id: T-GR-CORNERS
+    stage: 07-grading
+    title: Corners subgrade model (training + inference)
+    agent_role: ml
+    status: pending
+    depends_on: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
+    parallel_safe_with: [T-GR-EDGES, T-GR-SURFACE, T-GR-CENTERING]
+    provides: [grading:corners]
+    owns_paths: [apps/api-python/grading/corners/, apps/mobile/src/grading/corners/]
+    task_file: tasks/07-grading/T-GR-CORNERS.md
+    est_effort: L
+    stub: true
+
+  - id: T-GR-EDGES
+    stage: 07-grading
+    title: Edges subgrade model (training + inference)
+    agent_role: ml
+    status: pending
+    depends_on: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
+    parallel_safe_with: [T-GR-CORNERS, T-GR-SURFACE, T-GR-CENTERING]
+    provides: [grading:edges]
+    owns_paths: [apps/api-python/grading/edges/, apps/mobile/src/grading/edges/]
+    task_file: tasks/07-grading/T-GR-EDGES.md
+    est_effort: L
+    stub: true
+
+  - id: T-GR-SURFACE
+    stage: 07-grading
+    title: Surface subgrade model (training + inference)
+    agent_role: ml
+    status: pending
+    depends_on: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
+    parallel_safe_with: [T-GR-CORNERS, T-GR-EDGES, T-GR-CENTERING]
+    provides: [grading:surface]
+    owns_paths: [apps/api-python/grading/surface/, apps/mobile/src/grading/surface/]
+    task_file: tasks/07-grading/T-GR-SURFACE.md
+    est_effort: L
+    stub: true
+
+  - id: T-GR-AGGREGATE
+    stage: 07-grading
+    title: Subgrade aggregation + calibration to PSA + confidence band
+    agent_role: ml
+    status: pending
+    depends_on: [T-GR-CENTERING, T-GR-CORNERS, T-GR-EDGES, T-GR-SURFACE]
+    parallel_safe_with: []
+    provides: [grading:aggregate]
+    owns_paths: [apps/api-python/grading/aggregate/, apps/mobile/src/grading/aggregate/]
+    task_file: tasks/07-grading/T-GR-AGGREGATE.md
+    est_effort: M
+    stub: true
+
+  - id: T-GR-COMMUNITY-FLYWHEEL
+    stage: 07-grading
+    title: Community submission flywheel (paid users upload graded outcomes)
+    agent_role: backend
+    status: pending
+    depends_on: [T-GR-AGGREGATE, T-PB-ENTITLEMENTS]
+    parallel_safe_with: []
+    provides: [grading:flywheel]
+    owns_paths: [apps/mobile/src/grading/community/, apps/api-python/grading/flywheel/]
+    task_file: tasks/07-grading/T-GR-COMMUNITY-FLYWHEEL.md
+    est_effort: M
+    stub: true
+
+  # ============================================================
+  # PHASE 8 — SHAREABLES
+  # ============================================================
+  - id: T-SH-CONFIG-MODEL
+    stage: 08-shareables
+    title: Shareable configuration model + management UI (web + mobile)
+    agent_role: backend
+    status: pending
+    depends_on: [T-W-COLLECTION, T-M-COLLECTION]
+    parallel_safe_with: [T-SH-OG-IMAGES]
+    provides: [shareables:config]
+    owns_paths: [apps/web/app/settings/shareables/, apps/mobile/src/screens/shareables/]
+    task_file: tasks/08-shareables/T-SH-CONFIG-MODEL.md
+    est_effort: M
+    stub: true
+
+  - id: T-SH-OG-IMAGES
+    stage: 08-shareables
+    title: Dynamic OG image generation (Vercel OG / Satori)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-SHAREABLE-PUBLIC]
+    parallel_safe_with: [T-SH-CONFIG-MODEL]
+    provides: [shareables:og]
+    owns_paths: [apps/web/app/api/og/]
+    task_file: tasks/08-shareables/T-SH-OG-IMAGES.md
+    est_effort: M
+    stub: true
+
+  - id: T-SH-THEMES
+    stage: 08-shareables
+    title: Themed shareables (paid)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-SH-CONFIG-MODEL, T-PB-ENTITLEMENTS]
+    parallel_safe_with: []
+    provides: [shareables:themes]
+    owns_paths: [apps/web/app/c/themes/]
+    task_file: tasks/08-shareables/T-SH-THEMES.md
+    est_effort: M
+    stub: true
+
+  # ============================================================
+  # PHASE 9 — OFFLINE / SYNC
+  # ============================================================
+  - id: T-OF-LOCAL-DB
+    stage: 09-offline-sync
+    title: Mobile SQLite schema mirror + local repository layer
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-COLLECTION]
+    parallel_safe_with: [T-OF-QUEUE]
+    provides: [offline:local-db]
+    owns_paths: [apps/mobile/src/db/, apps/mobile/src/repositories/]
+    task_file: tasks/09-offline-sync/T-OF-LOCAL-DB.md
+    est_effort: L
+    stub: true
+
+  - id: T-OF-QUEUE
+    stage: 09-offline-sync
+    title: Mutation queue + replay engine
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-OF-LOCAL-DB]
+    parallel_safe_with: []
+    provides: [offline:queue]
+    owns_paths: [apps/mobile/src/sync/queue/]
+    task_file: tasks/09-offline-sync/T-OF-QUEUE.md
+    est_effort: M
+    stub: true
+
+  - id: T-OF-CONFLICTS
+    stage: 09-offline-sync
+    title: Conflict resolution (last-write-wins + log)
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-OF-QUEUE]
+    parallel_safe_with: []
+    provides: [offline:conflicts]
+    owns_paths: [apps/mobile/src/sync/conflicts/]
+    task_file: tasks/09-offline-sync/T-OF-CONFLICTS.md
+    est_effort: M
+    stub: true
+
+  # ============================================================
+  # PHASE 10 — PAYWALL / BILLING
+  # ============================================================
+  - id: T-PB-REVENUECAT
+    stage: 10-paywall-billing
+    title: RevenueCat SDK integration (mobile)
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-M-AUTH]
+    parallel_safe_with: [T-PB-PADDLE]
+    provides: [billing:revenuecat]
+    owns_paths: [apps/mobile/src/billing/]
+    task_file: tasks/10-paywall-billing/T-PB-REVENUECAT.md
+    est_effort: M
+    stub: true
+
+  - id: T-PB-PADDLE
+    stage: 10-paywall-billing
+    title: Paddle checkout (web; MoR with RC integration)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-W-AUTH]
+    parallel_safe_with: [T-PB-REVENUECAT]
+    provides: [billing:paddle]
+    owns_paths: [apps/web/app/billing/, apps/web/app/api/paddle/]
+    task_file: tasks/10-paywall-billing/T-PB-PADDLE.md
+    est_effort: M
+    stub: true
+
+  - id: T-PB-ENTITLEMENTS
+    stage: 10-paywall-billing
+    title: Unified entitlement service (RC as source of truth)
+    agent_role: backend
+    status: pending
+    depends_on: [T-PB-REVENUECAT, T-PB-PADDLE]
+    parallel_safe_with: []
+    provides: [billing:entitlements]
+    owns_paths: [packages/entitlements/, infra/supabase/functions/entitlements/]
+    task_file: tasks/10-paywall-billing/T-PB-ENTITLEMENTS.md
+    est_effort: M
+    stub: true
+
+  - id: T-PB-GATING
+    stage: 10-paywall-billing
+    title: Free vs paid feature gating across web and mobile
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-PB-ENTITLEMENTS]
+    parallel_safe_with: []
+    provides: [billing:gating]
+    owns_paths: [packages/feature-flags/, apps/web/lib/gating/, apps/mobile/src/lib/gating/]
+    task_file: tasks/10-paywall-billing/T-PB-GATING.md
+    est_effort: M
+    stub: true
+
+  # ============================================================
+  # PHASE 11 — DEPLOYMENT
+  # ============================================================
+  - id: T-DP-VERCEL
+    stage: 11-deployment
+    title: Vercel deployment for web
+    agent_role: devops
+    status: pending
+    depends_on: [T-W-SHELL]
+    parallel_safe_with: [T-DP-FLY, T-DP-SUPABASE-PROD, T-DP-R2-PROD]
+    provides: [deploy:vercel]
+    owns_paths: [apps/web/vercel.json, .github/workflows/deploy-web.yml]
+    task_file: tasks/11-deployment/T-DP-VERCEL.md
+    est_effort: S
+    stub: true
+
+  - id: T-DP-FLY
+    stage: 11-deployment
+    title: Fly.io deployment for Python services
+    agent_role: devops
+    status: pending
+    depends_on: [T-SC-ANN-INDEX, T-GR-AGGREGATE]
+    parallel_safe_with: [T-DP-VERCEL, T-DP-SUPABASE-PROD, T-DP-R2-PROD]
+    provides: [deploy:fly]
+    owns_paths: [infra/fly/, .github/workflows/deploy-fly.yml]
+    task_file: tasks/11-deployment/T-DP-FLY.md
+    est_effort: M
+    stub: true
+
+  - id: T-DP-SUPABASE-PROD
+    stage: 11-deployment
+    title: Supabase production project + migrations CI
+    agent_role: devops
+    status: pending
+    depends_on: [T-DL-RLS-POLICIES]
+    parallel_safe_with: [T-DP-VERCEL, T-DP-FLY, T-DP-R2-PROD]
+    provides: [deploy:supabase]
+    owns_paths: [infra/supabase/production/, .github/workflows/deploy-db.yml]
+    task_file: tasks/11-deployment/T-DP-SUPABASE-PROD.md
+    est_effort: M
+    stub: true
+
+  - id: T-DP-R2-PROD
+    stage: 11-deployment
+    title: R2 production buckets + access keys
+    agent_role: devops
+    status: pending
+    depends_on: [T-DL-IMAGE-PIPELINE]
+    parallel_safe_with: [T-DP-VERCEL, T-DP-FLY, T-DP-SUPABASE-PROD]
+    provides: [deploy:r2]
+    owns_paths: [infra/r2/production/]
+    task_file: tasks/11-deployment/T-DP-R2-PROD.md
+    est_effort: S
+    stub: true
+
+  - id: T-DP-EAS
+    stage: 11-deployment
+    title: EAS Build + Submit for iOS/Android
+    agent_role: devops
+    status: pending
+    depends_on: [T-M-SHELL]
+    parallel_safe_with: []
+    provides: [deploy:eas]
+    owns_paths: [apps/mobile/eas.json, .github/workflows/deploy-mobile.yml]
+    task_file: tasks/11-deployment/T-DP-EAS.md
+    est_effort: M
+    stub: true
+
+  - id: T-DP-MONITORING
+    stage: 11-deployment
+    title: Sentry + PostHog wiring across web/mobile/python
+    agent_role: devops
+    status: pending
+    depends_on: [T-DP-VERCEL, T-DP-FLY, T-DP-EAS]
+    parallel_safe_with: []
+    provides: [deploy:monitoring]
+    owns_paths: [packages/observability/, apps/web/lib/observability/, apps/mobile/src/lib/observability/]
+    task_file: tasks/11-deployment/T-DP-MONITORING.md
+    est_effort: M
+    stub: true
