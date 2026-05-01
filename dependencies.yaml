@@ -21,7 +21,7 @@ tasks:
     stage: 00-foundation
     title: Initialize Turborepo monorepo with pnpm
     agent_role: devops
-    status: pending
+    status: in_progress
     depends_on: []
     parallel_safe_with: []
     provides: [monorepo:scaffold]
