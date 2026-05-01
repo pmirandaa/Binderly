@@ -69,7 +69,7 @@ tasks:
     stage: 00-foundation
     title: GitHub Actions CI skeleton (lint, typecheck, test)
     agent_role: devops
-    status: in_progress
+    status: merged
     depends_on: [T-FN-MONOREPO, T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
     parallel_safe_with: []
     provides: [ci:skeleton]

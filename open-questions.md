@@ -62,6 +62,22 @@ that, sub-agents will use `gh pr create --base main` automatically.
 
 **Pablo's answer:** done with option 1, auth should work
 
+**Orchestrator follow-up (2026-04-30, post-T-FN-CI):** still broken.
+`gh auth status` returns:
+```
+github.com
+  X Failed to log in to github.com account pmirandaa (keyring)
+  - Active account: true
+  - The token in keyring is invalid.
+```
+Pablo: please re-run `gh auth login -h github.com` (HTTPS, paste a
+fresh PAT with `repo` + `workflow` + `admin:public_key` scopes, or
+the device-code flow). The orchestrator will run the default-branch
+swap + master deletion + `gh pr create` automation as soon as
+`gh auth status` returns clean. Until then, the manual
+"open this URL to create a PR" loop continues; all 6 merged Phase-0
+PRs were opened that way and it's working.
+
 ---
 
 ## Q-002 — Docker Desktop daemon not running; T-FN-DOCKER blocked
