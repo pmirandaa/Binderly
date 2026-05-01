@@ -118,7 +118,7 @@ tasks:
     stage: 00-foundation
     title: Worktree spawn/cleanup scripts and orchestrator config
     agent_role: devops
-    status: in_progress
+    status: merged
     depends_on: [T-FN-GITHUB]
     parallel_safe_with: [T-FN-DOCKER, T-FN-CI]
     provides: [orchestrator:scripts]
