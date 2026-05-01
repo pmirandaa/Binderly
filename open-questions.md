@@ -60,7 +60,7 @@ sub-agents who *push* their branches and print the GitHub
 summary. Pablo opens those PRs manually until `gh` is re-authed; after
 that, sub-agents will use `gh pr create --base main` automatically.
 
-**Pablo's answer:** _(empty until answered)_
+**Pablo's answer:** done with option 1, auth should work
 
 ---
 

@@ -21,7 +21,7 @@ tasks:
     stage: 00-foundation
     title: Initialize Turborepo monorepo with pnpm
     agent_role: devops
-    status: in_progress
+    status: merged
     depends_on: []
     parallel_safe_with: []
     provides: [monorepo:scaffold]
@@ -33,7 +33,7 @@ tasks:
     stage: 00-foundation
     title: Shared TypeScript config package
     agent_role: devops
-    status: pending
+    status: in_progress
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-LINT-CONFIG]
     provides: [config:typescript]
@@ -57,7 +57,7 @@ tasks:
     stage: 00-foundation
     title: GitHub repo, branch protection, PR template
     agent_role: devops
-    status: pending
+    status: in_progress
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG]
     provides: [github:repo]
@@ -81,7 +81,7 @@ tasks:
     stage: 00-foundation
     title: Docker Compose for local dev (Postgres, MinIO, Mailpit)
     agent_role: devops
-    status: pending
+    status: in_progress
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
     provides: [infra:local-docker]
