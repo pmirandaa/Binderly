@@ -64,4 +64,41 @@ that, sub-agents will use `gh pr create --base main` automatically.
 
 ---
 
+## Q-002 — Docker Desktop daemon not running; T-FN-DOCKER blocked
+
+**Raised:** 2026-04-30
+**Blocking:** T-FN-DOCKER (and transitively T-FN-SUPABASE-LOCAL,
+T-FN-DB-MIGRATIONS, T-FN-ENV-CONVENTIONS, all of Phase 1).
+
+**Context:** The T-FN-DOCKER sub-agent ran its mandatory pre-flight
+(`docker info`) and the daemon refused: *"Cannot connect to the Docker
+daemon at unix:///Users/pmiranda/.docker/run/docker.sock"*. The Docker
+CLI is installed (v28.3.3, context `desktop-linux`, darwin/arm64), but
+Docker Desktop itself isn't running. Per the task's escalation rule the
+sub-agent stopped immediately without modifying any files. The worktree
+`../binderly-wt-T-FN-DOCKER` and branch `agent/T-FN-DOCKER` are clean
+and ready for re-dispatch.
+
+**Options:**
+
+1. **Pablo starts Docker Desktop**, waits for the whale icon to go
+   solid, and tells the orchestrator. The orchestrator re-dispatches
+   T-FN-DOCKER into the existing clean worktree. Recommended — the
+   sub-agent reported it can resume from step 2 with no setup overhead.
+2. Skip Docker for now and unblock the chain via a non-Docker Postgres
+   (Homebrew). Not recommended — the spec explicitly mandates Docker
+   Compose for local-first, zero-cloud-account contributing, and many
+   later tasks (image pipeline, MinIO bucket validations) hard-depend
+   on the MinIO service.
+
+**Recommendation:** Option 1. T-FN-DOCKER stays in `dependencies.yaml`
+with `status: blocked`, `blocked_on: Q-002`. Other Phase 0 tasks
+continue dispatching in parallel; Phase 1 will block on this if it
+isn't resolved by the time the iteration-3/4 dispatch wants
+T-FN-SUPABASE-LOCAL.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
 _(no other open questions yet)_
