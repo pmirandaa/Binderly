@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Lockfiles — managed by their respective tool, never hand-formatted.
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+.turbo/
+.expo/
+.expo-shared/
+coverage/
+*.tsbuildinfo
+
+# Test / tooling caches
+.nyc_output/
+.cache/
+
+# Generated / vendored
+**/generated/
+**/__generated__/
+
+# Environment files (contents may include secrets, never reformat)
+.env
+.env.*
+!.env.example
+!.env.example.*
+
+# OS junk
+.DS_Store
+Thumbs.db

@@ -1,0 +1,25 @@
+# EditorConfig — https://editorconfig.org
+# Pinned by T-FN-LINT-CONFIG (Stage 00 foundation).
+
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Python (data-pipeline) — PEP 8 default of 4 spaces.
+[*.py]
+indent_size = 4
+
+# Markdown trailing whitespace can be syntactically meaningful (a hard
+# line break is two trailing spaces). Don't strip it.
+[*.md]
+trim_trailing_whitespace = false
+
+# Makefiles require literal tabs.
+[Makefile]
+indent_style = tab
