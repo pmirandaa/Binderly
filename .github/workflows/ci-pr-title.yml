@@ -1,0 +1,62 @@
+# Enforces a Conventional-Commits-style PR title so squash-merge commit
+# messages on `main` stay parseable by changelog/release tooling later.
+#
+# Per task T-FN-CI, the spec regex was:
+#   ^(T-[A-Z]{2}-[A-Z0-9-]+:|chore|build|docs|feat|fix|refactor|test):
+#
+# That literal pattern rejects both of the test cases the orchestrator wrote
+# into the verification step ("T-FN-CI: GitHub Actions CI skeleton" — the
+# trailing colon is doubled — and "feat(scanner): add ANN index loader" — no
+# scope-group support). The active regex below is the minimal correction:
+#   - moves the colon out of the T-XX alternative
+#   - adds an optional `(scope)` group (Conventional Commits)
+#   - tolerates an optional `!` for breaking changes
+# Documented in tasks/00-foundation/T-FN-CI.md "Notes from execution".
+#
+# Security: uses `pull_request` (NOT `pull_request_target`).
+
+name: CI / PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pr-title:
+    name: pr-title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title against Conventional Commits regex
+        env:
+          # Pass the title via env to avoid shell-injection from a malicious
+          # PR title that contains backticks or `$()`.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          regex='^(T-[A-Z]{2}-[A-Z0-9-]+|chore|build|docs|feat|fix|refactor|test)(\([a-z0-9.-]+\))?!?:[[:space:]].+'
+          if [[ "$PR_TITLE" =~ $regex ]]; then
+            echo "OK: PR title matches Conventional Commits format."
+            echo "    title : $PR_TITLE"
+            exit 0
+          fi
+          {
+            echo "PR title does not match the required Conventional Commits format."
+            echo ""
+            echo "  got     : $PR_TITLE"
+            echo "  regex   : $regex"
+            echo ""
+            echo "Examples of valid titles:"
+            echo "  - T-FN-CI: GitHub Actions CI skeleton"
+            echo "  - feat(scanner): add ANN index loader"
+            echo "  - fix(web): correct set ordering on browse page"
+            echo "  - chore: bump turbo to 2.x"
+            echo ""
+            echo "Allowed types: chore | build | docs | feat | fix | refactor | test"
+            echo "Allowed task tag prefix: T-XX-NAME (e.g. T-FN-CI, T-DL-PRICING-AGGREGATOR)"
+          } >&2
+          exit 1

@@ -1,0 +1,114 @@
+# Dependabot — weekly grouped bumps for the four ecosystems Binderly uses.
+#
+# Schema reference: https://json.schemastore.org/dependabot-2.0.json
+#
+# Groups: per task T-FN-CI, every ecosystem groups minor + patch bumps into a
+# single PR per week to keep review noise down. Major bumps still open as
+# individual PRs because they may include breaking changes.
+#
+# Notes for stage 00 (foundation):
+#   - The `pip` and `docker` ecosystems are wired in now per spec; until the
+#     Python data-pipeline manifest (T-DP-* / T-DL-*) and the first Dockerfile
+#     (T-FN-DOCKER and downstream) land, Dependabot will simply emit a
+#     warning that no manifests were found in the configured directory and
+#     skip those entries on its weekly schedule. That is expected.
+#   - Times are UTC.
+#   - Conventional Commits prefixes match conventions.md.
+
+version: 2
+
+updates:
+  # ── npm (root pnpm workspace) ────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    groups:
+      npm-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - npm
+    commit-message:
+      prefix: build
+      prefix-development: build
+      include: scope
+
+  # ── GitHub Actions ───────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    groups:
+      github-actions-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: ci
+      include: scope
+
+  # ── pip (Python data-pipeline) ───────────────────────────────────────────
+  # Forward-looking: the data-pipeline workspace currently contains only
+  # `.gitkeep`. Dependabot will warn until a requirements file lands.
+  - package-ecosystem: pip
+    directory: "/data-pipeline"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    groups:
+      pip-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - pip
+    commit-message:
+      prefix: build
+      include: scope
+
+  # ── Docker base images ───────────────────────────────────────────────────
+  # Forward-looking: no Dockerfiles exist yet. When `apps/api-python` and the
+  # local docker-compose stack land, Dependabot will start tracking their
+  # base-image digests/tags from this directory root.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 10
+    groups:
+      docker-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    labels:
+      - dependencies
+      - docker
+    commit-message:
+      prefix: build
+      include: scope
