@@ -61,3 +61,53 @@ scripts/                Orchestrator helpers (worktree management, etc.)
 | Phase 0 (foundation) tasks | Fully written |
 | Phase 1 (data layer) tasks | Fully written |
 | Phase 2–11 tasks | Stubbed; orchestrator elaborates them when their stage becomes ready (see `AGENT_ORCHESTRATOR.md` § Stub Elaboration) |
+
+## Getting started
+
+Binderly is a Turborepo monorepo managed with pnpm workspaces. Versions are
+pinned exactly (no `^` / `~`) in `package.json`, `.nvmrc`, and
+`pnpm-workspace.yaml`.
+
+### Prerequisites
+
+- **Node.js 22 LTS** — pinned in [`.nvmrc`](./.nvmrc). If you use
+  [nvm](https://github.com/nvm-sh/nvm), run `nvm install` then `nvm use`.
+- **pnpm** — managed by Node's built-in [Corepack](https://nodejs.org/api/corepack.html).
+  Do **not** `npm i -g pnpm`. Instead:
+
+  ```bash
+  corepack enable
+  corepack prepare pnpm@9.15.9 --activate
+  ```
+
+  Corepack reads the `packageManager` field in `package.json` and pins pnpm
+  for everyone working on the repo.
+
+### Install & run
+
+```bash
+pnpm install        # install all workspace dependencies
+pnpm dev            # start every app in dev mode (Turbo fan-out)
+pnpm build          # build everything
+pnpm test           # run all tests
+pnpm lint           # lint everything
+pnpm typecheck      # typecheck everything
+pnpm format         # format everything
+```
+
+All scripts delegate to Turbo; each workspace package may define its own
+`dev` / `build` / `test` / `lint` / `typecheck` / `format` script. See
+`turbo.json` for the task pipeline (caching, dependencies, outputs).
+
+### Workspace layout
+
+The workspace globs are declared in `pnpm-workspace.yaml`:
+
+```
+apps/*           # user-facing apps (web, mobile, api-python, …)
+packages/*       # shared TypeScript packages
+data-pipeline    # ingestion + standardization layer (single workspace)
+```
+
+Phase-0 lands the empty skeleton only — actual apps and packages are
+created by their respective foundation, data-layer, and feature tasks.

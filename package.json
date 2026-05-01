@@ -1,0 +1,23 @@
+{
+  "name": "binderly",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Binderly — Pokémon TCG collection tracker. Monorepo root.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": "22.22.2",
+    "pnpm": "9.15.9"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "turbo run format"
+  },
+  "devDependencies": {
+    "turbo": "2.9.6"
+  }
+}
