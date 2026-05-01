@@ -33,7 +33,7 @@ tasks:
     stage: 00-foundation
     title: Shared TypeScript config package
     agent_role: devops
-    status: in_progress
+    status: merged
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-LINT-CONFIG]
     provides: [config:typescript]
