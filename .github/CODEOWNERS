@@ -1,0 +1,13 @@
+# CODEOWNERS
+#
+# Every file in this repo is owned by Pablo by default. GitHub will auto-
+# request review from listed owners on any PR that touches matching paths.
+#
+# TODO: replace <pablo-username> below with Pablo's actual GitHub login
+# (the git remote org is `pmirandaa`, but the personal login may differ).
+# Until this is replaced with a real handle, CODEOWNERS-based review
+# requirements under branch protection will NOT enforce anything.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+
+* @<pablo-username>

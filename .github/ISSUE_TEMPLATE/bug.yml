@@ -1,0 +1,66 @@
+name: Bug report
+description: Report something that is broken or behaving unexpectedly.
+title: "bug: <short summary>"
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please include enough detail for someone to
+        reproduce the issue without back-and-forth. Do not paste secrets,
+        tokens, or personal data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences describing the bug.
+      placeholder: "Scanning a holo card returns the wrong variant 30% of the time."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that reliably produce the bug.
+      placeholder: |
+        1. Open the mobile app on iOS 18.
+        2. Tap "Scan".
+        3. Point at a 1999 Base Set Charizard holo.
+        4. Observe variant classification.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: App + version, OS + version, device, browser if applicable.
+      placeholder: "iOS 18.2, iPhone 15 Pro, Binderly mobile 0.3.1"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Redact any secrets or PII before pasting.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submit checklist
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: I have redacted secrets and personal data from this report.
+          required: true

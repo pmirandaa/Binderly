@@ -70,4 +70,52 @@ origin` has been done.
   meaningful.
 
 ## Notes from execution
-_(empty)_
+
+**Executed:** 2026-04-30 by sub-agent on branch `agent/T-FN-GITHUB`.
+
+**Deliverables shipped** (all under `owns_paths` = `.github/` plus the
+explicitly-allowed `docs/github-setup.md`):
+
+- `.github/pull_request_template.md` — `What` / `Why` / `Acceptance` /
+  `Notes` / `Out of scope` sections. Title-line comment references the
+  `T-XX-XXX: <title>` agent-PR format from `context/conventions.md` § PRs.
+- `.github/ISSUE_TEMPLATE/bug.yml` — GitHub form schema, validated with
+  `python3 -c "yaml.safe_load(...)"`.
+- `.github/ISSUE_TEMPLATE/feature.yml` — form schema, validated.
+- `.github/ISSUE_TEMPLATE/config.yml` — `blank_issues_enabled: false` plus
+  a pointer to GitHub Security Advisories for vuln reports.
+- `.github/CODEOWNERS` — `* @<pablo-username>` with a `# TODO: replace
+  <pablo-username>` comment calling out that CODEOWNERS-enforced review
+  under branch protection is a no-op until Pablo substitutes his real
+  handle.
+- `docs/github-setup.md` — step-by-step click-path + `gh` commands for
+  default-branch swap, branch protection, squash-merge settings, secrets
+  (mirroring `context/secrets-and-env.md`), variables for feature flags,
+  Actions permissions, third-party integrations, and verification.
+
+**Acceptance criteria** — all pass by inspection:
+
+- PR template renders — sections present, comments guide usage (can't be
+  tested offline without opening a PR; Pablo to confirm per §8 of the
+  setup doc).
+- CODEOWNERS placeholder clearly marked with `TODO` + explanation.
+- Setup doc is actionable — every manual step has a URL click-path *and*
+  a `gh` equivalent where the API supports it.
+- No real secrets, tokens, usernames, or emails committed. Grep for
+  common secret prefixes returned zero hits.
+
+**Escalations / open issues:**
+
+- CODEOWNERS still uses `<pablo-username>` placeholder. Branch-protection
+  Code-Owner review enforcement is a no-op until Pablo replaces it (step
+  1 of `docs/github-setup.md`). Flagged but not blocking.
+- `gh pr create` skipped per dispatch instructions (Q-001 — gh auth
+  broken). Orchestrator will open the PR from the printed URL.
+
+**Dependencies unblocked:** T-FN-CI can now rely on the PR template and
+(after Pablo applies branch protection) on the `lint` / `typecheck` /
+`test` / `build` status-check names documented in `github-setup.md` §3.
+
+**Commits:**
+- `feat(github): add PR + issue templates, CODEOWNERS, setup docs`
+- `docs(task): record T-FN-GITHUB execution notes`

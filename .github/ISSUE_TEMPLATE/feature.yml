@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose a new capability or enhancement.
+title: "feat: <short summary>"
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for new functionality or meaningful enhancements.
+        For bugs, use the bug template instead. For internal agent tasks,
+        prefer adding a task file under `tasks/<stage>/T-XX-XXX.md`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / user need
+      description: What user pain or product gap does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: A concrete proposal. Alternatives considered are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Bullet list of testable conditions that define "done".
+      placeholder: |
+        - Users can ...
+        - API returns ...
+        - Metric X improves by Y.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / out of scope
+      description: Trade-offs, dependencies, what this intentionally does NOT do.
