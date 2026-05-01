@@ -1,0 +1,6 @@
+{
+  "max_parallel": 3,
+  "branch_prefix": "agent/",
+  "worktree_prefix": "../binderly-wt-",
+  "default_main_branch": "main"
+}

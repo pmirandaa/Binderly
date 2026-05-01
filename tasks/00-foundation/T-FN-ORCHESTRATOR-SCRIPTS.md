@@ -91,4 +91,97 @@ runtime knobs (max_parallel, etc.).
   Windows, scripts need a PowerShell variant — out of scope here).
 
 ## Notes from execution
-_(empty)_
+
+### "Is this task merged?" detection strategy
+
+We scan the most recent N commit subjects on `main` for one beginning with
+`<task-id>:`. Exact recipe (used in both `cleanup_worktree.sh` and
+`list_ready_tasks.sh`):
+
+```bash
+git -C "${REPO_ROOT}" log --format=%s "${MAIN_BRANCH}" -n "${LOG_DEPTH}" \
+  | grep -qE "^${TASK_ID}:"
+```
+
+- N defaults to **200**, override via env var `BINDERLY_MERGE_LOG_DEPTH`.
+- This is reliable because the orchestrator squash-merges every PR with
+  the title `<task-id>: <human title>` (already proven by the existing
+  `T-FN-MONOREPO:` and `T-FN-GITHUB:` commits on `main`).
+- `cleanup_worktree.sh` has a secondary ancestry fallback for hypothetical
+  `--no-ff` merges: branch tip must be reachable from main *and* differ
+  from main's tip. The "differ from main's tip" guard is important — a
+  brand-new branch sitting at main's tip is a trivial ancestor but
+  represents zero merged work, and without the guard cleanup would
+  silently succeed on unmerged branches (caught during testing).
+
+### YAML parsing approach
+
+No `yq` / Python — macOS-only deps. We use a tiny awk state machine that
+emits one `id|status|dep1,dep2,...` line per task block. The state
+machine relies on the rigid formatting orchestrator-edited YAML already
+follows (one field per line, `depends_on` always inline-array).
+
+Recipe (full version in `scripts/list_ready_tasks.sh`):
+
+```awk
+/^[[:space:]]+- id: /         { emit_previous(); id = $3; status=""; deps="" }
+/^[[:space:]]+status: /       { status = $2 }
+/^[[:space:]]+depends_on: \[/ {
+  line = $0
+  sub(/^[^[]*\[/, "", line)   # strip everything up to and including [
+  sub(/\].*$/, "", line)      # strip ] and anything after
+  gsub(/[[:space:]]/, "", line)
+  deps = line
+}
+```
+
+The simpler "task exists" check used by `spawn_worktree.sh` is just:
+
+```bash
+grep -E "^[[:space:]]+- id: ${TASK_ID}$" dependencies.yaml
+```
+
+If the orchestrator ever switches `depends_on` to multi-line YAML lists,
+both the awk recipe and `scripts/README.md` must be revisited (search
+for "If we ever switch").
+
+### Test methodology
+
+Per the orchestrator's instruction, no test fixture was added to
+`dependencies.yaml`. We exercised against:
+
+- **`T-FN-SAMPLE`** and **`T-FN-NEVER-USED-XX`** — never-declared ids,
+  used to prove the "exists in deps" check rejects properly.
+- **`T-DL-FX-RATES`** — a real Phase 1 task far from any in-flight work,
+  used for the round-trip spawn → re-spawn (idempotent failure) →
+  cleanup-without-force (refused) → cleanup-with-force (succeeds) path.
+  Cleaned up immediately so no artifacts remained; verified with
+  `git worktree list` and `git branch | grep T-DL-FX-RATES`.
+
+All 9 acceptance tests passed. See PR description for the full table.
+
+### Edge cases / gotchas surfaced
+
+1. **Trivial ancestor false-positive** (described above) — the original
+   ancestry-only fallback would have approved cleanup of any
+   never-touched branch. Guarded with `branch_tip != main_tip`.
+2. **Worktree-local `dependencies.yaml`** — `list_ready_tasks.sh` reads
+   the deps file from the calling worktree, not from `main`. Inside a
+   sub-agent worktree the file reflects state at branch creation time
+   (which can lag main). The orchestrator runs from `main` so this is a
+   non-issue in practice; documented in `scripts/README.md` under
+   "Worktree discipline reminders".
+3. **`git worktree prune` writing to `.git/config`** — when
+   `cleanup_worktree.sh` runs in a writable-only-to-worktree sandbox,
+   prune logs `Operation not permitted` updating the main repo's config.
+   It's a warning only (cleanup completes, exit 0) and won't fire when
+   the orchestrator runs from the main worktree where it has full write
+   access.
+4. **No auto-fetch in `spawn_worktree.sh`** — keeps the script
+   network-free per the foundation rule. The orchestrator must
+   `git pull --ff-only` before spawning so the new branch starts from
+   the latest `main`. Documented in `scripts/README.md`.
+5. **`config:` block at top of `dependencies.yaml`** is informational
+   only; runtime knobs come from `scripts/orchestrator.config.json`.
+   They duplicate `max_parallel` and `branch_prefix` deliberately —
+   keep them in sync when one changes (called out in the README).
