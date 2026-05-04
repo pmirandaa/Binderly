@@ -1,89 +1,45 @@
 {
-  "id": "193602ad-2151-4f55-a4bb-2b429173103e",
+  "id": "49869670-cbd3-4fc9-bd15-b80d251f2cb4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.set": {
-      "name": "set",
+    "public.profile": {
+      "name": "profile",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
-        "canonical_key": {
-          "name": "canonical_key",
-          "type": "text",
+        "handle": {
+          "name": "handle",
+          "type": "citext",
           "primaryKey": false,
           "notNull": true
         },
-        "code": {
-          "name": "code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "language": {
-          "name": "language",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "series": {
-          "name": "series",
+        "display_name": {
+          "name": "display_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "release_date": {
-          "name": "release_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "printed_total": {
-          "name": "printed_total",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "total": {
-          "name": "total",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "logo_url": {
-          "name": "logo_url",
+        "avatar_url": {
+          "name": "avatar_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "symbol_url": {
-          "name": "symbol_url",
+        "bio": {
+          "name": "bio",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "master_set_rules": {
-          "name": "master_set_rules",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "source_metadata": {
-          "name": "source_metadata",
+        "preferences": {
+          "name": "preferences",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
@@ -104,43 +60,15 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "set_release_date_language_code_idx": {
-          "name": "set_release_date_language_code_idx",
-          "columns": [
-            {
-              "expression": "release_date",
-              "isExpression": false,
-              "asc": false,
-              "nulls": "last"
-            },
-            {
-              "expression": "language",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "code",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "set_canonical_key_unique": {
-          "name": "set_canonical_key_unique",
+        "profile_handle_unique": {
+          "name": "profile_handle_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "canonical_key"
+            "handle"
           ]
         }
       },
@@ -148,350 +76,65 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.card": {
-      "name": "card",
+    "public.subscription": {
+      "name": "subscription",
       "schema": "",
       "columns": {
-        "id": {
-          "name": "id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "canonical_key": {
-          "name": "canonical_key",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true
         },
-        "set_id": {
-          "name": "set_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "language": {
-          "name": "language",
+        "tier": {
+          "name": "tier",
           "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "number": {
-          "name": "number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name_localized": {
-          "name": "name_localized",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "subtype": {
-          "name": "subtype",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "hp": {
-          "name": "hp",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "illustrator": {
-          "name": "illustrator",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "flavor_text": {
-          "name": "flavor_text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attacks": {
-          "name": "attacks",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "weakness": {
-          "name": "weakness",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "resistance": {
-          "name": "resistance",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "retreat_cost": {
-          "name": "retreat_cost",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rarity": {
-          "name": "rarity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_metadata": {
-          "name": "source_metadata",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{}'::jsonb"
+          "default": "'free'"
         },
-        "created_at": {
-          "name": "created_at",
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_customer_id": {
+          "name": "external_customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expires_at": {
+          "name": "expires_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": false
         },
-        "updated_at": {
-          "name": "updated_at",
+        "last_event_at": {
+          "name": "last_event_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "card_set_id_number_idx": {
-          "name": "card_set_id_number_idx",
-          "columns": [
-            {
-              "expression": "set_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "number",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+          "notNull": false
         },
-        "card_name_trgm_idx": {
-          "name": "card_name_trgm_idx",
-          "columns": [
-            {
-              "expression": "\"name\" gin_trgm_ops",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
+        "raw": {
+          "name": "raw",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         }
       },
-      "foreignKeys": {
-        "card_set_id_set_id_fk": {
-          "name": "card_set_id_set_id_fk",
-          "tableFrom": "card",
-          "tableTo": "set",
-          "columnsFrom": [
-            "set_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
+      "indexes": {},
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "card_canonical_key_unique": {
-          "name": "card_canonical_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "canonical_key"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.printing": {
-      "name": "printing",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "variant_key": {
-          "name": "variant_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "card_id": {
-          "name": "card_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "variant_class": {
-          "name": "variant_class",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "variant_flags": {
-          "name": "variant_flags",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "ARRAY[]::text[]"
-        },
-        "variant_code": {
-          "name": "variant_code",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "include_in_master_set": {
-          "name": "include_in_master_set",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "image_small_url": {
-          "name": "image_small_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "image_large_url": {
-          "name": "image_large_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "image_source_url": {
-          "name": "image_source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_metadata": {
-          "name": "source_metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+      "checkConstraints": {
+        "subscription_tier_check": {
+          "name": "subscription_tier_check",
+          "value": "\"subscription\".\"tier\" IN ('free', 'pro')"
         }
       },
-      "indexes": {
-        "printing_card_id_idx": {
-          "name": "printing_card_id_idx",
-          "columns": [
-            {
-              "expression": "card_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "printing_master_set_idx": {
-          "name": "printing_master_set_idx",
-          "columns": [
-            {
-              "expression": "card_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "include_in_master_set = true",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "printing_card_id_card_id_fk": {
-          "name": "printing_card_id_card_id_fk",
-          "tableFrom": "printing",
-          "tableTo": "card",
-          "columnsFrom": [
-            "card_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "printing_variant_key_unique": {
-          "name": "printing_variant_key_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "variant_key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },

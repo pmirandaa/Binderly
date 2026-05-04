@@ -5,15 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1777914285171,
-      "tag": "0000_catalog_tables",
+      "when": 1777914587877,
+      "tag": "0000_user_tables",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1777914285172,
-      "tag": "0001_catalog_rls",
+      "when": 1777914687165,
+      "tag": "0001_users_rls",
       "breakpoints": true
     }
   ]
