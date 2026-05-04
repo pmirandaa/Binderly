@@ -426,4 +426,36 @@ Append to `open-questions.md` and STOP if:
 
 ## Notes from execution
 
-_(empty until the sub-agent runs)_
+- Implemented exactly as elaborated; no classifier patches needed.
+  The classifier's `include_in_master_set_default` covered every
+  decision domain the engine cares about.
+- The locked override schema mirrors `tcg-domain.md` § 2 verbatim.
+  COSMOS_PATTERN / GALAXY_PATTERN intentionally have no toggle
+  (cosmetic per Pablo's spec — they fall through to the underlying
+  class default, which is `true` for REVERSE_HOLO and so they ship
+  master-included).
+- `overridesApplied` trace fires only when the final decision differs
+  from the classifier default. This keeps the trace small for the
+  common case (defaults correct → empty trace) and matches the
+  README's "empty trace means no overrides took effect" promise.
+  Documented in README "Trace output" + tested in
+  `decide.test.ts:trace correctness`.
+- Test count: 53 new tests across `types.test.ts` (10),
+  `rules.test.ts` (13), `decide.test.ts` (24), `decide.fixtures.test.ts`
+  (6). Package total went from 154 → 207. All pass.
+- Surgical edit outside `owns_paths`: added one re-export line to
+  `data-pipeline/src/index.ts` (`export * from './master-set/index.js'`).
+  Pre-authorized in the elaborated ACs.
+- No dependency additions. zod was already a `@binderly/data-pipeline`
+  dep (added by T-DL-SOURCE-INTERFACES).
+- Downstream cues:
+  - **T-DL-SEED-INGEST** — call
+    `decideMasterSetMembership({ set, printings })` after the
+    classifier runs, BEFORE `printing.include_in_master_set` is
+    persisted. Use `parseMasterSetRules(set.masterSetRules)` if you
+    want to validate the jsonb shape upstream of the engine for a
+    cleaner error surface.
+  - **T-BE-COMPLETION-API / T-SP-SET-COMPLETION** — read the
+    materialized `printing.include_in_master_set` boolean. The partial
+    index `printing_master_set_idx` makes "missing master-set
+    printings" queries O(set size).
