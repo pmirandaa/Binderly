@@ -43,4 +43,9 @@ export * from './grading.js';
 export * from './prices.js';
 export * from './price_snapshots.js';
 
+// ============================================================
+// === T-DL-IMAGE-PIPELINE === (sidecar provenance table)
+// ============================================================
+export * from './printing_image.js';
+
 export {};
