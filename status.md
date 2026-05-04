@@ -1,44 +1,36 @@
-# Build status — Phase 1 iter 8 dispatching: PRICING-ROLLUP (the pricing pipeline cap)
+# Build status — Phase 1 iter 9 dispatching: PRICING-CURRENT-VIEW (the materialised-view cap)
 
-**Phase:** 1 — Data layer (29/109 tasks merged)
-**Merged:** 29 / 109 tasks
-**In progress:** 1 (T-DL-PRICING-ROLLUP)
+**Phase:** 1 — Data layer (30/109 tasks merged)
+**Merged:** 30 / 109 tasks
+**In progress:** 1 (T-DL-PRICING-CURRENT-VIEW)
 **Blocked:** 0
-**Blocked on humans:** 0 (Q-003 verified live by Pablo on 2026-05-04; SEED-INGEST live smoke tests pending Pablo's re-run after Q-005 fix landed — non-blocking)
+**Blocked on humans:** 0 (Q-003 verified live 2026-05-04 23:24Z; Q-005 verified live same session — clean SEED-INGEST run with 332 transcoded / 9 cached / 0 errors)
 
-**Phase 1 schema-work milestone reached.** All 5 schema tasks
-(USERS, CARDS, COLLECTIONS, GRADING, PRICING) merged. 13 schema
-modules and 13 monotonic migrations (0000–0012) on main.
+**Phase 1 schema-work milestone reached.** All 5 schema tasks merged.
+13 schema modules + 13 monotonic migrations (0000–0012) on main.
 
-**Phase 1 source-pipeline milestone reached.** All 5 source
-adapters merged (TCGDEX-EN, PTCGIO, BULBAPEDIA, TCGDEX-JP,
-POKEMONCARD-JP). Pre-staged barrel + additive rarity registry
-held up across 4 sibling-adapter merges with zero 3-way conflicts.
+**Phase 1 source-pipeline milestone reached.** All 5 source adapters
+merged.
 
-**Phase 1 SEED-INGEST integration crown jewel landed.** All 5
-adapters + resolver + variant classifier + master-set engine + DB
-upserts + image pipeline (R2 dedup) compose end-to-end via
-`runSeedIngest`. Live smoke (Pablo, 2026-05-04) confirmed catalog
-write side end-to-end (1 set / 216 cards / 341 printings upserted
-clean); image-pipeline cross-host bug surfaced and fixed in PR #35
-(Q-005); awaiting re-run for full image-side verification.
+**Phase 1 SEED-INGEST integration crown jewel landed AND verified live.**
+Pablo's 2026-05-04 23:24Z run (post-Q-005 hotfix): 1 set / 216 cards /
+341 printings upserted; 332 images transcoded + 9 cached (dedup hit) /
+0 errors; cross-source agreement signal flowing (PTCGIO validates
+TCGdex-EN: name 301/310, hp 151/172, rarity 114/172).
 
-**Phase 1 pricing pair landed.** PRICING-AGGREGATOR (Layer 1 —
-mock-by-default Cardmarket + eBay-sold) + PRICING-EBAY-BROWSE
-(Layer 2 — active eBay listings, free, no approval) both merged.
-Both write to existing `price_observation`. PRICING-ROLLUP
-(daily aggregate rollup; the consumer of both layers) is the
-next critical-path piece and is dispatching this iter.
+**Phase 1 pricing pipeline complete except for the materialised view.**
+- Layer 1: PRICING-AGGREGATOR (Cardmarket + eBay-sold paid API; mock-by-default).
+- Layer 2: PRICING-EBAY-BROWSE (free eBay Browse active listings).
+- Daily aggregation: PRICING-ROLLUP (idempotent; outlier-trimmed; per-currency).
+- Display lookup: PRICING-CURRENT-VIEW **(this iter — dispatching)**.
 
-**Phase 1 now ~75% done.** PRICING-ROLLUP unblocks
-PRICING-CURRENT-VIEW (the materialised view + nightly refresh).
-After that pair, only DATA-CONFLICT-TABLE + ADMIN-DEBUG-SURFACES
-(both still need stub authoring) and a handful of smaller
-follow-ups remain in the data-layer phase.
+**Phase 1 now ~78% done.** After PRICING-CURRENT-VIEW lands the only
+remaining critical-path data-layer pieces are DATA-CONFLICT-TABLE +
+ADMIN-DEBUG-SURFACES (both still need stub authoring as iter-10 prep).
 
 ## Dispatch loop status
 
-Iter 7 closed; iter 8 dispatching. Phase 1 progression so far:
+Iter 8 closed; iter 9 dispatching. Phase 1 progression so far:
 
 iter 1 (USERS+CARDS) →
 iter 2 (COLLECTIONS+GRADING+SOURCE-INTERFACES) →
@@ -47,12 +39,14 @@ iter 4 (PTCGIO+BULBAPEDIA+TCGDEX-JP) →
 iter 5 (IMAGE-PIPELINE+RLS-POLICIES+EBAY-LISTING-PARSER) →
 iter 6 (SEED-INGEST+PROFILE-GRANTS-FIX+FX-RATES) →
 iter 7 (PRICING-AGGREGATOR+PRICING-EBAY-BROWSE) →
-**iter 7.5** (Q-005 hotfix: image-pipeline cross-host) →
-iter 8 (PRICING-ROLLUP).
+iter 7.5 (Q-005 hotfix: image-pipeline cross-host) →
+iter 8 (PRICING-ROLLUP) →
+**iter 9 (PRICING-CURRENT-VIEW)**.
 
-Reconciliation playbooks (migration renumbering, pre-staged
-sectioned barrels) preserved in earlier orchestrator commits +
-git log; not re-documented inline.
+Reconciliation playbooks (migration renumbering, pre-staged sectioned
+barrels, symbol-rename for parallel-developed type collisions)
+preserved in earlier orchestrator commits + git log; not re-documented
+inline.
 
 Post-merge migration sequence on main is monotonic 0000-0012:
 
@@ -70,8 +64,10 @@ Post-merge migration sequence on main is monotonic 0000-0012:
   0011_image_provenance_rls (T-DL-IMAGE-PIPELINE, hand-authored)
   0012_profile_grants_fix   (T-DL-PROFILE-GRANTS-FIX, hand-authored, closes Q-003)
 
-All schema-barrel sections in `packages/db/src/schema/index.ts`
-are uncommented.
+PRICING-CURRENT-VIEW WILL add a migration (likely `0013_mv_current_price.sql`
+hand-authored — materialised views aren't drizzle-generated). All other
+schema-barrel sections in `packages/db/src/schema/index.ts` already
+uncommented.
 
 ## Phase 1 ledger
 
@@ -90,69 +86,54 @@ are uncommented.
 | T-DL-SOURCE-TCGDEX-JP | merged | #26 (`4c30cf0`; agent hung post-commit, orchestrator validated + opened PR) |
 | T-DL-IMAGE-PIPELINE | merged | #27 (`9be37c0`; +printing_image table; mig 0010/0011) |
 | T-DL-RLS-POLICIES | merged | #28 (`3c448db`; verify-rls suite + posture docs; surfaced Q-003) |
-| T-DL-EBAY-LISTING-PARSER | merged | #30 (`2b2d144`; 8-pass; 108-entry corpus; 310 new tests) |
-| T-DL-PROFILE-GRANTS-FIX | merged | #31 (`1fe1fbd`; mig 0012; closes Q-003 — Pablo verified live 2026-05-04) |
-| T-DL-FX-RATES | merged | #32 (`63a8ae8`; Frankfurter `.dev/v1`; 6 quote currencies; 30 new tests) |
-| T-DL-SEED-INGEST | merged | #33 (`34264a3`; integration crown jewel; reconciliation merge `463b9d4`; live smoke 2026-05-04 surfaced Q-005) |
-| T-DL-IMAGE-PIPELINE-CROSSHOST-FIX | merged | #35 (`49e9446`; closes Q-005; tcgdex assets host + ImagePipelineError.toJSON) |
-| T-DL-PRICING-AGGREGATOR | merged | #34 (`f3e5608`; Layer 1; mock-by-default; 49 new tests) |
-| T-DL-PRICING-EBAY-BROWSE | merged | #36 (`8b855f4`; Layer 2; mock-by-default; reconciliation rename `EbayBrowsePriceObservation*` to dodge AGGREGATOR collision) |
-| T-DL-PRICING-ROLLUP | in_progress (iter 8) | — |
-| T-DL-PRICING-CURRENT-VIEW | blocked on PRICING-ROLLUP | — |
-| T-DL-DATA-CONFLICT-TABLE / -ADMIN-DEBUG-SURFACES | held to iter 9 (no stubs yet — author one before dispatch) | — |
+| T-DL-EBAY-LISTING-PARSER | merged | #30 (`2b2d144`; 8-pass; 108-entry corpus) |
+| T-DL-PROFILE-GRANTS-FIX | merged | #31 (`1fe1fbd`; mig 0012; closes Q-003 — Pablo verified live) |
+| T-DL-FX-RATES | merged | #32 (`63a8ae8`; Frankfurter `.dev/v1`) |
+| T-DL-SEED-INGEST | merged | #33 (`34264a3`; integration crown jewel; surfaced Q-005) |
+| T-DL-IMAGE-PIPELINE-CROSSHOST-FIX | merged | #35 (`49e9446`; closes Q-005) |
+| T-DL-PRICING-AGGREGATOR | merged | #34 (`f3e5608`; Layer 1 paid API) |
+| T-DL-PRICING-EBAY-BROWSE | merged | #36 (`8b855f4`; Layer 2 free Browse; reconciliation rename) |
+| T-DL-PRICING-ROLLUP | merged | #37 (`1cc7a40`; daily aggregation; outlier-trimmed; per-currency) |
+| T-DL-PRICING-CURRENT-VIEW | in_progress (iter 9) | — |
+| T-DL-DATA-CONFLICT-TABLE / -ADMIN-DEBUG-SURFACES | held to iter 10 (no stubs yet — author one before dispatch) | — |
 | ... ~9 more pending Phase 1 tasks | pending | — |
 
-## Iter 8 dispatch (1 in flight, under MAX_PARALLEL=3)
+## Iter 9 dispatch (1 in flight, under MAX_PARALLEL=3)
 
-PRICING-ROLLUP solo. It transforms `price_observation` rows
-(from PRICING-AGGREGATOR + PRICING-EBAY-BROWSE) into daily
-`price_aggregate` rows; idempotent on re-run via
-(printing_id, market, grade_tier, observed_date) UNIQUE.
-Holds the pricing pipeline cap; PRICING-CURRENT-VIEW
-(blocked on this) is the materialised view that turns the
-aggregates into a fast `mv_current_price` lookup for the app.
+PRICING-CURRENT-VIEW solo. It's the materialised view that turns
+`price_aggregate` rows into the fast `mv_current_price` lookup the app
+reads from. Effort S; depends only on PRICING-ROLLUP.
 
 | Task | Effort | Owns_paths | Why this iter |
 |---|---|---|---|
-| **T-DL-PRICING-ROLLUP** | M | `data-pipeline/src/jobs/pricing-rollup.ts` (+ test) | Daily price aggregation cap; consumes both Layer 1 + Layer 2 observations; downstream of the pricing pair that just landed. |
+| **T-DL-PRICING-CURRENT-VIEW** | S | `packages/db/src/migrations/0013_mv_current_price.sql` (anticipated) + a refresh job in `data-pipeline/src/jobs/` | Caps the pricing pipeline; gives the app a single fast lookup row per (printing, grade_tier, market, currency). |
 
 Migration coordination:
-- No new migration. Writes to existing `price_aggregate` table
-  (from `T-DL-SCHEMA-PRICING`).
-- Reads from `price_observation` + `fx_rate` (the latter for the
-  source-currency → display-currency conversion).
+- Adds **mig 0013** (materialised view DDL + indices). Hand-authored
+  (drizzle-kit doesn't model materialised views). No schema-barrel
+  changes needed (mvs aren't `pgTable`s).
+- DATA-CONFLICT-TABLE / ADMIN-DEBUG-SURFACES (held to iter 10) will
+  share the migrations folder; their stubs need authoring before
+  dispatch — flagging the serialisation now.
 
-Stub elaboration: same Phase 1 / Phase 2 pattern as
-SEED-INGEST / FX-RATES / PRICING-{AGGREGATOR,EBAY-BROWSE}.
+Stub elaboration: same Phase 1 / Phase 2 pattern as the prior pricing
+pair + ROLLUP. Sub-agent reads PROJECT.md § 6/§13 + the rules + every
+dependency's merged code (especially price_aggregate's columns) and
+rewrites the stub against §7's full template before implementing.
 
-## Held to iter 9
+## Held to iter 10
 
-- T-DL-PRICING-CURRENT-VIEW (depends on ROLLUP)
-- T-DL-DATA-CONFLICT-TABLE (no stub yet — author one in iter 9 prep)
+- T-DL-DATA-CONFLICT-TABLE (no stub yet — author one in iter 10 prep)
 - T-DL-ADMIN-DEBUG-SURFACES (no stub yet; touches `packages/db/src/migrations/` so requires serialisation against DATA-CONFLICT-TABLE)
+- T-DL-PRICING-TYPES-CONSOLIDATION (proposed cleanup; consolidate the AGGREGATOR/EBAY-BROWSE symbol divergence introduced by PR #36's reconciliation; non-critical-path)
 
 ## Open questions
 
-- **Q-003** (raised by T-DL-RLS-POLICIES, PR #28; **fix shipped** in
-  T-DL-PROFILE-GRANTS-FIX, PR #31, mig 0012; **Pablo's answer** —
-  "do option 1" — ratifies; **verified live by Pablo on 2026-05-04**:
-  verify-rls reports 97/0 after applying 0012). **Closed.**
-- **Q-004** (raised by T-DL-SEED-INGEST, PR #33; **self-fixed in
-  same PR**): `@binderly/db`'s `package.json` was missing `main` /
-  `types` / `exports`. Sub-agent applied the additive fix in PR #33.
-  Documented; no further action required. Two follow-ups logged
-  below (turbo build pipeline; tsx-friendly conditional exports).
-  **Closed (with follow-ups).**
-- **Q-005** (raised by SEED-INGEST live smoke, 2026-05-04;
-  **fix shipped** in T-DL-IMAGE-PIPELINE-CROSSHOST-FIX, PR #35):
-  cross-host RateLimitedClient pin caught the seed wiring trying
-  to fetch images from `assets.tcgdex.net` via the `api.tcgdex.net`
-  client (also latent same-shape bug for ptcgio's
-  `images.pokemontcg.io`). Plus `ImagePipelineError.cause` was
-  serialised as `{}` because Error props are non-enumerable.
-  PR #35 added dedicated assets clients + `toJSON()` overrides on
-  `ImagePipelineError` + `AdapterError`. **Closed pending Pablo's
-  re-run of the SEED-INGEST smoke against the post-Q-005 main.**
+All open questions are closed.
+
+- **Q-003** (RLS grants gap) — closed; verified live by Pablo 2026-05-04 (97/0 on verify-rls after applying mig 0012).
+- **Q-004** (`@binderly/db` package.json exports) — closed (self-fixed in PR #33; turbo-build follow-up logged).
+- **Q-005** (image-pipeline cross-host) — closed; verified live by Pablo 2026-05-04 23:24Z (332 transcoded / 9 cached / 0 errors against the post-fix main).
 
 ## Phase 0 ledger (closed)
 
@@ -161,65 +142,62 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
-- T-DL-PRICING-EBAY-BROWSE — `8b855f4` (Layer 2 active-listings ingest; eBay Browse v1 OAuth client-credentials + paginated search; mock-by-default behind `MOCK_PRICING_EBAY_BROWSE`; min-confidence 0.55; 6 marketplaces; 35 new tests, package total 1043; reconciliation rename `EbayBrowsePriceObservation*` to dodge AGGREGATOR's already-merged symbols)
-- T-DL-PRICING-AGGREGATOR — `f3e5608` (Layer 1 paid-source ingest; Cardmarket-style + eBay-sold-style mock fixtures; reuses EBAY-LISTING-PARSER joiner for unattributed eBay-sold rows; deterministic source_listing_id per quote kind; 49 new tests, package total 976)
-- T-DL-IMAGE-PIPELINE-CROSSHOST-FIX — `49e9446` (closes Q-005; dedicated assets.tcgdex.net + images.pokemontcg.io clients in seed; toJSON on ImagePipelineError + AdapterError; 14 new tests, package total 941)
-- T-DL-SEED-INGEST — `34264a3` (Phase-1 integration crown jewel; runSeedIngest wires 5 adapters + resolver + variant classifier + master-set + DB upserts + image pipeline + R2 dedup; live smoke surfaced Q-005)
-- T-DL-FX-RATES — `63a8ae8` (Frankfurter `.dev/v1`; USD-base; 6 quote currencies; weekend-remap-aware; 30 new tests; corrected fx_rate PK)
+- T-DL-PRICING-ROLLUP — `1cc7a40` (daily price-observation -> price_aggregate rollup; idempotent on the schema's composite PK; per-currency aggregation [no FX in rollup — display-time conversion]; outlier filter active in v1: drop top/bottom 5% when sample_count >= 20; 29 new tests; package total 1072)
+- T-DL-PRICING-EBAY-BROWSE — `8b855f4` (Layer 2 active-listings ingest; eBay Browse v1 OAuth client-credentials + paginated search; mock-by-default; 6 marketplaces; reconciliation rename `EbayBrowsePriceObservation*` to dodge AGGREGATOR's already-merged symbols; 35 new tests; package total 1043)
+- T-DL-PRICING-AGGREGATOR — `f3e5608` (Layer 1 paid-source ingest; Cardmarket + eBay-sold mock fixtures; reuses EBAY-LISTING-PARSER joiner; 49 new tests; package total 976)
+- T-DL-IMAGE-PIPELINE-CROSSHOST-FIX — `49e9446` (closes Q-005; dedicated assets.tcgdex.net + images.pokemontcg.io clients in seed; toJSON on ImagePipelineError + AdapterError; 14 new tests; package total 941)
+- T-DL-SEED-INGEST — `34264a3` (Phase-1 integration crown jewel; runSeedIngest end-to-end; live smoke surfaced Q-005)
 
 ## Known follow-ups (logged, non-blocking)
 
 1. **`T-DL-DB-TEST-INFRA` (proposed)** — stand up vitest in
-   `@binderly/db`; rewrite `db:generate` / `db:migrate` wrappers
-   in plain ESM (no `tsx` runtime) so future db sub-agents don't
-   hit sandbox tsx-IPC-pipe failures. PRICING agent's temporary
-   plain-ESM migrator pattern is the prototype.
-2. **`T-DL-PRICING-TYPES-CONSOLIDATION` (proposed)** — hoist a
-   shared `RawPriceObservation` (+ schema) to
-   `data-pipeline/src/types.ts` and have BOTH AGGREGATOR and
-   EBAY-BROWSE adapters import from there; same for
-   `PriceObservationRepo` + `InMemoryPriceObservationRepo`. EBAY-
-   BROWSE's symbols are currently differentiated as
-   `RawEbayBrowsePriceObservation` / `EbayBrowsePriceObservationRepo`
-   etc. as a holding pattern (see PR #36's reconciliation merge).
-   Both sets work today; consolidating is purely an API-surface
-   cleanup. Coordinate with PRICING-ROLLUP (which consumes both).
+   `@binderly/db`; rewrite `db:generate` / `db:migrate` wrappers in
+   plain ESM (no `tsx` runtime) so future db sub-agents don't hit
+   sandbox tsx-IPC-pipe failures. PRICING agent's temporary plain-ESM
+   migrator pattern is the prototype.
+2. **`T-DL-PRICING-TYPES-CONSOLIDATION` (proposed)** — hoist a shared
+   `RawPriceObservation` (+ schema) to `data-pipeline/src/types.ts`
+   and have BOTH AGGREGATOR and EBAY-BROWSE adapters import from
+   there; same for `PriceObservationRepo` +
+   `InMemoryPriceObservationRepo`. EBAY-BROWSE's symbols are currently
+   differentiated as `RawEbayBrowsePriceObservation` /
+   `EbayBrowsePriceObservationRepo` etc. as a holding pattern (see
+   PR #36's reconciliation merge). Both sets work today;
+   consolidating is purely an API-surface cleanup.
 3. **`T-DL-DATAPIPELINE-DOTENV` (proposed)** — make
    `data-pipeline/scripts/seed.ts` + `fx-rates.ts` +
-   `pricing-aggregator.ts` + `pricing-ebay-browse.ts`
-   auto-load `.env` via dotenv so smoke tests are one-liners.
-   Plus: PR #33's smoke test references the wrong DATABASE_URL
-   default (5433 Compose Postgres vs 54322 Supabase Postgres
-   where migrations live); fix the smoke-test docs in
-   `data-pipeline/README.md`.
-4. **`T-DL-DB-TURBO-BUILD-PIPELINE` (proposed; Q-004 follow-up)** —
-   add a turbo `^build` pipeline so `pnpm seed` implicitly builds
+   `pricing-aggregator.ts` + `pricing-ebay-browse.ts` +
+   `pricing-rollup.ts` auto-load `.env` via dotenv so smoke tests are
+   one-liners. Also: PR #33's smoke-test instructions reference the
+   wrong DATABASE_URL default (Compose Postgres :5433 vs Supabase
+   Postgres :54322 where migrations live); fix the README.
+4. **`T-DL-DB-TURBO-BUILD-PIPELINE` (proposed; Q-004 follow-up)** — add
+   a turbo `^build` pipeline so `pnpm seed` implicitly builds
    `@binderly/db` first, OR add an `import` conditional in
-   `@binderly/db`'s `exports` that points at `./src/index.ts`
-   so `tsx` resolves it without a dist artefact.
+   `@binderly/db`'s `exports` that points at `./src/index.ts` so `tsx`
+   resolves it without a dist artefact.
 5. **One-shot snapshot regen** — Pablo can run
-   `pnpm install && pnpm --filter @binderly/db db:generate` once
-   to confirm drizzle-kit produces a no-op diff against the
-   hand-merged `meta/0002_snapshot.json` and `meta/0006_snapshot.json`.
-   Not gating; `db:migrate` doesn't read the snapshot.
+   `pnpm install && pnpm --filter @binderly/db db:generate` once to
+   confirm drizzle-kit produces a no-op diff against the hand-merged
+   `meta/0002_snapshot.json` and `meta/0006_snapshot.json`. Not
+   gating; `db:migrate` doesn't read the snapshot.
 6. **`db:migrate` UX wart** — `migrate.ts` errors hard if
    `meta/_journal.json` is missing entries instead of skipping
    gracefully. Tracked from T-FN-DB-MIGRATIONS handoff.
-7. **Dependabot backlog** — ~9 open PRs from when CI landed.
-   Triage when convenient.
-8. **`.nvmrc` 22.22.2 not locally installable** — fall back to
-   22.13.0. Worth lockfile-pinning instead if we want CI to stay
-   green on the exact version.
+7. **Dependabot backlog** — ~9 open PRs from when CI landed. Triage
+   when convenient.
+8. **`.nvmrc` 22.22.2 not locally installable** — fall back to 22.13.0.
+   Worth lockfile-pinning instead if we want CI to stay green on the
+   exact version.
 
 ## Verification protocol
 
-For runtime ACs that need Docker socket access, the orchestrator
-hands Pablo a paste-able one-liner and merges on his thumbs-up.
-Static-only ACs are verified in foreground via the diff inspector
-or by sub-agents inside their worktrees. GRADING's agent
-successfully ran live psql against local Supabase :54322 from
-inside its worktree (Pablo's Docker is up); future schema agents
-should attempt the same before deferring.
+For runtime ACs that need Docker socket access, the orchestrator hands
+Pablo a paste-able one-liner and merges on his thumbs-up. Static-only
+ACs are verified in foreground via the diff inspector or by sub-agents
+inside their worktrees. The post-Q-005 SEED-INGEST live smoke
+(2026-05-04 23:24Z) demonstrates the full chain working end-to-end —
+this is the new baseline for "Phase 1 is integrated, not just unit-tested".
 
 ## Notes
 
