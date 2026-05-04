@@ -81,14 +81,13 @@ tasks:
     stage: 00-foundation
     title: Docker Compose for local dev (Postgres, MinIO, Mailpit)
     agent_role: devops
-    status: blocked
+    status: in_progress
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
     provides: [infra:local-docker]
     owns_paths: [infra/docker-compose.yml, infra/docker/, .env.example]
     task_file: tasks/00-foundation/T-FN-DOCKER.md
     est_effort: M
-    blocked_on: Q-002
 
   - id: T-FN-SUPABASE-LOCAL
     stage: 00-foundation

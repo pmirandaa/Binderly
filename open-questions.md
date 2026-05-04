@@ -167,6 +167,13 @@ work**. Diagnostic files left in `/tmp/docker-bounce-trace.log` +
 
 T-FN-DOCKER stays `blocked`. The dispatch loop is parked.
 
+**~~RESOLVED 2026-05-04: Docker Desktop is up.~~**
+`docker info` returns `28.3.3 | linux/aarch64 | 8 GB`.
+T-FN-DOCKER respawned into a fresh worktree
+(`../binderly-wt-T-FN-DOCKER` from current `main`) and dispatched.
+T-FN-DOCKER moved from `blocked` to `in_progress`; `blocked_on`
+field removed in dependencies.yaml.
+
 ---
 
 _(no other open questions yet)_
