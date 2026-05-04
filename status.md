@@ -1,10 +1,14 @@
-# Build status — Phase 1 iter 3 partial: MASTER-SET-RULES merged; PRICING + TCGDEX-EN in flight
+# Build status — Phase 1 schema work CLOSED; iter 3 has only TCGDEX-EN in flight
 
-**Phase:** 1 — Data layer (16/109 tasks merged)
-**Merged:** 16 / 109 tasks
-**In progress:** 2 (T-DL-SCHEMA-PRICING, T-DL-SOURCE-TCGDEX-EN)
+**Phase:** 1 — Data layer (17/109 tasks merged)
+**Merged:** 17 / 109 tasks
+**In progress:** 1 (T-DL-SOURCE-TCGDEX-EN)
 **Blocked:** 0
 **Blocked on humans:** 0
+
+**Phase 1 schema-work milestone reached.** All 5 schema tasks
+(USERS, CARDS, COLLECTIONS, GRADING, PRICING) merged. 13 schema
+modules and 10 monotonic migrations (0000–0009) on main.
 
 ## Dispatch loop status
 
@@ -56,7 +60,7 @@ schema task) section is still pre-staged + commented.
 | T-DL-SCHEMA-GRADING | merged | #18 (`77d18d0`, renumber `ffc4d34`) |
 | T-DL-SOURCE-INTERFACES | merged | #19 (`51b3727`) |
 | T-DL-MASTER-SET-RULES | merged | #21 (`d531dc7`) |
-| T-DL-SCHEMA-PRICING | in_progress (iter 3) | — |
+| T-DL-SCHEMA-PRICING | merged | #22 (`a99fc0b`) |
 | T-DL-SOURCE-TCGDEX-EN | in_progress (iter 3) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
 | T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
@@ -89,11 +93,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
-- T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; mirrors variant-classifier defaults with runtime drift guard)
-- T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154/154 tests; tcg-domain.md § 8 patched per allowed escalation)
+- T-DL-SCHEMA-PRICING — `a99fc0b` (4 tables: market + price_observation + price_aggregate + fx_rate; idempotent 7-market seed; observation-internal RLS; 11/11 ACs PASS live; closes Phase 1 schema surface)
+- T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; runtime drift guard against classifier defaults)
+- T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154 tests; tcg-domain.md § 8 patched)
 - T-DL-SCHEMA-GRADING — `77d18d0` (grading_submission + grading_training_sample; cross-schema FK; service-role-only training corpus; renumbered 0006/0007)
 - T-DL-SCHEMA-COLLECTIONS — `c131903` (5 tables + 0004/0005; NULLS NOT DISTINCT; nested-table RLS via EXISTS; shareable slug-gated public-read)
-- T-DL-SCHEMA-CARDS — `24b0fd4` (catalog tables + RLS; renumbered 0002/0003; snapshot hand-merge)
 
 ## Known follow-ups (logged, non-blocking)
 
@@ -102,11 +106,15 @@ All 10 foundation tasks merged. See git log between `7df9f12`
    COLLECTIONS' two deferred ACs can land. GRADING ran live psql
    and didn't need a runner. The two prior tasks need this before
    their fixture round-trip tests can execute.
-2. **Sandbox + drizzle-kit wrapper** — `pnpm exec drizzle-kit generate`
-   works directly; the `pnpm db:generate` wrapper is a `tsx` script
-   and `tsx` cannot create its IPC pipe under the Cursor sandbox.
-   Future db sub-agents need the same workaround until the wrapper
-   is rewritten in plain Node or sandbox grants IPC access.
+2. **Sandbox + tsx-IPC-pipe wrappers** — `pnpm exec drizzle-kit generate`
+   works directly; the `pnpm db:generate` AND `pnpm db:migrate`
+   wrappers are `tsx` scripts and `tsx` cannot create its IPC pipe
+   under the Cursor sandbox. **Three sub-agents now hit this**
+   (COLLECTIONS, GRADING, PRICING). T-DL-DB-TEST-INFRA scope should
+   include rewriting both wrappers in plain ESM (no `tsx` runtime)
+   so future db sub-agents don't repeat the dance. PRICING agent
+   wrote a temporary plain-ESM migrator for AC verification and
+   deleted before commit — that pattern is the prototype.
 3. **One-shot snapshot regen** — Pablo can run
    `pnpm install && pnpm --filter @binderly/db db:generate` once
    to confirm drizzle-kit produces a no-op diff against the
