@@ -19,7 +19,7 @@
 ## Soft dependencies
 
 - T-DL-PRICING-AGGREGATOR (concurrent in iter 7 — both tasks may add the
-  same `RawPriceObservation` shape to `data-pipeline/src/types.ts`. We
+  same `RawEbayBrowsePriceObservation` shape to `data-pipeline/src/types.ts`. We
   coordinate via the additive-types pattern documented in the
   reconciliation note below; both tasks also append to the sectioned
   barrel `data-pipeline/src/adapters/index.ts`.)
@@ -181,7 +181,7 @@ Response shape (relevant fields, full zod schema in
 }
 ```
 
-## `RawPriceObservation` shape (shared with PRICING-AGGREGATOR)
+## `RawEbayBrowsePriceObservation` shape (shared with PRICING-AGGREGATOR)
 
 Both this task and `T-DL-PRICING-AGGREGATOR` need an
 adapter-emitted shape. We define it once in
@@ -192,7 +192,7 @@ translation pass — same posture as `FxRateRow` ↔ `NewFxRate` in
 `T-DL-FX-RATES`.
 
 ```ts
-export const rawPriceObservationSchema = z.object({
+export const rawEbayBrowsePriceObservationSchema = z.object({
   source: z.string().min(1),                  // 'ebay_browse', 'aggregator_<name>', ...
   sourceListingId: z.string().min(1).nullable(),
   printingId: z.string().uuid(),
@@ -207,7 +207,7 @@ export const rawPriceObservationSchema = z.object({
   observedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   rawMetadata: z.record(z.unknown()).nullable(),
 }).strict();
-export type RawPriceObservation = z.infer<typeof rawPriceObservationSchema>;
+export type RawEbayBrowsePriceObservation = z.infer<typeof rawEbayBrowsePriceObservationSchema>;
 ```
 
 **Coordination with PRICING-AGGREGATOR.** Both PRs may attempt to add
@@ -359,16 +359,16 @@ deployments leave it unset.
 | `data-pipeline/src/adapters/pricing-ebay-browse/oauth.ts` | `EbayOAuthClient` — handles client-credentials token exchange with in-process caching + skew protection. Hits `api.ebay.com/identity/v1/oauth2/token` via a dedicated `RateLimitedClient` (the auth host is the same as the API host but conceptually separate). |
 | `data-pipeline/src/adapters/pricing-ebay-browse/client.ts` | `EbayBrowseClient` — thin wrapper around `RateLimitedClient` for `api.ebay.com`. Exposes `searchItemSummaries({ query, marketplace, limit, offset })`. Validates with zod, surfaces `NotFoundError` for legitimate 404s. Handles the `Authorization: Bearer` header by calling into `EbayOAuthClient`. |
 | `data-pipeline/src/adapters/pricing-ebay-browse/mock.ts` | `MockEbayBrowseClient` — programmable in-memory `EbayBrowseClient` swap-in for tests + `MOCK_PRICING_EBAY_BROWSE=1` mode. Same shape as `MockAdapter` from `seed.fixtures.ts`. |
-| `data-pipeline/src/adapters/pricing-ebay-browse/adapter.ts` | `EbayBrowseAdapter` — orchestrates client + parser + joiner. Exposes `streamObservationsForQuery({ query, marketplace, limit })` returning an async iterable of `RawPriceObservation`. Internally pages through search results, parses titles, joins to printings, applies the confidence threshold, and emits. Defines `PRICING_EBAY_BROWSE_SOURCE = 'ebay_browse'` and `PRICING_EBAY_BROWSE_MIN_CONFIDENCE = 0.5`. |
+| `data-pipeline/src/adapters/pricing-ebay-browse/adapter.ts` | `EbayBrowseAdapter` — orchestrates client + parser + joiner. Exposes `streamObservationsForQuery({ query, marketplace, limit })` returning an async iterable of `RawEbayBrowsePriceObservation`. Internally pages through search results, parses titles, joins to printings, applies the confidence threshold, and emits. Defines `PRICING_EBAY_BROWSE_SOURCE = 'ebay_browse'` and `PRICING_EBAY_BROWSE_MIN_CONFIDENCE = 0.5`. |
 | `data-pipeline/src/adapters/pricing-ebay-browse/oauth.test.ts` | FetchShim tests: token-fetch happy path, in-process caching, refresh-before-expiry, 401 → `PermanentError`, 429 retry. |
 | `data-pipeline/src/adapters/pricing-ebay-browse/client.test.ts` | FetchShim tests: search happy path, pagination, 404, 429 retry, malformed JSON, schema-mismatch. |
 | `data-pipeline/src/adapters/pricing-ebay-browse/adapter.test.ts` | Integration test against `MockEbayBrowseClient` + in-memory `ParserCatalogReader`: confidence-threshold drop, lot-listing skip, raw-card → `RAW_NM` mapping, slabbed-listing → `PSA_10` mapping, market mapping, currency captured natively, shipping captured. |
-| `data-pipeline/src/jobs/pricing-ebay-browse.ts` | `runPricingEbayBrowseIngest(opts)` — orchestrates a run: enumerates queries from a set or an explicit query list, drives `EbayBrowseAdapter.streamObservationsForQuery` per query, batches `RawPriceObservation` rows into `PriceObservationRepo.upsertMany`, returns a `PricingEbayBrowseReport`. Defines `PriceObservationRepo` interface + `InMemoryPriceObservationRepo` test helper (mirrors `FxRateRepo`). |
-| `data-pipeline/src/jobs/pricing-ebay-browse.test.ts` | Unit tests with `InMemoryPriceObservationRepo` + `MockEbayBrowseClient`: full-set ingest, idempotent re-run, partial-failure (some queries 404, some succeed), low-confidence drops, reporter shape. |
+| `data-pipeline/src/jobs/pricing-ebay-browse.ts` | `runPricingEbayBrowseIngest(opts)` — orchestrates a run: enumerates queries from a set or an explicit query list, drives `EbayBrowseAdapter.streamObservationsForQuery` per query, batches `RawEbayBrowsePriceObservation` rows into `EbayBrowsePriceObservationRepo.upsertMany`, returns a `PricingEbayBrowseReport`. Defines `EbayBrowsePriceObservationRepo` interface + `InMemoryEbayBrowsePriceObservationRepo` test helper (mirrors `FxRateRepo`). |
+| `data-pipeline/src/jobs/pricing-ebay-browse.test.ts` | Unit tests with `InMemoryEbayBrowsePriceObservationRepo` + `MockEbayBrowseClient`: full-set ingest, idempotent re-run, partial-failure (some queries 404, some succeed), low-confidence drops, reporter shape. |
 | `data-pipeline/src/jobs/index.ts` | Append `=== T-DL-PRICING-EBAY-BROWSE ===` section with `export * from './pricing-ebay-browse.js';` (additive sectioned barrel — coordinate with PRICING-AGGREGATOR; same pattern as the existing FX-RATES + SEED-INGEST sections). |
-| `data-pipeline/src/types.ts` | Append `RawPriceObservation` type + zod schema (only one of {us, AGGREGATOR} lands it; document who in PR body). |
+| `data-pipeline/src/types.ts` | Append `RawEbayBrowsePriceObservation` type + zod schema (only one of {us, AGGREGATOR} lands it; document who in PR body). |
 | `data-pipeline/src/adapters/index.ts` | Add `=== T-DL-PRICING-EBAY-BROWSE ===` section with `export * from './pricing-ebay-browse/index.js';` (do NOT touch the AGGREGATOR section). |
-| `data-pipeline/scripts/pricing-ebay-browse.ts` | CLI entry — argv parser → `runPricingEbayBrowseIngest` → JSON report on stdout, exit 0/1. Honors `MOCK_PRICING_EBAY_BROWSE=1`. Wires Drizzle-backed `PriceObservationRepo` and `ParserCatalogReader` against `@binderly/db`. |
+| `data-pipeline/scripts/pricing-ebay-browse.ts` | CLI entry — argv parser → `runPricingEbayBrowseIngest` → JSON report on stdout, exit 0/1. Honors `MOCK_PRICING_EBAY_BROWSE=1`. Wires Drizzle-backed `EbayBrowsePriceObservationRepo` and `ParserCatalogReader` against `@binderly/db`. |
 | `data-pipeline/package.json` | Add `"pricing-ebay-browse": "tsx scripts/pricing-ebay-browse.ts"` script entry. |
 | `data-pipeline/README.md` | Append a "Layer 2 — eBay Browse pricing" section with the OAuth setup steps + CLI usage + smoke-test invocation. |
 
@@ -388,7 +388,7 @@ edits, pre-authorized here:
   barrel; AGGREGATOR's section untouched).
 - `data-pipeline/src/jobs/index.ts` — add our section (sectioned
   barrel; FX / SEED untouched).
-- `data-pipeline/src/types.ts` — append `RawPriceObservation` (shared
+- `data-pipeline/src/types.ts` — append `RawEbayBrowsePriceObservation` (shared
   with AGGREGATOR; reconcile at merge if both PRs added it).
 - `data-pipeline/package.json` — add the `"pricing-ebay-browse"`
   script (one line; trivial conflict resolution if AGGREGATOR also
@@ -426,19 +426,19 @@ Anything outside this list is a deviation that goes through
 
 - [ ] `EbayBrowseAdapter.streamObservationsForQuery({ query: '...',
       marketplace: 'EBAY_US' })` against the mock client + in-memory
-      catalog reader emits `RawPriceObservation` rows whose
+      catalog reader emits `RawEbayBrowsePriceObservation` rows whose
       `printingId` matches the canonical-key-resolved printing.
 - [ ] Listings whose joiner confidence < 0.5 are dropped from the
       stream (asserted by counting and sampling input vs output).
 - [ ] `parsedListing.isLot === true` listings always drop (joiner
       returns confidence 0).
 - [ ] Slabbed listing with `gradeTier = 'PSA_10'` round-trips into
-      `RawPriceObservation.gradeTier`.
+      `RawEbayBrowsePriceObservation.gradeTier`.
 - [ ] Raw-NM listing (no slab, condition parsed) round-trips into
-      `RawPriceObservation.gradeTier = 'RAW_NM'`.
+      `RawEbayBrowsePriceObservation.gradeTier = 'RAW_NM'`.
 - [ ] Listing with neither slab nor parsed condition emits
       `gradeTier = 'RAW_UNKNOWN'` (rather than dropping the row).
-- [ ] `RawPriceObservation.market` is correctly mapped per the
+- [ ] `RawEbayBrowsePriceObservation.market` is correctly mapped per the
       marketplace table (`EBAY_US` for `EBAY_US`, etc.).
 - [ ] `observedPrice` and `observedCurrency` are taken verbatim from
       the listing's `price.value/.currency` (no FX conversion).
@@ -466,7 +466,7 @@ Anything outside this list is a deviation that goes through
       `{ source, queriesRequested, queriesSucceeded, listingsFetched,
         listingsParsed, droppedLowConfidence, droppedLot,
         observationsUpserted, durationMs, errors[] }`.
-- [ ] `InMemoryPriceObservationRepo` keys on `(source,
+- [ ] `InMemoryEbayBrowsePriceObservationRepo` keys on `(source,
       sourceListingId)` and replaces in place on conflict.
 
 ### CLI
@@ -531,7 +531,7 @@ Append to `open-questions.md` and STOP if:
   invalidate the rate-limit floor; current docs say 5000).
 - `parseEbayListing` / `resolveListingToPrinting` change their
   signatures (would force re-coordination with EBAY-LISTING-PARSER).
-- The `RawPriceObservation` shape we and AGGREGATOR each landed
+- The `RawEbayBrowsePriceObservation` shape we and AGGREGATOR each landed
   diverge enough that a clean merge isn't possible (orchestrator
   intervenes).
 - `price_observation` table shape changes underneath

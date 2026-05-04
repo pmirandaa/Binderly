@@ -5,7 +5,7 @@
 //   - the live `EbayBrowseAdapter` over `EbayBrowseClient` +
 //     `EbayOAuthClient` against `api.ebay.com`, OR a synthetic
 //     `MockEbayBrowseClient` when `MOCK_PRICING_EBAY_BROWSE=1`.
-//   - a Drizzle-backed `PriceObservationRepo` against the database
+//   - a Drizzle-backed `EbayBrowsePriceObservationRepo` against the database
 //     identified by `--url` / `DATABASE_URL` / `SUPABASE_DB_URL`.
 //   - a Drizzle-backed `ParserCatalogReader` over `card` + `printing`
 //     for the joiner; a Drizzle-backed `PricingSetReader` over
@@ -57,7 +57,7 @@ import {
 import { RateLimitedClient } from '../src/http/rate-limited-client.js';
 import {
   runPricingEbayBrowseIngest,
-  type PriceObservationRepo,
+  type EbayBrowsePriceObservationRepo,
   type PricingEbayBrowseReport,
   type PricingSetReader,
   type PricingSetReaderCard,
@@ -69,7 +69,7 @@ import type {
   ParserCatalogPrinting,
   ParserCatalogReader,
 } from '../src/parsers/ebay-listing/index.js';
-import type { RawPriceObservation } from '../src/types.js';
+import type { RawEbayBrowsePriceObservation } from '../src/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const SCRIPT_NAME = path.basename(__filename);
@@ -313,9 +313,9 @@ function makeSetReader(db: DrizzleDb): PricingSetReader {
   };
 }
 
-function makeRepo(db: DrizzleDb): PriceObservationRepo {
+function makeRepo(db: DrizzleDb): EbayBrowsePriceObservationRepo {
   return {
-    async upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number> {
+    async upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number> {
       if (rows.length === 0) return 0;
       const values = rows.map((r) => ({
         printingId: r.printingId,
@@ -430,9 +430,9 @@ function makeMockSetReader(): PricingSetReader {
   };
 }
 
-class InMemoryPriceObservationCliRepo implements PriceObservationRepo {
-  private readonly rows = new Map<string, RawPriceObservation>();
-  async upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number> {
+class InMemoryPriceObservationCliRepo implements EbayBrowsePriceObservationRepo {
+  private readonly rows = new Map<string, RawEbayBrowsePriceObservation>();
+  async upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number> {
     for (const r of rows) {
       const k = `${r.source}|${r.sourceListingId ?? ''}`;
       this.rows.set(k, { ...r });
@@ -529,7 +529,7 @@ async function main(): Promise<void> {
   //   normal + URL   → real Drizzle catalog reader + Drizzle repo.
   let db: DrizzleDb | null = null;
   let pgClient: { end: (opts?: { timeout?: number }) => Promise<void> } | null = null;
-  let repo: PriceObservationRepo;
+  let repo: EbayBrowsePriceObservationRepo;
   let catalogReader: ParserCatalogReader;
   let setReader: PricingSetReader;
 

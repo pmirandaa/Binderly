@@ -1,6 +1,6 @@
 // `EbayBrowseAdapter` — orchestrates `EbayBrowseClient` +
 // `parseEbayListing` + `resolveListingToPrinting` to emit a stream
-// of `RawPriceObservation` records (Layer 2, `observation_kind =
+// of `RawEbayBrowsePriceObservation` records (Layer 2, `observation_kind =
 // 'active_listing'`).
 //
 // Pipeline per query:
@@ -13,7 +13,7 @@
 //       gradeTier = parsed.grading.gradeTier
 //                 ?? conditionToTier(parsed.condition)
 //                 ?? 'RAW_UNKNOWN'
-//       emit RawPriceObservation { ...native price, ...market }
+//       emit RawEbayBrowsePriceObservation { ...native price, ...market }
 //
 // The adapter exposes `streamObservationsForQuery({ query, marketplace,
 // maxListings })` returning an async iterable so the runner can apply
@@ -31,7 +31,7 @@ import {
 } from '../../parsers/ebay-listing/index.js';
 
 import type { EbayItemSummary, EbayMarketplace } from './types.js';
-import type { PriceObservationGradeTier, RawPriceObservation } from '../../types.js';
+import type { PriceObservationGradeTier, RawEbayBrowsePriceObservation } from '../../types.js';
 
 /**
  * Confidence floor below which a `(parsed, joined)` listing is
@@ -111,7 +111,7 @@ export interface StreamObservationsStats {
 }
 
 export interface StreamObservationsResult {
-  readonly observations: RawPriceObservation[];
+  readonly observations: RawEbayBrowsePriceObservation[];
   readonly stats: StreamObservationsStats;
 }
 
@@ -139,7 +139,7 @@ export class EbayBrowseAdapter {
   }
 
   /**
-   * Fetch + parse + join + emit `RawPriceObservation`s for a single
+   * Fetch + parse + join + emit `RawEbayBrowsePriceObservation`s for a single
    * search query. Pages through results until `maxListings` /
    * `maxPages` is reached or the upstream returns an empty page.
    */
@@ -158,7 +158,7 @@ export class EbayBrowseAdapter {
       droppedUnresolved: 0,
       pagesFetched: 0,
     };
-    const observations: RawPriceObservation[] = [];
+    const observations: RawEbayBrowsePriceObservation[] = [];
     const marketplaceMeta = EBAY_MARKETPLACE_TO_BINDERLY[options.marketplace];
 
     let offset = 0;
@@ -215,7 +215,7 @@ export class EbayBrowseAdapter {
     marketplace: EbayMarketplace,
     marketplaceMeta: { market: string; currency: string },
     stats: StreamObservationsStats,
-  ): Promise<RawPriceObservation | null> {
+  ): Promise<RawEbayBrowsePriceObservation | null> {
     let parsed: ParsedListing;
     try {
       parsed = parseEbayListing(item.title);

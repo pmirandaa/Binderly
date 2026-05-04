@@ -445,6 +445,71 @@ describe('processImage (error paths)', () => {
     expect(result.error).toBeInstanceOf(DedupError);
   });
 
+  // Regression test for Q-005: when `processImage` wraps a non-typed
+  // upstream Error (e.g. the `RateLimitedClient` cross-host guard
+  // throwing a plain `Error`), the resulting `FetchError` MUST
+  // round-trip through `JSON.stringify` carrying the underlying
+  // `name` + `message`. The seed-run reports drop the cause to `{}`
+  // without this — making cross-host wiring bugs invisible.
+  it('FetchError JSON serialization preserves Error cause name + message (Q-005)', () => {
+    const inner = new Error(
+      'RateLimitedClient: refusing cross-host call (expected api.tcgdex.net, got assets.tcgdex.net).',
+    );
+    const err = new FetchError('msg', {
+      source: 'tcgdex-en',
+      target: 'https://assets.tcgdex.net/en/swsh/swsh9/018/high.png',
+      cause: inner,
+    });
+    const json = JSON.stringify(err);
+    expect(json).toContain('"name":"FetchError"');
+    expect(json).toContain('"kind":"fetch"');
+    expect(json).toContain('"message":"msg"');
+    expect(json).toContain('"source":"tcgdex-en"');
+    expect(json).toContain('"target":"https://assets.tcgdex.net/en/swsh/swsh9/018/high.png"');
+    expect(json).toContain('"cause":{"name":"Error","message":');
+    expect(json).toContain('refusing cross-host call');
+    expect(json).not.toContain('"cause":{}');
+
+    const parsed = JSON.parse(json) as {
+      name: string;
+      kind: string;
+      message: string;
+      source: string;
+      target: string;
+      cause: { name: string; message: string };
+      upstream: unknown;
+    };
+    expect(parsed.cause).toEqual({ name: 'Error', message: inner.message });
+    expect(parsed.upstream).toBeUndefined();
+  });
+
+  it('FetchError JSON serialization includes `upstream` AdapterError when present', () => {
+    const upstream = new TransientError('HTTP 503 from x', {
+      source: 'x',
+      target: 'https://x',
+      statusCode: 503,
+      attempt: 1,
+    });
+    const err = new FetchError('image-pipeline: upstream fetch failed (transient)', {
+      source: 'tcgdex-en',
+      target: 'https://assets.tcgdex.net/img.png',
+      upstream,
+      cause: upstream,
+    });
+    const parsed = JSON.parse(JSON.stringify(err)) as {
+      cause: { name: string; message: string };
+      upstream: { name: string; kind: string; message: string };
+    };
+    expect(parsed.cause).toEqual({ name: 'TransientError', message: 'HTTP 503 from x' });
+    expect(parsed.upstream).toEqual({
+      name: 'TransientError',
+      kind: 'transient',
+      message: 'HTTP 503 from x',
+      source: 'x',
+      target: 'https://x',
+    });
+  });
+
   it('returns DedupError when dedup.upsert throws', async () => {
     const png = await makePngBytes(64, 64);
     rig.shim.enqueue({

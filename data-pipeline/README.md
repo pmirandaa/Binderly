@@ -203,7 +203,7 @@ Hits eBay's [Browse API](https://developer.ebay.com/api-docs/buy/browse/overview
 (`api.ebay.com/buy/browse/v1/item_summary/search`), parses each
 listing title via `parseEbayListing()`, joins to a printing via
 `resolveListingToPrinting()`, and upserts the resolved
-`RawPriceObservation` rows into `price_observation` keyed on
+`RawEbayBrowsePriceObservation` rows into `price_observation` keyed on
 `(source = 'ebay_browse', source_listing_id = itemId)`. Per
 `PROJECT.md` § 13, this is the _independent_ (Layer 2) data trail —
 free, no approval required, growing in coverage and history every

@@ -138,7 +138,7 @@ describe('EbayBrowseAdapter — streamObservationsForQuery', () => {
     });
   }
 
-  it('emits a RawPriceObservation for a high-confidence PSA 10 listing', async () => {
+  it('emits a RawEbayBrowsePriceObservation for a high-confidence PSA 10 listing', async () => {
     const client = new MockEbayBrowseClient();
     client.enqueue(
       { marketplace: 'EBAY_US', query: 'Charizard VMAX 020/172' },

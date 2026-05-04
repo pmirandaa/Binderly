@@ -6,14 +6,14 @@
 //
 //   1. Caller (CLI / cron / test) constructs an `EbayBrowseAdapter`
 //      (which wraps an `EbayBrowseClient` or a mock) plus a
-//      `PriceObservationRepo` (Drizzle in production; in-memory in
+//      `EbayBrowsePriceObservationRepo` (Drizzle in production; in-memory in
 //      tests).
 //   2. Caller decides on a query plan: either an explicit list of
 //      free-text queries or a set canonical key (e.g. `'en-swsh9'`)
 //      whose cards are enumerated into one query each.
 //   3. The job iterates the query plan, calls
 //      `adapter.streamObservationsForQuery`, batches the resulting
-//      `RawPriceObservation` rows into `repo.upsertMany`, and
+//      `RawEbayBrowsePriceObservation` rows into `repo.upsertMany`, and
 //      tallies per-query stats into the report.
 //
 // Idempotency: relies on `price_observation`'s
@@ -34,7 +34,7 @@ import {
 import { NotFoundError, type AdapterLogger } from '../interfaces/adapter.js';
 
 import type { EbayMarketplace } from '../adapters/pricing-ebay-browse/index.js';
-import type { RawPriceObservation } from '../types.js';
+import type { RawEbayBrowsePriceObservation } from '../types.js';
 
 // ============================================================
 // Repo boundary
@@ -42,18 +42,18 @@ import type { RawPriceObservation } from '../types.js';
 
 /**
  * Thin abstraction the runner depends on for persistence. Tests
- * inject `InMemoryPriceObservationRepo`; production wires a
+ * inject `InMemoryEbayBrowsePriceObservationRepo`; production wires a
  * Drizzle-backed implementation in
  * `scripts/pricing-ebay-browse.ts`.
  */
-export interface PriceObservationRepo {
+export interface EbayBrowsePriceObservationRepo {
   /**
    * Upsert all rows in a single batch. Returns the number of rows
    * processed (Postgres reports it; the in-memory shim returns
    * `rows.length`). Implementations MUST use the canonical UNIQUE
    * `(source, source_listing_id)` for ON CONFLICT.
    */
-  upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number>;
+  upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number>;
 }
 
 // ============================================================
@@ -128,7 +128,7 @@ export interface RunPricingEbayBrowseIngestOptions {
   /** Adapter wired with client + catalog reader. */
   adapter: EbayBrowseAdapter;
   /** Persistence layer; injected by the CLI / tests. */
-  repo: PriceObservationRepo;
+  repo: EbayBrowsePriceObservationRepo;
   /** Marketplace to drive (only one per run for v1). Defaults `EBAY_US`. */
   marketplace?: EbayMarketplace;
   /**
@@ -199,7 +199,7 @@ export async function runPricingEbayBrowseIngest(
   const cappedQueries = queries.slice(0, cap);
 
   const errors: PricingEbayBrowseError[] = [];
-  const buffered: RawPriceObservation[] = [];
+  const buffered: RawEbayBrowsePriceObservation[] = [];
   let listingsFetched = 0;
   let listingsParsed = 0;
   let droppedLot = 0;
@@ -334,7 +334,7 @@ function errToObj(err: unknown): Record<string, unknown> {
 // ============================================================
 
 /**
- * In-memory `PriceObservationRepo`. Keys on the canonical UNIQUE
+ * In-memory `EbayBrowsePriceObservationRepo`. Keys on the canonical UNIQUE
  * `(source, source_listing_id)`. Calling `upsertMany` twice with
  * the same key replaces the row in place — same posture as the SQL
  * `ON CONFLICT … DO UPDATE`.
@@ -343,11 +343,11 @@ function errToObj(err: unknown): Record<string, unknown> {
  * Not exported from the public barrel; lives here so adapter-side
  * tests can reuse it.
  */
-export class InMemoryPriceObservationRepo implements PriceObservationRepo {
+export class InMemoryEbayBrowsePriceObservationRepo implements EbayBrowsePriceObservationRepo {
   /** `(source, source_listing_id)` → row. */
-  readonly rows = new Map<string, RawPriceObservation>();
+  readonly rows = new Map<string, RawEbayBrowsePriceObservation>();
 
-  async upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number> {
+  async upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number> {
     for (const row of rows) {
       const key = `${row.source}|${row.sourceListingId ?? '\u0000'}`;
       this.rows.set(key, { ...row });
@@ -359,7 +359,7 @@ export class InMemoryPriceObservationRepo implements PriceObservationRepo {
     return this.rows.size;
   }
 
-  list(): RawPriceObservation[] {
+  list(): RawEbayBrowsePriceObservation[] {
     return [...this.rows.values()].sort((a, b) => {
       if (a.printingId !== b.printingId) return a.printingId.localeCompare(b.printingId);
       return (a.sourceListingId ?? '').localeCompare(b.sourceListingId ?? '');

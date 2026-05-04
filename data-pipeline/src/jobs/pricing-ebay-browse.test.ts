@@ -2,7 +2,7 @@
 //
 // Strategy mirrors `fx-rates.test.ts`:
 //   * Drive the runner end-to-end against `MockEbayBrowseClient` +
-//     `InMemoryPriceObservationRepo`. No HTTP, no Postgres.
+//     `InMemoryEbayBrowsePriceObservationRepo`. No HTTP, no Postgres.
 //   * Assert per-stage outcomes via the `PricingEbayBrowseReport`.
 //   * Re-run a second time with the same listings to assert the
 //     idempotency contract (same `(source, source_listing_id)` key
@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
-  InMemoryPriceObservationRepo,
+  InMemoryEbayBrowsePriceObservationRepo,
   InMemoryPricingSetReader,
   runPricingEbayBrowseIngest,
 } from './pricing-ebay-browse.js';
@@ -107,7 +107,7 @@ function item(id: string, title: string, over: Partial<EbayItemSummary> = {}): E
 interface Harness {
   readonly client: MockEbayBrowseClient;
   readonly adapter: EbayBrowseAdapter;
-  readonly repo: InMemoryPriceObservationRepo;
+  readonly repo: InMemoryEbayBrowsePriceObservationRepo;
 }
 
 function buildHarness(over: { client?: MockEbayBrowseClient } = {}): Harness {
@@ -117,7 +117,7 @@ function buildHarness(over: { client?: MockEbayBrowseClient } = {}): Harness {
     catalogReader: makeReader(),
     now: () => new Date('2026-05-01T12:00:00.000Z'),
   });
-  const repo = new InMemoryPriceObservationRepo();
+  const repo = new InMemoryEbayBrowsePriceObservationRepo();
   return { client, adapter, repo };
 }
 
@@ -127,7 +127,7 @@ function buildHarness(over: { client?: MockEbayBrowseClient } = {}): Harness {
 
 describe('runPricingEbayBrowseIngest — argument validation', () => {
   it('refuses missing adapter', async () => {
-    const repo = new InMemoryPriceObservationRepo();
+    const repo = new InMemoryEbayBrowsePriceObservationRepo();
     await expect(
       runPricingEbayBrowseIngest({ adapter: undefined as never, repo, queries: ['q'] }),
     ).rejects.toThrow(/adapter/u);
@@ -278,7 +278,7 @@ describe('runPricingEbayBrowseIngest — explicit queries', () => {
       catalogReader: makeReader(),
       now: () => new Date('2026-05-01T12:00:00.000Z'),
     });
-    const repo = new InMemoryPriceObservationRepo();
+    const repo = new InMemoryEbayBrowsePriceObservationRepo();
     const report = await runPricingEbayBrowseIngest({
       adapter,
       repo,

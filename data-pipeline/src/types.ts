@@ -376,7 +376,7 @@ export interface ResolveListResult<T> {
  *   - `'aggregator_quote'`  — Layer 1 (aggregator's normalized quote).
  *
  * Mirrored here as a const tuple so adapters that emit
- * `RawPriceObservation` records validate against the schema without
+ * `RawEbayBrowsePriceObservation` records validate against the schema without
  * dragging `@binderly/db` into the type graph.
  */
 export const PRICE_OBSERVATION_KINDS = ['sold', 'active_listing', 'aggregator_quote'] as const;
@@ -421,7 +421,7 @@ export const priceObservationGradeTierSchema = z.enum(PRICE_OBSERVATION_GRADE_TI
 export type PriceObservationGradeTier = z.infer<typeof priceObservationGradeTierSchema>;
 
 /**
- * `RawPriceObservation` — the shape every pricing adapter EMITS,
+ * `RawEbayBrowsePriceObservation` — the shape every pricing adapter EMITS,
  * one row per upstream listing / quote / sale.
  *
  * Field-for-field mirror of `NewPriceObservation` from `@binderly/db`
@@ -438,7 +438,7 @@ export type PriceObservationGradeTier = z.infer<typeof priceObservationGradeTier
  * Shared by `T-DL-PRICING-EBAY-BROWSE` (Layer 2) and
  * `T-DL-PRICING-AGGREGATOR` (Layer 1).
  */
-export const rawPriceObservationSchema = z
+export const rawEbayBrowsePriceObservationSchema = z
   .object({
     /** `'ebay_browse'`, `'aggregator_<name>'`, etc. */
     source: z.string().min(1),
@@ -479,4 +479,4 @@ export const rawPriceObservationSchema = z
     rawMetadata: z.record(z.unknown()).nullable(),
   })
   .strict();
-export type RawPriceObservation = z.infer<typeof rawPriceObservationSchema>;
+export type RawEbayBrowsePriceObservation = z.infer<typeof rawEbayBrowsePriceObservationSchema>;

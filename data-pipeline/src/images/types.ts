@@ -215,6 +215,12 @@ export interface ImagePipelineErrorContext {
 /**
  * Base class. Carries the `kind` discriminator so consumers can
  * narrow without `instanceof` chains.
+ *
+ * `toJSON` is overridden so this error round-trips through
+ * `JSON.stringify` without dropping `name` / `message` / `cause`.
+ * `Error`'s built-in fields are non-enumerable, so the default
+ * serializer would emit `{}` and the seed-run reports would lose
+ * the underlying failure (Q-005, 2026-05-04 SEED-INGEST smoke).
  */
 export abstract class ImagePipelineError extends Error {
   abstract readonly kind: ImagePipelineErrorKind;
@@ -228,6 +234,48 @@ export abstract class ImagePipelineError extends Error {
     this.source = ctx.source;
     this.target = ctx.target;
     this.cause = ctx.cause;
+  }
+
+  toJSON(): {
+    name: string;
+    kind: ImagePipelineErrorKind;
+    message: string;
+    source: string;
+    target: string | undefined;
+    cause: { name: string; message: string } | string | undefined;
+  } {
+    return {
+      name: this.name,
+      kind: this.kind,
+      message: this.message,
+      source: this.source,
+      target: this.target,
+      cause: serializeErrorCause(this.cause),
+    };
+  }
+}
+
+/**
+ * Coerce an `Error.cause` (or `AdapterErrorContext.cause`) into a
+ * shape that survives `JSON.stringify`. Plain `Error` instances
+ * have non-enumerable `name` / `message` / `stack`, so the default
+ * serializer drops them; string / number / object causes pass
+ * through untouched (the latter only stringified via
+ * `String(...)` for safety).
+ */
+export function serializeErrorCause(
+  cause: unknown,
+): { name: string; message: string } | string | undefined {
+  if (cause === undefined) return undefined;
+  if (cause instanceof Error) {
+    return { name: cause.name, message: cause.message };
+  }
+  if (typeof cause === 'string') return cause;
+  if (cause === null) return 'null';
+  try {
+    return JSON.stringify(cause);
+  } catch {
+    return String(cause);
   }
 }
 
@@ -243,6 +291,28 @@ export class FetchError extends ImagePipelineError {
   constructor(message: string, ctx: ImagePipelineErrorContext & { upstream?: AdapterError }) {
     super(message, ctx);
     this.upstream = ctx.upstream;
+  }
+
+  override toJSON(): ReturnType<ImagePipelineError['toJSON']> & {
+    upstream:
+      | { name: string; kind: string; message: string; source: string; target: string | undefined }
+      | undefined;
+  } {
+    const base = super.toJSON();
+    const upstream = this.upstream;
+    return {
+      ...base,
+      upstream:
+        upstream === undefined
+          ? undefined
+          : {
+              name: upstream.name,
+              kind: upstream.kind,
+              message: upstream.message,
+              source: upstream.source,
+              target: upstream.target,
+            },
+    };
   }
 }
 
