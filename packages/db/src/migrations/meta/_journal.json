@@ -57,6 +57,20 @@
       "when": 1777917838257,
       "tag": "0007_grading_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1777919410118,
+      "tag": "0008_pricing_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1777919410119,
+      "tag": "0009_pricing_rls",
+      "breakpoints": true
     }
   ]
 }
