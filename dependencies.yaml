@@ -207,7 +207,7 @@ tasks:
     stage: 01-data-layer
     title: Supabase RLS policies for all user tables
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-USERS, T-DL-SCHEMA-GRADING]
     parallel_safe_with: []
     provides: [security:rls]
@@ -408,6 +408,47 @@ tasks:
     owns_paths: [data-pipeline/src/jobs/seed.ts, data-pipeline/scripts/]
     task_file: tasks/01-data-layer/T-DL-SEED-INGEST.md
     est_effort: L
+    stub: true
+
+  # Follow-ups raised by T-DL-RLS-POLICIES (PR #28). All small,
+  # all pure additive; no schema-history rewrite.
+  - id: T-DL-PROFILE-GRANTS-FIX
+    stage: 01-data-layer
+    title: Additive migration to fix Q-003 (profile/subscription grants gap)
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-RLS-POLICIES]
+    parallel_safe_with: [T-DL-EBAY-LISTING-PARSER, T-DL-FX-RATES, T-DL-DATA-CONFLICT-TABLE, T-DL-ADMIN-DEBUG-SURFACES]
+    provides: [security:profile-grants-fix]
+    owns_paths: [packages/db/src/migrations/]
+    task_file: tasks/01-data-layer/T-DL-PROFILE-GRANTS-FIX.md
+    est_effort: XS
+    stub: true
+
+  - id: T-DL-DATA-CONFLICT-TABLE
+    stage: 01-data-layer
+    title: data_conflict table + resolver write path (admin debug surface)
+    agent_role: data
+    status: pending
+    depends_on: [T-DL-RLS-POLICIES, T-DL-SOURCE-INTERFACES]
+    parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-ADMIN-DEBUG-SURFACES]
+    provides: [table:data_conflict]
+    owns_paths: [packages/db/src/schema/data_conflict.ts, data-pipeline/src/resolver/conflict-log.ts]
+    task_file: tasks/01-data-layer/T-DL-DATA-CONFLICT-TABLE.md
+    est_effort: S
+    stub: true
+
+  - id: T-DL-ADMIN-DEBUG-SURFACES
+    stage: 01-data-layer
+    title: Admin debug views (pg_stat_statements + catalog audit views)
+    agent_role: backend
+    status: pending
+    depends_on: [T-DL-RLS-POLICIES]
+    parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-DATA-CONFLICT-TABLE]
+    provides: [debug:admin-surfaces]
+    owns_paths: [packages/db/src/migrations/, packages/db/src/views/]
+    task_file: tasks/01-data-layer/T-DL-ADMIN-DEBUG-SURFACES.md
+    est_effort: S
     stub: true
 
   # ============================================================
