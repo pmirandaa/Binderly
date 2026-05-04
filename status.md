@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 4 partial close (PTCGIO merged); BULBAPEDIA + TCGDEX-JP still in flight
+# Build status — Phase 1 iter 4 near-close (PTCGIO + BULBAPEDIA merged); TCGDEX-JP still in flight
 
-**Phase:** 1 — Data layer (19/109 tasks merged)
-**Merged:** 19 / 109 tasks
-**In progress:** 2 (T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP)
+**Phase:** 1 — Data layer (20/109 tasks merged)
+**Merged:** 20 / 109 tasks
+**In progress:** 1 (T-DL-SOURCE-TCGDEX-JP)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -67,7 +67,7 @@ schema task) section is still pre-staged + commented.
 | T-DL-SCHEMA-PRICING | merged | #22 (`a99fc0b`) |
 | T-DL-SOURCE-TCGDEX-EN | merged | #23 (`1a741ab`, includes `4f0a36c` reconciliation) |
 | T-DL-SOURCE-PTCGIO | merged | #24 (`c8b2de0`) |
-| T-DL-SOURCE-BULBAPEDIA | in_progress (iter 4) | — |
+| T-DL-SOURCE-BULBAPEDIA | merged | #25 (`4afde4d`) |
 | T-DL-SOURCE-TCGDEX-JP | in_progress (iter 4) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
 | T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
@@ -117,11 +117,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-SOURCE-BULBAPEDIA — `4afde4d` (filler-tier English; wiki-shaped; raw-wikitext brace-counted parser; CC-BY-NC-SA-compliant — no images persisted; 108 new tests, package total 367; first parser-heavy adapter)
 - T-DL-SOURCE-PTCGIO — `c8b2de0` (validation-tier English adapter; tcgplayer.prices key set + rarity-string class signals; X-Api-Key support; 61 new tests, package total 313; rarity registry pre-seeded by SOURCE-INTERFACES)
 - T-DL-SOURCE-TCGDEX-EN — `1a741ab` (first concrete adapter; primary English; FetchShim test pattern; 45 new tests, package total 199; canonical adapter playbook for siblings)
 - T-DL-SCHEMA-PRICING — `a99fc0b` (4 tables: market + price_observation + price_aggregate + fx_rate; idempotent 7-market seed; observation-internal RLS; 11/11 ACs PASS live; closes Phase 1 schema surface)
 - T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; runtime drift guard against classifier defaults)
-- T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154 tests; tcg-domain.md § 8 patched)
 
 ## Known follow-ups (logged, non-blocking)
 
