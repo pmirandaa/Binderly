@@ -1,0 +1,48 @@
+{
+  "name": "@binderly/data-pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Source adapters, resolver, variant classifier, and rate-limited HTTP client for Binderly catalog ingestion.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@binderly/db": "workspace:*",
+    "bottleneck": "2.19.5",
+    "pino": "9.5.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@types/node": "22.19.17",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "undici": "6.21.1",
+    "vitest": "2.1.9"
+  }
+}
