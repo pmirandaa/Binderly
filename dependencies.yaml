@@ -194,7 +194,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for prices and snapshots (scaffolded, gated)
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-CARDS]
     parallel_safe_with: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING]
     provides: [schema:pricing]
@@ -220,7 +220,7 @@ tasks:
     stage: 01-data-layer
     title: Standardization layer — source adapter interfaces and resolver
     agent_role: data
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SCHEMA-CARDS]
     parallel_safe_with: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [pipeline:interfaces, pipeline:resolver]
@@ -232,7 +232,7 @@ tasks:
     stage: 01-data-layer
     title: TCGdex EN adapter (primary English source)
     agent_role: data
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [adapter:tcgdex-en]
@@ -375,7 +375,7 @@ tasks:
     stage: 01-data-layer
     title: Master set rules engine — per-set flags + tests
     agent_role: data
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-CARDS, T-DL-SOURCE-INTERFACES]
     parallel_safe_with: []
     provides: [logic:master-set-rules]

@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 2 nearly closed: 4/4 schema tasks merged; SOURCE-INTERFACES still in flight
+# Build status — Phase 1 iter 2 closed; iter 3 dispatching (last schema + first adapter + master-set rules)
 
-**Phase:** 1 — Data layer (14/109 tasks merged)
-**Merged:** 14 / 109 tasks
-**In progress:** 1 (T-DL-SOURCE-INTERFACES)
+**Phase:** 1 — Data layer (15/109 tasks merged)
+**Merged:** 15 / 109 tasks
+**In progress:** 3 (T-DL-SCHEMA-PRICING, T-DL-SOURCE-TCGDEX-EN, T-DL-MASTER-SET-RULES)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -54,29 +54,33 @@ schema task) section is still pre-staged + commented.
 | T-DL-SCHEMA-CARDS | merged | #16 (`24b0fd4`, renumber `b5af7f7`) |
 | T-DL-SCHEMA-COLLECTIONS | merged | #17 (`c131903`) |
 | T-DL-SCHEMA-GRADING | merged | #18 (`77d18d0`, renumber `ffc4d34`) |
-| T-DL-SOURCE-INTERFACES | in_progress | — |
-| T-DL-SCHEMA-PRICING | queued (next iter) | — |
-| T-DL-RLS-POLICIES | scope shrunk; ready to dispatch (depends_on satisfied) | — |
-| T-DL-SOURCE-* (4 adapters) | blocked on SOURCE-INTERFACES | — |
-| T-DL-MASTER-SET-RULES | blocked on SOURCE-INTERFACES | — |
-| T-DL-EBAY-LISTING-PARSER | blocked on SOURCE-INTERFACES | — |
-| ... 22 more pending Phase 1 tasks | pending | — |
+| T-DL-SOURCE-INTERFACES | merged | #19 (`51b3727`) |
+| T-DL-SCHEMA-PRICING | in_progress (iter 3) | — |
+| T-DL-SOURCE-TCGDEX-EN | in_progress (iter 3) | — |
+| T-DL-MASTER-SET-RULES | in_progress (iter 3) | — |
+| T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
+| T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
+| T-DL-EBAY-LISTING-PARSER | ready (queued) | — |
+| T-DL-IMAGE-PIPELINE | ready (queued) | — |
+| T-DL-PRICING-AGGREGATOR / -EBAY-BROWSE / -ROLLUP / -CURRENT-VIEW | blocked on SCHEMA-PRICING | — |
+| T-DL-FX-RATES | blocked on SCHEMA-PRICING | — |
+| T-DL-SEED-INGEST | blocked on adapters + MASTER-SET-RULES + IMAGE-PIPELINE + RLS-POLICIES | — |
+| ... ~14 more pending Phase 1 tasks | pending | — |
 
-## Iter 3 plan (after SOURCE-INTERFACES merges)
+## Iter 3 dispatch (3 in flight, MAX_PARALLEL=3)
 
-Ready-set after that merge:
-- T-DL-SCHEMA-PRICING (stub, depends on CARDS only — independent)
-- T-DL-RLS-POLICIES (scope shrunk to data_conflict + admin debug)
-- T-DL-MASTER-SET-RULES (depends on CARDS + SOURCE-INTERFACES)
-- T-DL-SOURCE-TCGDEX-EN, -PTCGIO, -BULBAPEDIA, -TCGDEX-JP (all stubs)
-- T-DL-EBAY-LISTING-PARSER (stub, depends on SOURCE-INTERFACES + CARDS)
+Owns_paths are pairwise disjoint, so all 3 run safely in parallel:
 
-Likely iter-3 dispatch: PRICING (now safe to add as the only schema
-task in flight, no migration collision), MASTER-SET-RULES (uses
-SOURCE-INTERFACES variant classifier), and one source adapter
-(TCGDEX-EN as the primary English source). RLS-POLICIES held since
-its scope is now mostly redundant; may consolidate into a docs-only
-PR.
+| Task | Scope | Owns_paths |
+|---|---|---|
+| T-DL-SCHEMA-PRICING | Last schema task in Phase 1; finalizes the DB surface for the pricing branch. Migrations land cleanly at 0008/0009 (no other schema in flight). | `packages/db/src/schema/{prices,price_snapshots}.ts` + barrel uncomment + new migrations |
+| T-DL-SOURCE-TCGDEX-EN | First concrete adapter; primary English source. Validates the @binderly/data-pipeline contract from the consumer side. | `data-pipeline/src/adapters/tcgdex-en/` |
+| T-DL-MASTER-SET-RULES | Master set decision logic; consumes the variant classifier from SOURCE-INTERFACES; emits `printing.include_in_master_set` writes. | `data-pipeline/src/master-set/` |
+
+All three are stubs flagged for elaboration (the orchestrator's
+"elaborate-then-ship" prompt pattern from GRADING is reused). RLS-
+POLICIES held: its remaining scope (data_conflict + admin debug
+surfaces) may roll into a later docs PR.
 
 ## Phase 0 ledger (closed)
 
@@ -85,11 +89,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154/154 tests; tcg-domain.md § 8 patched per allowed escalation)
 - T-DL-SCHEMA-GRADING — `77d18d0` (grading_submission + grading_training_sample; cross-schema FK; service-role-only training corpus; renumbered 0006/0007)
 - T-DL-SCHEMA-COLLECTIONS — `c131903` (5 tables + 0004/0005; NULLS NOT DISTINCT; nested-table RLS via EXISTS; shareable slug-gated public-read)
 - T-DL-SCHEMA-CARDS — `24b0fd4` (catalog tables + RLS; renumbered 0002/0003; snapshot hand-merge)
 - T-DL-SCHEMA-USERS — `e9b4f38` (profile + subscription; cross-schema FK to auth.users; user-side RLS)
-- T-FN-DB-MIGRATIONS — `7b4529e` (Drizzle ORM + migration tooling; pre-staged schema barrel)
 
 ## Known follow-ups (logged, non-blocking)
 
