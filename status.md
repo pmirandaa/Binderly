@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 4 CLOSED (5 source adapters merged); iter 5 dispatching
+# Build status — Phase 1 iter 5 partial close (IMAGE-PIPELINE merged); 2 still in flight
 
-**Phase:** 1 — Data layer (21/109 tasks merged)
-**Merged:** 21 / 109 tasks
-**In progress:** 3 (T-DL-IMAGE-PIPELINE, T-DL-EBAY-LISTING-PARSER, T-DL-RLS-POLICIES)
+**Phase:** 1 — Data layer (22/109 tasks merged)
+**Merged:** 22 / 109 tasks
+**In progress:** 2 (T-DL-EBAY-LISTING-PARSER, T-DL-RLS-POLICIES)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -75,7 +75,7 @@ schema task) section is still pre-staged + commented.
 | T-DL-SOURCE-PTCGIO | merged | #24 (`c8b2de0`) |
 | T-DL-SOURCE-BULBAPEDIA | merged | #25 (`4afde4d`) |
 | T-DL-SOURCE-TCGDEX-JP | merged | #26 (`4c30cf0`; agent hung post-commit, orchestrator validated + opened PR) |
-| T-DL-IMAGE-PIPELINE | in_progress (iter 5) | — |
+| T-DL-IMAGE-PIPELINE | merged | #27 (`9be37c0`; +printing_image table; mig 0010/0011) |
 | T-DL-EBAY-LISTING-PARSER | in_progress (iter 5) | — |
 | T-DL-RLS-POLICIES | in_progress (iter 5; scope shrunk) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
@@ -121,11 +121,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-IMAGE-PIPELINE — `9be37c0` (sharp+S3+R2 image ingestion; 4-step variant ladder thumb/card/large/original; deterministic key shape; SHA-256 dedup via printing_image sidecar; Bulbapedia auto-excluded by EXCLUDED_IMAGE_SOURCES; mig 0010/0011; 42 new tests, package total 569)
 - T-DL-SOURCE-TCGDEX-JP — `4c30cf0` (primary JP TCGdex + filler JP Pokemon-Card.com; reuses isTcgdexPromoSet from EN; pokemoncardJpToTcgdexJp matcher bridges id systems; 99 new tests, package total 527; closes iter 4)
 - T-DL-SOURCE-BULBAPEDIA — `4afde4d` (filler-tier English; wiki-shaped; raw-wikitext brace-counted parser; CC-BY-NC-SA-compliant — no images persisted; 108 new tests, package total 367; first parser-heavy adapter)
 - T-DL-SOURCE-PTCGIO — `c8b2de0` (validation-tier English adapter; tcgplayer.prices key set + rarity-string class signals; X-Api-Key support; 61 new tests, package total 313; rarity registry pre-seeded by SOURCE-INTERFACES)
 - T-DL-SOURCE-TCGDEX-EN — `1a741ab` (first concrete adapter; primary English; FetchShim test pattern; 45 new tests, package total 199; canonical adapter playbook for siblings)
-- T-DL-SCHEMA-PRICING — `a99fc0b` (4 tables: market + price_observation + price_aggregate + fx_rate; idempotent 7-market seed; observation-internal RLS; 11/11 ACs PASS live; closes Phase 1 schema surface)
 
 ## Known follow-ups (logged, non-blocking)
 

@@ -388,7 +388,7 @@ tasks:
     stage: 01-data-layer
     title: Image ingestion → R2 with WebP variants and provenance metadata
     agent_role: data
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [pipeline:images]
