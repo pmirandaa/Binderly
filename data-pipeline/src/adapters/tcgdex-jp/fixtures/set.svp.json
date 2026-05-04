@@ -1,0 +1,30 @@
+{
+  "cardCount": {
+    "firstEd": 0,
+    "holo": 0,
+    "normal": 0,
+    "official": 0,
+    "reverse": 0,
+    "total": 12
+  },
+  "cards": [
+    {
+      "id": "svp-001",
+      "image": "https://assets.tcgdex.net/jp/sv/svp/001",
+      "localId": "001",
+      "name": "ピカチュウ"
+    }
+  ],
+  "id": "svp",
+  "logo": "https://assets.tcgdex.net/jp/sv/svp/logo",
+  "name": "プロモーションカードパック",
+  "releaseDate": "2023-01-20",
+  "serie": {
+    "id": "sv",
+    "name": "スカーレット&バイオレット"
+  },
+  "symbol": "https://assets.tcgdex.net/univ/sv/svp/symbol",
+  "abbreviation": {
+    "official": "SVP"
+  }
+}

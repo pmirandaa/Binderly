@@ -22,6 +22,7 @@ import type { Rarity } from '../types.js';
 export type SourceName =
   | 'tcgdex-en'
   | 'tcgdex-jp'
+  | 'pokemoncard-jp'
   | 'ptcgio'
   | 'bulbapedia-en'
   | 'pokellector'
@@ -190,13 +191,52 @@ const tcgdexJp: RarityMappingTable = {
   Uncommon: 'UNCOMMON',
   Rare: 'RARE',
   'Rare Holo': 'HOLO_RARE',
+  'Holo Rare': 'HOLO_RARE',
+  'Holo Rare V': 'ULTRA_RARE',
+  'Holo Rare VMAX': 'ULTRA_RARE',
+  'Holo Rare VSTAR': 'ULTRA_RARE',
   'Double Rare': 'DOUBLE_RARE',
   'Ultra Rare': 'ULTRA_RARE',
   'Special Art Rare': 'SPECIAL_ILLUSTRATION_RARE',
   'Special Illustration Rare': 'SPECIAL_ILLUSTRATION_RARE',
+  // Lowercase-`rare` SV-era variants observed on some TCGdex JP fixtures
+  // (mirrors EN's word-order pattern). Keep both off the
+  // case-insensitive fallback path.
+  'Special illustration rare': 'SPECIAL_ILLUSTRATION_RARE',
   'Illustration Rare': 'ILLUSTRATION_RARE',
+  'Illustration rare': 'ILLUSTRATION_RARE',
   'Art Rare': 'ILLUSTRATION_RARE',
   'Hyper Rare': 'HYPER_RARE',
+  'Hyper rare': 'HYPER_RARE',
+  // JP-side prints occasionally surface a Rainbow Rare label.
+  'Rainbow Rare': 'RAINBOW_RARE',
+  'Rare Rainbow': 'RAINBOW_RARE',
+  'Shiny Rare': 'ULTRA_RARE',
+  'Shiny Super Rare': 'ULTRA_RARE',
+  'Character Rare': 'ULTRA_RARE',
+  'Character Super Rare': 'ULTRA_RARE',
+  'Super Rare': 'ULTRA_RARE',
+  Promo: 'PROMO',
+};
+
+const pokemoncardJp: RarityMappingTable = {
+  // Pokemon-Card.com glyph → label mapping (the parser emits the
+  // labels below; raw glyphs like `AR` / `SAR` / `HR` / `RR` /
+  // `RRR` / `CHR` / `CSR` / `S` / `SSR` are mapped to these labels
+  // in `pokemoncard-jp/parsers.ts`). All glyphs map through
+  // canonical rarities per § "Rarity normalization registry" in the
+  // T-DL-SOURCE-TCGDEX-JP elaborated spec.
+  Common: 'COMMON',
+  Uncommon: 'UNCOMMON',
+  Rare: 'RARE',
+  'Double Rare': 'DOUBLE_RARE',
+  'Super Rare': 'ULTRA_RARE',
+  'Ultra Rare': 'ULTRA_RARE',
+  'Hyper Rare': 'HYPER_RARE',
+  'Illustration Rare': 'ILLUSTRATION_RARE',
+  'Art Rare': 'ILLUSTRATION_RARE',
+  'Special Illustration Rare': 'SPECIAL_ILLUSTRATION_RARE',
+  'Special Art Rare': 'SPECIAL_ILLUSTRATION_RARE',
   'Shiny Rare': 'ULTRA_RARE',
   'Shiny Super Rare': 'ULTRA_RARE',
   'Character Rare': 'ULTRA_RARE',
@@ -207,6 +247,7 @@ const tcgdexJp: RarityMappingTable = {
 const REGISTRY = new Map<SourceName, Map<string, Rarity>>();
 REGISTRY.set('tcgdex-en', new Map(Object.entries(tcgdexEn)));
 REGISTRY.set('tcgdex-jp', new Map(Object.entries(tcgdexJp)));
+REGISTRY.set('pokemoncard-jp', new Map(Object.entries(pokemoncardJp)));
 REGISTRY.set('ptcgio', new Map(Object.entries(ptcgio)));
 REGISTRY.set('bulbapedia-en', new Map(Object.entries(bulbapediaEn)));
 REGISTRY.set('pokellector', new Map());
@@ -289,6 +330,7 @@ export function _resetRarityRegistryForTests(): void {
   REGISTRY.clear();
   REGISTRY.set('tcgdex-en', new Map(Object.entries(tcgdexEn)));
   REGISTRY.set('tcgdex-jp', new Map(Object.entries(tcgdexJp)));
+  REGISTRY.set('pokemoncard-jp', new Map(Object.entries(pokemoncardJp)));
   REGISTRY.set('ptcgio', new Map(Object.entries(ptcgio)));
   REGISTRY.set('bulbapedia-en', new Map(Object.entries(bulbapediaEn)));
   REGISTRY.set('pokellector', new Map());

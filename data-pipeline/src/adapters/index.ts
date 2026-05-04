@@ -25,5 +25,5 @@ export * from './bulbapedia/index.js';
 // ============================================================
 // === T-DL-SOURCE-TCGDEX-JP === (primary Japanese)
 // ============================================================
-// export * from './tcgdex-jp/index.js';
-// export * from './pokemoncard-jp/index.js';
+export * from './tcgdex-jp/index.js';
+export * from './pokemoncard-jp/index.js';

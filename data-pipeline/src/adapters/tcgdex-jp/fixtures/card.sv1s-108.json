@@ -1,0 +1,32 @@
+{
+  "category": "Energy",
+  "id": "sv1s-108",
+  "image": "https://assets.tcgdex.net/jp/sv/sv1s/108",
+  "localId": "108",
+  "name": "基本草エネルギー",
+  "rarity": "Hyper Rare",
+  "set": {
+    "cardCount": {
+      "official": 71,
+      "total": 108
+    },
+    "id": "sv1s",
+    "logo": "https://assets.tcgdex.net/jp/sv/sv1s/logo",
+    "name": "トリプレットビート",
+    "symbol": "https://assets.tcgdex.net/univ/sv/sv1s/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": false,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "energyType": "Normal",
+  "effect": "このカードは、自分の場のポケモンに、いつでも好きなだけつけることができる。つけているポケモンに、草エネルギーを1個ぶん与える。",
+  "legal": {
+    "standard": true,
+    "expanded": true
+  },
+  "updated": "2025-08-16T20:39:55Z"
+}

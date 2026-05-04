@@ -1,0 +1,57 @@
+{
+  "category": "Pokemon",
+  "id": "svp-001",
+  "illustrator": "Akira Komayama",
+  "image": "https://assets.tcgdex.net/jp/sv/svp/001",
+  "localId": "001",
+  "name": "ピカチュウ",
+  "rarity": "Promo",
+  "set": {
+    "cardCount": {
+      "official": 0,
+      "total": 12
+    },
+    "id": "svp",
+    "logo": "https://assets.tcgdex.net/jp/sv/svp/logo",
+    "name": "プロモーションカードパック",
+    "symbol": "https://assets.tcgdex.net/univ/sv/svp/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "variants_detailed": [
+    {
+      "type": "holo",
+      "size": "standard",
+      "variantId": "generated"
+    }
+  ],
+  "dexId": [25],
+  "hp": 60,
+  "types": ["Lightning"],
+  "stage": "Basic",
+  "attacks": [
+    {
+      "cost": ["Lightning"],
+      "name": "でんきショック",
+      "damage": 20
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fighting",
+      "value": "×2"
+    }
+  ],
+  "retreat": 1,
+  "regulationMark": "G",
+  "legal": {
+    "standard": true,
+    "expanded": true
+  },
+  "updated": "2025-08-16T20:39:55Z"
+}
