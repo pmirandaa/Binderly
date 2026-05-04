@@ -537,4 +537,61 @@ Stop and append to `open-questions.md` if:
 
 ## Notes from execution
 
-_(Sub-agent appends here at end. Empty until then.)_
+- **Idempotent variant tags.** `RawPrinting.sourceKey` is built as
+  `card.id + '-' + variantTag`, where `variantTag` encodes the
+  visible axis + flags (e.g. `swsh9-001-normal`,
+  `swsh9-001-reverse`, `base1-4-holo-shadowless-1stedition`,
+  `base1-4-holo-shadowless`, `base1-4-holo-unlimited`). This
+  guarantees the same physical printing produces the same source
+  key on every re-fetch, which the seed-ingest task relies on for
+  upserts.
+- **`variants_detailed` semantics.** TCGdex uses `subtype` to mean
+  three things — vintage subset (`shadowless`, `unlimited`,
+  `1999-2000-copyright`), pattern (none observed in our captures),
+  and other. We special-case `shadowless` / `unlimited`; everything
+  else falls through into `RawPrinting.extra.subtypeTag` for the
+  filler / validation tier sources to refine.
+- **SV-era special rares are derived from rarity.** TCGdex returns
+  `variants.holo: false` (and no `variants_detailed`) for
+  Illustration / Special Illustration / Hyper / Rare Rainbow. The
+  adapter maps the rarity string to `isFullArt` /
+  `isAltArt` / `isGoldRare` / `isRainbowRare` so the variant
+  classifier still picks the right class. Documented as branch 3 of
+  `tcgdexCardToPrintings`.
+- **Promo set rule lives in `promo-sets.ts`.** Suffix-`p` regex
+  matches every era's Black Star set we've observed (`basep`,
+  `swshp`, `xyp`, `swp`, `wp`). The rule is exported so the JP
+  adapter can reuse it.
+- **Logo / symbol URLs need an explicit extension.** TCGdex serves
+  assets without the `.png` suffix; the `RawSet.logoUrl` /
+  `symbolUrl` zod schemas require fully-qualified URLs, so the
+  transform appends `.png`. The image pipeline downstream is free
+  to choose `.webp` instead — it owns rehosting and format
+  selection.
+- **Rate-limit floor 5 rps / burst 10.** Picked the more
+  conservative orchestrator-stated floor over the README's 10 rps /
+  burst 5 because TCGdex doesn't publish a per-IP limit and the
+  orchestrator's task instructions take precedence. The README's
+  general guidance line will be reconciled with the next
+  data-pipeline-wide rate-limit pass.
+- **Trainer cards in fixtures.** The `swsh9-150` Ultra Ball /
+  `swsh9-147` Professor's Research / `swsh9-151` Double Turbo
+  cards live inside the swsh9 set fixture but were not captured as
+  individual card fixtures. The `Trainer card with trainerType`
+  test synthesizes a Trainer payload from a Pokémon fixture so the
+  test stays small and deterministic. The "Energy" path uses the
+  real `sv01-258` Hyper-Rare basic energy fixture.
+- **`pricing` stripped from card fixtures.** TCGdex returns daily-
+  changing Cardmarket / TCGplayer figures inline. The adapter
+  ignores them entirely (pricing pipeline owns price data); we
+  trim `pricing` from the captured fixtures so re-captures don't
+  drift the diff.
+- **Touched files outside `owns_paths`.** Per the task brief and
+  the registry-extension carve-out: `data-pipeline/src/normalize/rarity.ts`
+  (added the `Holo Rare V[MAX|STAR|EX|GX|LV.X]`, lowercase-`rare`
+  illustration / hyper variants), and `data-pipeline/src/index.ts`
+  (re-exports the new `adapters/` barrel). Both are documented in
+  the PR body.
+- **Test counts.** 199 / 199 passing across 12 test files: 22
+  transform tests, 19 adapter tests, 4 resolver-integration tests
+  inside this task; 154 pre-existing tests untouched.
