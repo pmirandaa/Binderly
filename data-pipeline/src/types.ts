@@ -362,3 +362,121 @@ export interface ResolveListResult<T> {
   canonical: T[];
   conflicts: DataConflict[];
 }
+
+// ============================================================
+// Raw price observations — what pricing adapters EMIT
+// ============================================================
+
+/**
+ * The three values `price_observation.observation_kind` is allowed to
+ * carry per `packages/db/src/schema/prices.ts`'s CHECK constraint:
+ *
+ *   - `'sold'`              — Layer 3 / aggregator-emitted sold sales.
+ *   - `'active_listing'`    — Layer 2 (eBay Browse — asking prices).
+ *   - `'aggregator_quote'`  — Layer 1 (aggregator's normalized quote).
+ *
+ * Mirrored here as a const tuple so adapters that emit
+ * `RawEbayBrowsePriceObservation` records validate against the schema without
+ * dragging `@binderly/db` into the type graph.
+ */
+export const PRICE_OBSERVATION_KINDS = ['sold', 'active_listing', 'aggregator_quote'] as const;
+export const priceObservationKindSchema = z.enum(PRICE_OBSERVATION_KINDS);
+export type PriceObservationKind = z.infer<typeof priceObservationKindSchema>;
+
+/**
+ * Canonical `price_observation.grade_tier` vocabulary, copied from
+ * `data-pipeline/src/parsers/ebay-listing/types.ts`. Re-declared here
+ * (rather than imported) so this module stays at the bottom of the
+ * type graph; the parser package is a downstream consumer.
+ *
+ * Keep this list in sync with the parser's `GRADE_TIERS`. A test in
+ * `data-pipeline/src/types.alignment.test.ts` (or the adapter's own
+ * tests) asserts the alignment.
+ */
+export const PRICE_OBSERVATION_GRADE_TIERS = [
+  'RAW_NM',
+  'RAW_LP',
+  'RAW_MP',
+  'RAW_HP',
+  'RAW_DMG',
+  'RAW_UNKNOWN',
+  'PSA_10',
+  'PSA_9',
+  'PSA_8',
+  'PSA_7',
+  'PSA_LOWER',
+  'BGS_10_BLACK',
+  'BGS_10',
+  'BGS_9_5',
+  'BGS_9',
+  'BGS_LOWER',
+  'CGC_10_PRISTINE',
+  'CGC_10',
+  'CGC_9_5',
+  'CGC_9',
+  'CGC_LOWER',
+  'OTHER_GRADED',
+] as const;
+export const priceObservationGradeTierSchema = z.enum(PRICE_OBSERVATION_GRADE_TIERS);
+export type PriceObservationGradeTier = z.infer<typeof priceObservationGradeTierSchema>;
+
+/**
+ * `RawEbayBrowsePriceObservation` — the shape every pricing adapter EMITS,
+ * one row per upstream listing / quote / sale.
+ *
+ * Field-for-field mirror of `NewPriceObservation` from `@binderly/db`
+ * (insert type for `price_observation`) so the runner's repo
+ * implementation can map straight into a Drizzle insert without a
+ * second translation pass — same posture as `FxRateRow` ↔ `NewFxRate`
+ * from `T-DL-FX-RATES`.
+ *
+ * `observedPrice` and `shipping` are strings (rather than `number`)
+ * because Drizzle's `numeric` columns round-trip cleanly as strings
+ * (`'12.34'`) but suffer the usual floating-point quirks when fed
+ * raw `number` (`0.1 + 0.2 → 0.30000000000000004`).
+ *
+ * Shared by `T-DL-PRICING-EBAY-BROWSE` (Layer 2) and
+ * `T-DL-PRICING-AGGREGATOR` (Layer 1).
+ */
+export const rawEbayBrowsePriceObservationSchema = z
+  .object({
+    /** `'ebay_browse'`, `'aggregator_<name>'`, etc. */
+    source: z.string().min(1),
+    /**
+     * Upstream stable id used for idempotent upserts. eBay returns
+     * `itemId` (always present); aggregators that lack a stable id
+     * may set this null — the schema's `(source, source_listing_id)`
+     * UNIQUE constraint uses Postgres's default NULLS DISTINCT so
+     * null entries don't conflict.
+     */
+    sourceListingId: z.string().min(1).nullable(),
+    /** Resolved printing UUID from the catalog joiner. */
+    printingId: z.string().uuid(),
+    observationKind: priceObservationKindSchema,
+    /** `market.code` value: `'EBAY_US'`, `'CARDMARKET_EU'`, etc. */
+    market: z.string().min(1),
+    gradeTier: priceObservationGradeTierSchema,
+    /** numeric(12,2) — string for round-trip stability. */
+    observedPrice: z.string().regex(/^-?\d+(\.\d{1,2})?$/),
+    /** ISO-4217 alpha-3, uppercase. */
+    observedCurrency: z.string().regex(/^[A-Z]{3}$/),
+    /** numeric(12,2). Null when shipping is unknown / free / bundled. */
+    shipping: z
+      .string()
+      .regex(/^-?\d+(\.\d{1,2})?$/)
+      .nullable(),
+    /** 0..1. Aggregates exclude < 0.7 per the rollup spec. */
+    parseConfidence: z.number().min(0).max(1).nullable(),
+    /** When the upstream quote / sale was real. */
+    observedAt: z.date(),
+    /** ISO `YYYY-MM-DD`; date-only of `observedAt` (UTC) for FX joins. */
+    observedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    /**
+     * Listing title, seller, source URL, raw payload — debug-only,
+     * never surfaced to clients (RLS is service-role-only). Also
+     * the kill-switch / takedown response per `legal-and-brand.md`.
+     */
+    rawMetadata: z.record(z.unknown()).nullable(),
+  })
+  .strict();
+export type RawEbayBrowsePriceObservation = z.infer<typeof rawEbayBrowsePriceObservationSchema>;

@@ -37,3 +37,8 @@ export * from './fx/index.js';
 // === T-DL-PRICING-AGGREGATOR === (Layer 1 pricing — eBay sold + Cardmarket via paid API)
 // ============================================================
 export * from './pricing-aggregator/index.js';
+
+// ============================================================
+// === T-DL-PRICING-EBAY-BROWSE === (Layer 2 — active listings)
+// ============================================================
+export * from './pricing-ebay-browse/index.js';

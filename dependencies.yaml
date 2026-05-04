@@ -313,7 +313,7 @@ tasks:
     depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING, T-DL-EBAY-LISTING-PARSER]
     parallel_safe_with: [T-DL-PRICING-AGGREGATOR]
     provides: [adapter:pricing-ebay-browse]
-    owns_paths: [data-pipeline/src/adapters/pricing-ebay-browse/]
+    owns_paths: [data-pipeline/src/adapters/pricing-ebay-browse/, data-pipeline/src/jobs/pricing-ebay-browse.ts, data-pipeline/scripts/pricing-ebay-browse.ts]
     task_file: tasks/01-data-layer/T-DL-PRICING-EBAY-BROWSE.md
     est_effort: L
     stub: true
