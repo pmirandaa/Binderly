@@ -21,8 +21,8 @@
 // ============================================================
 // === T-DL-SCHEMA-USERS ===
 // ============================================================
-// export * from "./profiles.js";
-// export * from "./subscriptions.js";
+export * from './profiles.js';
+export * from './subscriptions.js';
 
 // ============================================================
 // === T-DL-SCHEMA-COLLECTIONS ===
