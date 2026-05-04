@@ -1,0 +1,8 @@
+# Generated SQL migrations live here. Files are produced by
+# `pnpm db:generate` (which wraps `drizzle-kit generate`) and committed
+# to git. drizzle-kit also writes a `meta/` subfolder with a
+# `_journal.json` it uses to track which migrations exist — that
+# metadata is committed too, but it is NOT the migration itself.
+#
+# Until the first schema lands in Phase 1 this directory only contains
+# this placeholder.

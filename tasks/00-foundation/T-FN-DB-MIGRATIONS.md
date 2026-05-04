@@ -6,19 +6,23 @@
 **Status:** pending
 
 ## Hard dependencies
+
 - T-FN-SUPABASE-LOCAL
 - T-FN-TS-CONFIG
 
 ## Soft dependencies
+
 _(none)_
 
 ## Required reading
+
 - rules/00-foundation.md
 - context/data-model.md (general structure; specifics handled in stage 01)
 - context/conventions.md (Database migrations)
 - context/tech-stack.md (Why Drizzle)
 
 ## Goal
+
 Wire up Drizzle as our schema-and-migration tool. Provide the
 `packages/db` package skeleton that subsequent data-layer tasks will fill
 with real schemas. Migrations are SQL files committed to git; Drizzle is
@@ -84,4 +88,84 @@ production — only generated SQL.
   unilaterally.
 
 ## Notes from execution
-_(empty)_
+
+### Pinned versions (npm `latest` at time of authoring)
+
+| Package       | Pin        | Notes                                                       |
+| ------------- | ---------- | ----------------------------------------------------------- |
+| `drizzle-orm` | `0.45.2`   | postgres-js binding consumed at runtime.                    |
+| `drizzle-kit` | `0.31.10`  | devDep; used only for `drizzle-kit generate`.               |
+| `postgres`    | `3.4.9`    | postgres-js driver.                                         |
+| `zod`         | `3.25.76`  | held at 3.x per spec — Phase-1 callers stay on 3.x for now. |
+| `tsx`         | `4.21.0`   | runs the TS scripts directly.                               |
+| `typescript`  | `5.9.3`    | matches workspace pin (`packages/config/tsconfig`).         |
+| `@types/node` | `22.19.17` | matches workspace pin.                                      |
+| `eslint`      | `9.39.4`   | matches `@binderly/eslint-config` peer.                     |
+| `prettier`    | `3.8.3`    | matches `@binderly/prettier-config` peer.                   |
+
+### Acceptance criteria results
+
+| AC   | Status   | Proof / paste-able verification                                                                                                                                                                                                                                                         |
+| ---- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-1 | PASS     | `pnpm exec tsx packages/db/scripts/generate.ts --config drizzle.smoke.config.ts` produced `0000_flowery_makkari.sql` matching `^\d{4}_[a-z0-9]+(?:_[a-z0-9]+)*\.sql$`. Output cleaned post-check.                                                                                       |
+| AC-2 | DEFERRED | Sandbox cannot reach Docker. Run from main shell: `cd /Users/pmiranda/Stuff/binderly-wt-T-FN-DB-MIGRATIONS && pnpm db:start && pnpm db:migrate:local` (no-op until Phase 1 lands a real schema).                                                                                        |
+| AC-3 | PASS     | `cd packages/db && tsc -p . && tsc -p . --noEmit && eslint --max-warnings=0 . && prettier --check .` all exit 0.                                                                                                                                                                        |
+| AC-4 | DEFERRED | Same Docker dependency as AC-2. Round-trip command: `pnpm exec tsx packages/db/scripts/generate.ts --config drizzle.smoke.config.ts && pnpm db:migrate:local && psql "$SUPABASE_DB_URL" -c 'select * from _smoke; drop table _smoke;'`, then `git restore packages/db/src/migrations/`. |
+| AC-5 | PASS     | The smoke run produced `src/migrations/0000_flowery_makkari.sql` containing real SQL (`CREATE TABLE "_smoke" (...)`) and `src/migrations/meta/_journal.json` as separate metadata. Verified by file inspection before deletion.                                                         |
+
+### Decisions
+
+- **Driver**: `postgres` (postgres-js) per spec. Edge-runtime friendly,
+  lighter than `pg`, first-class TS types. Pooling note: postgres-js
+  uses a single Postgres connection pool with a `max` parameter; for
+  PgBouncer-fronted prod (transaction pool mode) we may need to disable
+  prepared statements (`prepare: false`). Documented in
+  `packages/db/README.md` "Driver" section so a future schema/data-layer
+  task can re-evaluate without re-deriving the choice.
+- **Schema barrel**: empty `src/schema/index.ts` ships `export {};`.
+  Once Phase-1 schema files land they'll switch to
+  `export * from './<feature>.js';` — `verbatimModuleSyntax` is OFF in
+  the inherited `@binderly/tsconfig/library.json`, so `export *` from a
+  freshly-populated barrel works without ceremony. Confirmed by typecheck.
+- **Sequential-name enforcement**: drizzle-kit's default naming
+  (`NNNN_<random_two_word>.sql`) already matches the convention regex.
+  `scripts/generate.ts` asserts this on every invocation so a future
+  drizzle-kit upgrade that changes naming fails the build instead of
+  shipping a divergent file.
+- **`scripts/migrate.ts`** uses Drizzle's official
+  `migrate(db, { migrationsFolder })` from `drizzle-orm/postgres-js/migrator`.
+  URL precedence: `--url` flag > `DATABASE_URL` > `SUPABASE_DB_URL`.
+  Always closes the postgres-js pool in a `finally` block.
+
+### Sandbox-deferred verification (orchestrator should run)
+
+```bash
+cd /Users/pmiranda/Stuff/binderly-wt-T-FN-DB-MIGRATIONS
+pnpm db:start
+# AC-2: applies the empty migrations folder (no-op until Phase 1 lands).
+pnpm db:migrate:local
+# AC-4 (full round-trip):
+pnpm exec tsx packages/db/scripts/generate.ts --config packages/db/drizzle.smoke.config.ts
+pnpm db:migrate:local
+psql "$SUPABASE_DB_URL" -c 'select * from _smoke; drop table _smoke;'
+# Then restore the migrations folder so the schema barrel stays empty:
+git restore packages/db/src/migrations/
+pnpm db:stop
+```
+
+### Lockfile
+
+`pnpm install --frozen-lockfile` failed with `ERR_PNPM_OUTDATED_LOCKFILE`
+(expected — the new package adds deps). Fell back to `pnpm install`
+which regenerated `pnpm-lock.yaml` cleanly with all new deps pinned at
+the exact versions above. This matches the foundation-stage lockfile
+carve-out for new dep additions.
+
+### Escalations
+
+None. The PG17-vs-PG16 question (Supabase 17, Compose 16) is already
+inert per `infra/supabase/README.md` — the app schema lives only on
+Supabase, so PG17 is what every generated migration targets. Drizzle's
+generated SQL uses portable DDL (`CREATE TABLE … PRIMARY KEY DEFAULT
+gen_random_uuid()`, `timestamp with time zone DEFAULT now()`) so the
+PG16-vs-PG17 distinction is not a live concern for this skeleton.
