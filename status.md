@@ -1,48 +1,52 @@
-# Build status — Phase 0 at 7/10; SUPABASE-LOCAL in flight
+# Build status — Phase 0 at 8/10; ENV-CONVENTIONS in flight
 
-**Phase:** 0 — Foundation (70% merged)
-**Merged:** 7 / 109 tasks
-**In progress:** 1 (T-FN-SUPABASE-LOCAL)
+**Phase:** 0 — Foundation (80% merged)
+**Merged:** 8 / 109 tasks
+**In progress:** 1 (T-FN-ENV-CONVENTIONS)
 **Blocked:** 0
 **Blocked on humans:** 0
-**Resolved this session:** Q-002 (Docker Desktop up after reboot path)
 
-## Dispatch loop status: 1 task in flight
+## Dispatch loop status
 
-T-FN-SUPABASE-LOCAL dispatched into `../binderly-wt-T-FN-SUPABASE-LOCAL`.
-Soft-parallel sibling T-FN-ENV-CONVENTIONS held back deliberately:
-both tasks modify `.env.example`, and the spec for ENV-CONVENTIONS
-explicitly asks it to consolidate the Supabase vars into the canonical
-shape. Sequencing them avoids a guaranteed merge conflict on a
-foundation file. ENV-CONVENTIONS dispatches as soon as SUPABASE-LOCAL
-merges.
+T-FN-ENV-CONVENTIONS dispatched into `../binderly-wt-T-FN-ENV-CONVENTIONS`.
+T-FN-DB-MIGRATIONS held back deliberately: both tasks add scripts to
+root `package.json` and may both touch `pnpm-lock.yaml`. Sequencing
+avoids the merge conflict; ENV-CONVENTIONS is S-effort (~5-10 min)
+so the wall-clock cost is small. DB-MIGRATIONS dispatches as soon as
+ENV-CONVENTIONS merges.
 
 ## Phase 0 remaining
 
 | Task | Direct deps | Status | When ready |
 |---|---|---|---|
-| T-FN-SUPABASE-LOCAL | T-FN-DOCKER | in_progress | now |
-| T-FN-ENV-CONVENTIONS | T-FN-DOCKER | pending | held; dispatches after SUPABASE-LOCAL merges |
-| T-FN-DB-MIGRATIONS | T-FN-SUPABASE-LOCAL | pending | after SUPABASE-LOCAL merges |
+| T-FN-ENV-CONVENTIONS | T-FN-DOCKER | in_progress | now |
+| T-FN-DB-MIGRATIONS | T-FN-SUPABASE-LOCAL, T-FN-TS-CONFIG | pending | held; dispatches after ENV-CONVENTIONS merges |
 
-After all three merge, Phase 0 is complete and Phase 1 (data layer)
-unlocks — every schema task transitively gates on T-FN-DB-MIGRATIONS.
+After both merge, **Phase 0 is complete** and Phase 1 (data layer)
+unlocks. Most schema tasks become parallel-ready (cards, users, then
+collections/grading/pricing/source-interfaces).
 
-## Tooling
-Both worktree scripts have battle-tested across 7 dispatches now.
-Merge-detection (title-marker heuristic) survives both local
-squash-merges and `gh pr merge --squash` (used for T-FN-DOCKER #11
-since gh auth came back online).
+## Verification protocol learnings (this session)
+The Cursor Shell sandbox blocks Docker socket access for `bash`-style
+chained commands and arbitrary scripts under `/tmp/`, even with
+`required_permissions: ["all"]`. Direct allowlisted commands
+(`docker info`, `gh pr ...`, `git push`, `bash scripts/<workspace>/...`)
+escape it. Workaround for runtime ACs that need Docker:
+1. Static-analyze the diff in foreground (always works).
+2. If a smoke test is needed, give Pablo a paste-able one-liner.
+3. Merge on his thumbs-up.
+
+T-FN-SUPABASE-LOCAL was verified this way: ALL CHECKS PASSED on
+Pablo's manual smoke run before merge.
 
 ## Last 5 merges
-- T-FN-DOCKER               — `3aae727` (gh pr merge --squash, branch
-                              auto-deleted on origin)
-- T-FN-CI                   — `79805a3` (E-002 deviation: PR-title regex)
-- T-FN-LINT-CONFIG          — `f20b66b`
+- T-FN-SUPABASE-LOCAL — `e81cb2f` (E-003: npm wrapper + --workdir infra; PG17 vs PG16 inert divergence approved)
+- T-FN-DOCKER        — `3aae727` (gh pr merge --squash)
+- T-FN-CI            — `79805a3` (E-002: PR-title regex)
+- T-FN-LINT-CONFIG   — `f20b66b`
 - T-FN-ORCHESTRATOR-SCRIPTS — `79a2587`
-- T-FN-TS-CONFIG            — `df01a4d`
 
-## Side note: Dependabot PRs
+## Side note
 Dependabot still has ~9 open PRs from when CI landed. Triage when
 convenient; not blocking.
 

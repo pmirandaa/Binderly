@@ -93,7 +93,7 @@ tasks:
     stage: 00-foundation
     title: Supabase local dev via supabase-cli
     agent_role: devops
-    status: in_progress
+    status: merged
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: []
     provides: [infra:supabase-local]
@@ -129,7 +129,7 @@ tasks:
     stage: 00-foundation
     title: Environment variable conventions and .env.example
     agent_role: devops
-    status: pending
+    status: in_progress
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: [T-FN-SUPABASE-LOCAL, T-FN-ORCHESTRATOR-SCRIPTS]
     provides: [config:env]
