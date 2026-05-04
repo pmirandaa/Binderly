@@ -1,0 +1,74 @@
+{
+  "id": "swsh9-18",
+  "name": "Charizard VSTAR",
+  "supertype": "Pokémon",
+  "subtypes": ["VSTAR"],
+  "hp": "280",
+  "types": ["Fire"],
+  "evolvesFrom": "Charizard V",
+  "rules": [
+    "VSTAR rule: When your Pokémon VSTAR is Knocked Out, your opponent takes 2 Prize cards."
+  ],
+  "attacks": [
+    {
+      "name": "Explosive Fire",
+      "cost": ["Fire", "Fire", "Colorless"],
+      "convertedEnergyCost": 3,
+      "damage": "130+",
+      "text": "If this Pokémon has any damage counters on it, this attack does 100 more damage."
+    },
+    {
+      "name": "Star Blaze",
+      "cost": ["Fire", "Fire", "Fire", "Colorless"],
+      "convertedEnergyCost": 4,
+      "damage": "320",
+      "text": "Discard 2 Energy from this Pokémon. (You can't use more than 1 VSTAR Power in a game.)"
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Water",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": ["Colorless", "Colorless"],
+  "convertedRetreatCost": 2,
+  "set": {
+    "id": "swsh9",
+    "name": "Brilliant Stars",
+    "series": "Sword & Shield",
+    "printedTotal": 172,
+    "total": 186,
+    "legalities": {
+      "unlimited": "Legal",
+      "standard": "Legal",
+      "expanded": "Legal"
+    },
+    "ptcgoCode": "BRS",
+    "releaseDate": "2022/02/25",
+    "updatedAt": "2022/02/23 09:45:00",
+    "images": {
+      "symbol": "https://images.pokemontcg.io/swsh9/symbol.png",
+      "logo": "https://images.pokemontcg.io/swsh9/logo.png"
+    }
+  },
+  "number": "18",
+  "artist": "5ban Graphics",
+  "rarity": "Rare Holo VSTAR",
+  "nationalPokedexNumbers": [6],
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "regulationMark": "F",
+  "images": {
+    "small": "https://images.pokemontcg.io/swsh9/18.png",
+    "large": "https://images.pokemontcg.io/swsh9/18_hires.png"
+  },
+  "tcgplayer": {
+    "prices": {
+      "holofoil": {}
+    }
+  }
+}

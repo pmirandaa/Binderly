@@ -1,0 +1,71 @@
+{
+  "id": "sv1-200",
+  "name": "Dolliv",
+  "supertype": "Pokémon",
+  "subtypes": ["Stage 1"],
+  "hp": "90",
+  "types": ["Grass"],
+  "evolvesFrom": "Smoliv",
+  "attacks": [
+    {
+      "cost": ["Colorless"],
+      "name": "Slap",
+      "damage": "20",
+      "text": "",
+      "convertedEnergyCost": 1
+    },
+    {
+      "cost": ["Grass", "Colorless"],
+      "name": "Apply Oil",
+      "damage": "40",
+      "text": "During your opponent's next turn, if the Defending Pokémon tries to attack, your opponent flips a coin. If tails, that attack doesn't happen.",
+      "convertedEnergyCost": 2
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fire",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": ["Colorless"],
+  "convertedRetreatCost": 1,
+  "set": {
+    "id": "sv1",
+    "name": "Scarlet & Violet",
+    "series": "Scarlet & Violet",
+    "printedTotal": 198,
+    "total": 258,
+    "legalities": {
+      "unlimited": "Legal",
+      "standard": "Legal",
+      "expanded": "Legal"
+    },
+    "releaseDate": "2023/03/31",
+    "updatedAt": "2023/03/31 15:45:00",
+    "images": {
+      "symbol": "https://images.pokemontcg.io/sv1/symbol.png",
+      "logo": "https://images.pokemontcg.io/sv1/logo.png"
+    }
+  },
+  "number": "200",
+  "artist": "Oswaldo KATO",
+  "rarity": "Illustration Rare",
+  "flavorText": "Dolliv shares its tasty, fresh-scented oil with others. This species has coexisted with humans since times long gone.",
+  "nationalPokedexNumbers": [929],
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "regulationMark": "G",
+  "images": {
+    "small": "https://images.pokemontcg.io/sv1/200.png",
+    "large": "https://images.pokemontcg.io/sv1/200_hires.png"
+  },
+  "tcgplayer": {
+    "prices": {
+      "holofoil": {}
+    }
+  }
+}

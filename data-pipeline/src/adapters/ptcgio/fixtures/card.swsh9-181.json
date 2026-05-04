@@ -1,0 +1,77 @@
+{
+  "id": "swsh9-181",
+  "name": "Galarian Articuno V",
+  "supertype": "Pokémon",
+  "subtypes": ["Basic", "V"],
+  "hp": "210",
+  "types": ["Psychic"],
+  "rules": ["V rule: When your Pokémon V is Knocked Out, your opponent takes 2 Prize cards."],
+  "abilities": [
+    {
+      "name": "Reconstitute",
+      "text": "You must discard 2 cards from your hand in order to use this Ability. Once during your turn, you may draw a card.",
+      "type": "Ability"
+    }
+  ],
+  "attacks": [
+    {
+      "name": "Psyray",
+      "cost": ["Psychic", "Colorless", "Colorless"],
+      "convertedEnergyCost": 3,
+      "damage": "110",
+      "text": "Your opponent's Active Pokémon is now Confused."
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Darkness",
+      "value": "×2"
+    }
+  ],
+  "resistances": [
+    {
+      "type": "Fighting",
+      "value": "-30"
+    }
+  ],
+  "retreatCost": ["Colorless", "Colorless"],
+  "convertedRetreatCost": 2,
+  "set": {
+    "id": "swsh9",
+    "name": "Brilliant Stars",
+    "series": "Sword & Shield",
+    "printedTotal": 172,
+    "total": 186,
+    "legalities": {
+      "unlimited": "Legal",
+      "standard": "Legal",
+      "expanded": "Legal"
+    },
+    "ptcgoCode": "BRS",
+    "releaseDate": "2022/02/25",
+    "updatedAt": "2022/02/23 09:45:00",
+    "images": {
+      "symbol": "https://images.pokemontcg.io/swsh9/symbol.png",
+      "logo": "https://images.pokemontcg.io/swsh9/logo.png"
+    }
+  },
+  "number": "181",
+  "artist": "5ban Graphics",
+  "rarity": "Rare Secret",
+  "nationalPokedexNumbers": [144],
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "regulationMark": "E",
+  "images": {
+    "small": "https://images.pokemontcg.io/swsh9/181.png",
+    "large": "https://images.pokemontcg.io/swsh9/181_hires.png"
+  },
+  "tcgplayer": {
+    "prices": {
+      "holofoil": {}
+    }
+  }
+}

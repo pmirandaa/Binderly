@@ -1,0 +1,19 @@
+{
+  "id": "swsh9",
+  "name": "Brilliant Stars",
+  "series": "Sword & Shield",
+  "printedTotal": 172,
+  "total": 186,
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "ptcgoCode": "BRS",
+  "releaseDate": "2022/02/25",
+  "updatedAt": "2022/02/23 09:45:00",
+  "images": {
+    "symbol": "https://images.pokemontcg.io/swsh9/symbol.png",
+    "logo": "https://images.pokemontcg.io/swsh9/logo.png"
+  }
+}

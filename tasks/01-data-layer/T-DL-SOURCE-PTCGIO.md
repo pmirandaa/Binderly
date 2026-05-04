@@ -647,4 +647,59 @@ Stop and append to `open-questions.md` if:
   implementation.
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+- **`tcgplayer.prices` keys are the variant signal, not the values.**
+  PTCGIO inlines volatile pricing on every card response. The captured
+  fixtures preserve the *key set* (`normal` / `holofoil` /
+  `reverseHolofoil` / `1stEditionHolofoil` / `1stEditionNormal`) by
+  emptying each entry to `{}`, and strip the `cardmarket` block
+  entirely. This keeps the variant-signal-bearing surface stable across
+  re-captures without committing daily-changing numbers to source
+  control. The adapter only reads the key set; pricing values are
+  ignored.
+- **PTCGIO is materially less complete than TCGdex-EN for variants.**
+  Brilliant Stars: PTCGIO has 186 cards, TCGdex has 216 (the 30 Trainer
+  Gallery cards `swsh9-TG01`..`swsh9-TG30` are absent on PTCGIO). Base
+  Set Charizard: PTCGIO has one row (`base1-4` with a single
+  `holofoil` price key), TCGdex has four rows in `variants_detailed`
+  (Holo Unlimited, Holo Shadowless, Holo Shadowless 1st Edition, Holo
+  1999-2000 Copyright). This is the documented validation-tier
+  posture — the resolver retains the primary's `variants_detailed`
+  data and PTCGIO contributes provenance plus rarity/illustrator/HP
+  cross-checks.
+- **PTCGIO has no `Pokemon Center` / pattern / stamp / texture
+  signals.** The adapter sets `pattern: null`, `stamp: null`,
+  `isShadowless: false`, `isTextured: false`, `isError: false` on every
+  printing. These are recovered (where possible) from BULBAPEDIA in
+  T-DL-SOURCE-BULBAPEDIA.
+- **Number formats differ between PTCGIO and TCGdex.** PTCGIO emits
+  `"18"`, TCGdex emits `"018"`. Both align on the canonical key
+  `en-swsh9-018` because `canonical-keys.ts` zero-pads numeric numbers
+  to 3 (lettered numbers like `SWSH001` are preserved verbatim). The
+  adapter preserves PTCGIO's source formatting on `RawCard.number`.
+- **API key handling.** Reads `BINDERLY_PTCGIO_API_KEY` at construction
+  time. When set, sends `X-Api-Key: <value>` on every request. Empty
+  string is treated as no key. The constructor's explicit `apiKey`
+  wins over the env var. Without a key, PTCGIO caps at 1000
+  requests/day with a 30/min ceiling — sufficient for fixture capture
+  and dev smoke tests but not a full set seed-ingest.
+- **Rate-limit floor 5 rps / burst 10.** Matches the
+  orchestrator-stated free-API floor and TCGDEX-EN's choice. Well
+  below the with-key 20k/day budget; in keyless mode we hit the 30
+  rpm cap on long pulls (documented).
+- **Rarity registry was already seeded.** The `'ptcgio'` table in
+  `data-pipeline/src/normalize/rarity.ts` was added in
+  T-DL-SOURCE-INTERFACES (40+ entries covering observed PTCGIO
+  vocabulary). A coverage test in `transform.test.ts` walks every
+  captured fixture's `rarity` value through `normalizeRarity('ptcgio',
+  …)` and asserts no throws. This guards against drift if PTCGIO
+  introduces new rarity strings between captures. No registry
+  extension was needed for this task.
+- **Touched files outside `owns_paths`.** Per the task brief and the
+  pre-staged barrel pattern: only `data-pipeline/src/adapters/index.ts`
+  (1-line uncomment in the `T-DL-SOURCE-PTCGIO` section). The rarity
+  registry was unchanged.
+- **Test counts.** 313 / 313 passing across 19 test files. New PTCGIO
+  contribution: 32 transform tests, 25 adapter tests, 4 resolver-
+  integration tests = 61 tests. The 252 pre-existing tests are
+  untouched.

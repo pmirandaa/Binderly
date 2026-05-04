@@ -1,0 +1,19 @@
+{
+  "id": "swshp",
+  "name": "SWSH Black Star Promos",
+  "series": "Sword & Shield",
+  "printedTotal": 307,
+  "total": 304,
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "ptcgoCode": "PR-SW",
+  "releaseDate": "2019/11/15",
+  "updatedAt": "2022/07/23 20:15:00",
+  "images": {
+    "symbol": "https://images.pokemontcg.io/swshp/symbol.png",
+    "logo": "https://images.pokemontcg.io/swshp/logo.png"
+  }
+}

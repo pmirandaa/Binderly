@@ -15,7 +15,7 @@ export * from './tcgdex-en/index.js';
 // ============================================================
 // === T-DL-SOURCE-PTCGIO === (validation; English)
 // ============================================================
-// export * from './ptcgio/index.js';
+export * from './ptcgio/index.js';
 
 // ============================================================
 // === T-DL-SOURCE-BULBAPEDIA === (validation/filler)

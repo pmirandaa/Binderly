@@ -1,0 +1,64 @@
+{
+  "id": "swshp-SWSH001",
+  "name": "Grookey",
+  "supertype": "Pokémon",
+  "subtypes": ["Basic"],
+  "hp": "60",
+  "types": ["Grass"],
+  "evolvesTo": ["Thwackey"],
+  "attacks": [
+    {
+      "name": "Branch Poke",
+      "cost": ["Grass", "Colorless"],
+      "convertedEnergyCost": 2,
+      "damage": "30",
+      "text": ""
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fire",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": ["Colorless"],
+  "convertedRetreatCost": 1,
+  "set": {
+    "id": "swshp",
+    "name": "SWSH Black Star Promos",
+    "series": "Sword & Shield",
+    "printedTotal": 307,
+    "total": 304,
+    "legalities": {
+      "unlimited": "Legal",
+      "standard": "Legal",
+      "expanded": "Legal"
+    },
+    "ptcgoCode": "PR-SW",
+    "releaseDate": "2019/11/15",
+    "updatedAt": "2022/07/23 20:15:00",
+    "images": {
+      "symbol": "https://images.pokemontcg.io/swshp/symbol.png",
+      "logo": "https://images.pokemontcg.io/swshp/logo.png"
+    }
+  },
+  "number": "SWSH001",
+  "artist": "kirisAki",
+  "rarity": "Promo",
+  "flavorText": "When it uses its special stick to strike up a beat, the sound waves produced carry revitalizing energy to the plants and flowers in the area.",
+  "nationalPokedexNumbers": [810],
+  "legalities": {
+    "unlimited": "Legal",
+    "expanded": "Legal"
+  },
+  "regulationMark": "D",
+  "images": {
+    "small": "https://images.pokemontcg.io/swshp/SWSH001.png",
+    "large": "https://images.pokemontcg.io/swshp/SWSH001_hires.png"
+  },
+  "tcgplayer": {
+    "prices": {
+      "holofoil": {}
+    }
+  }
+}
