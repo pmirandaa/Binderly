@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 3 closed; iter 4 dispatching (3 sibling adapters)
+# Build status — Phase 1 iter 4 partial close (PTCGIO merged); BULBAPEDIA + TCGDEX-JP still in flight
 
-**Phase:** 1 — Data layer (18/109 tasks merged)
-**Merged:** 18 / 109 tasks
-**In progress:** 3 (T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP)
+**Phase:** 1 — Data layer (19/109 tasks merged)
+**Merged:** 19 / 109 tasks
+**In progress:** 2 (T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -66,7 +66,7 @@ schema task) section is still pre-staged + commented.
 | T-DL-MASTER-SET-RULES | merged | #21 (`d531dc7`) |
 | T-DL-SCHEMA-PRICING | merged | #22 (`a99fc0b`) |
 | T-DL-SOURCE-TCGDEX-EN | merged | #23 (`1a741ab`, includes `4f0a36c` reconciliation) |
-| T-DL-SOURCE-PTCGIO | in_progress (iter 4) | — |
+| T-DL-SOURCE-PTCGIO | merged | #24 (`c8b2de0`) |
 | T-DL-SOURCE-BULBAPEDIA | in_progress (iter 4) | — |
 | T-DL-SOURCE-TCGDEX-JP | in_progress (iter 4) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
@@ -117,11 +117,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-SOURCE-PTCGIO — `c8b2de0` (validation-tier English adapter; tcgplayer.prices key set + rarity-string class signals; X-Api-Key support; 61 new tests, package total 313; rarity registry pre-seeded by SOURCE-INTERFACES)
 - T-DL-SOURCE-TCGDEX-EN — `1a741ab` (first concrete adapter; primary English; FetchShim test pattern; 45 new tests, package total 199; canonical adapter playbook for siblings)
 - T-DL-SCHEMA-PRICING — `a99fc0b` (4 tables: market + price_observation + price_aggregate + fx_rate; idempotent 7-market seed; observation-internal RLS; 11/11 ACs PASS live; closes Phase 1 schema surface)
 - T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; runtime drift guard against classifier defaults)
 - T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154 tests; tcg-domain.md § 8 patched)
-- T-DL-SCHEMA-GRADING — `77d18d0` (grading_submission + grading_training_sample; cross-schema FK; service-role-only training corpus; renumbered 0006/0007)
 
 ## Known follow-ups (logged, non-blocking)
 
