@@ -1,0 +1,23 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 67890,
+        "ns": 0,
+        "title": "Charizard VSTAR (Brilliant Stars 174)",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "contentmodel": "wikitext",
+                "contentformat": "text/x-wiki",
+                "content": "{{CardInfobox\n|cardname=Charizard VSTAR\n|jname=リザードンVSTAR\n|jtrans=Lizardon V-STAR\n|image=CharizardVSTARBrilliantStars174.jpg\n|caption=Illus. [[Aky CG Works]]\n|species=Charizard\n|evostage=VSTAR\n|evoname=Charizard V\n|type=R\n|hp=280\n|weakness=W\n|resistance=\n|retreatcost=2\n|class=Rainbow Rare\n|rarity=Rare Rainbow\n|cardno=174/172\n|expansion=Brilliant Stars\n|regulationmark=F\n|setlist=Brilliant Stars\n}}\n"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

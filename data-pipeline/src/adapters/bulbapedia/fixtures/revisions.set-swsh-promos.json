@@ -1,0 +1,23 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 33333,
+        "ns": 0,
+        "title": "SWSH Black Star Promos (TCG)",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "contentmodel": "wikitext",
+                "contentformat": "text/x-wiki",
+                "content": "{{SetInfobox\n|name=SWSH Black Star Promos\n|series=Sword & Shield\n|released=November 15, 2019\n|cards=313\n}}\n"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

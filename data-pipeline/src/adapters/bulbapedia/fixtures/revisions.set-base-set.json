@@ -1,0 +1,23 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 11111,
+        "ns": 0,
+        "title": "Base Set (TCG)",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "contentmodel": "wikitext",
+                "contentformat": "text/x-wiki",
+                "content": "{{SetInfobox\n|name=Base Set\n|jname=拡張パック 第1弾\n|series=Original\n|cards=102\n|cardstotal=102\n|released=January 9, 1999\n}}\n"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

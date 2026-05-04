@@ -1,0 +1,11 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "title": "<not a valid title>",
+        "invalid": true
+      }
+    ]
+  }
+}

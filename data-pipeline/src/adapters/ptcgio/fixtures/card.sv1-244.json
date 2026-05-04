@@ -1,0 +1,72 @@
+{
+  "id": "sv1-244",
+  "name": "Miraidon ex",
+  "supertype": "Pokémon",
+  "subtypes": ["Basic", "ex"],
+  "hp": "220",
+  "types": ["Lightning"],
+  "rules": [
+    "Pokémon ex rule: When your Pokémon ex is Knocked Out, your opponent takes 2 Prize cards."
+  ],
+  "abilities": [
+    {
+      "type": "Ability",
+      "name": "Tandem Unit",
+      "text": "Once during your turn, you may search your deck for up to 2 Basic Lightning Pokémon and put them onto your Bench. Then, shuffle your deck."
+    }
+  ],
+  "attacks": [
+    {
+      "cost": ["Lightning", "Lightning", "Colorless"],
+      "name": "Photon Blaster",
+      "damage": "220",
+      "text": "During your next turn, this Pokémon can't attack.",
+      "convertedEnergyCost": 3
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fighting",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": ["Colorless"],
+  "convertedRetreatCost": 1,
+  "set": {
+    "id": "sv1",
+    "name": "Scarlet & Violet",
+    "series": "Scarlet & Violet",
+    "printedTotal": 198,
+    "total": 258,
+    "legalities": {
+      "unlimited": "Legal",
+      "standard": "Legal",
+      "expanded": "Legal"
+    },
+    "releaseDate": "2023/03/31",
+    "updatedAt": "2023/03/31 15:45:00",
+    "images": {
+      "symbol": "https://images.pokemontcg.io/sv1/symbol.png",
+      "logo": "https://images.pokemontcg.io/sv1/logo.png"
+    }
+  },
+  "number": "244",
+  "artist": "kantaro",
+  "rarity": "Special Illustration Rare",
+  "nationalPokedexNumbers": [1008],
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "regulationMark": "G",
+  "images": {
+    "small": "https://images.pokemontcg.io/sv1/244.png",
+    "large": "https://images.pokemontcg.io/sv1/244_hires.png"
+  },
+  "tcgplayer": {
+    "prices": {
+      "holofoil": {}
+    }
+  }
+}

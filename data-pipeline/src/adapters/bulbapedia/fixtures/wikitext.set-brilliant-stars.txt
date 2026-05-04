@@ -1,0 +1,15 @@
+<!-- Synthetic fixture: Bulbapedia "Brilliant Stars (TCG)". -->
+{{SetInfobox
+|name=Brilliant Stars
+|jname=スターバース
+|series=Sword & Shield
+|cards=172
+|cardstotal=216
+|released=February 25, 2022
+|prev=Fusion Strike
+|next=Astral Radiance
+}}
+
+'''Brilliant Stars''' is the ninth main expansion in the Sword &
+Shield Series of the Pokémon Trading Card Game. It introduced the
+VSTAR mechanic and the Trainer Gallery sub-set.

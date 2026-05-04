@@ -1,0 +1,30 @@
+<!-- Synthetic fixture: SWSH Black Star Promos Lugia V (staff stamp).
+     Promo set + STAFF stamp variant flag exercise. -->
+{{CardInfobox
+|cardname=Lugia V
+|jname=ルギアV
+|jtrans=Lugia V
+|image=LugiaVPromoSWSH285.jpg
+|caption=Illus. [[5ban Graphics]]
+|species=Lugia
+|evostage=Basic
+|type=C
+|hp=220
+|weakness=L
+|resistance=F
+|retreatcost=2
+|class=Holographic
+|rarity=Promo
+|cardno=SWSH285
+|expansion=SWSH Black Star Promos
+|stamp=Pokémon TCG Staff
+|setlist=SWSH Black Star Promos
+}}
+
+==Card text==
+{{Cardtext/Pokémon|name=Lugia V|tcg=yes}}
+
+==Release information==
+This card was originally distributed at Pokémon Organized Play
+events. A version stamped with the "Pokémon TCG Staff" mark was
+distributed to event staff.

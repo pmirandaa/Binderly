@@ -1,0 +1,30 @@
+<!-- Synthetic fixture: Brilliant Stars Charizard VSTAR Rainbow Rare
+     (number 174 / printedTotal 172 → secret-rare numbering, but the
+     RAINBOW class signal wins the variant decision tree per § 8). -->
+{{CardInfobox
+|cardname=Charizard VSTAR
+|jname=リザードンVSTAR
+|jtrans=Lizardon V-STAR
+|image=CharizardVSTARBrilliantStars174.jpg
+|caption=Illus. [[Aky CG Works]]
+|species=Charizard
+|evostage=VSTAR
+|evoname=Charizard V
+|type=R
+|hp=280
+|weakness=W
+|resistance=
+|retreatcost=2
+|class=Rainbow Rare
+|rarity=Rare Rainbow
+|cardno=174/172
+|expansion=Brilliant Stars
+|regulationmark=F
+|setlist=Brilliant Stars
+}}
+
+==Card text==
+{{Cardtext/Pokémon|name=Charizard VSTAR|tcg=yes}}
+
+==Trivia==
+Rainbow Rares are colloquially called "rainbows" by collectors.

@@ -1,0 +1,17 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "categorymembers": [
+      {
+        "pageid": 67890,
+        "ns": 0,
+        "title": "Charizard VSTAR (Brilliant Stars 174)"
+      },
+      {
+        "pageid": 67891,
+        "ns": 0,
+        "title": "Pikachu (Brilliant Stars 49)"
+      }
+    ]
+  }
+}

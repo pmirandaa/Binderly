@@ -1,0 +1,23 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 12345,
+        "ns": 0,
+        "title": "Charizard (Base Set 4)",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "contentmodel": "wikitext",
+                "contentformat": "text/x-wiki",
+                "content": "{{CardInfobox\n|cardname=Charizard\n|jname=リザードン\n|jtrans=Lizardon\n|image=CharizardBaseSet4.jpg\n|caption=Illus. [[Mitsuhiro Arita]]\n|species=Charizard\n|evostage=Stage 2\n|evoname=Charmeleon\n|type=R\n|hp=120\n|weakness=W\n|resistance=F\n|retreatcost=3\n|class=Holographic\n|rarity=Holo Rare\n|cardno=4/102\n|expansion=Base Set\n|setlist=Base Set\n}}\n\n==Release information==\n{{CardPrintInfo|label=1st Edition Shadowless Holo|class=Holographic|1stEdition=yes|shadowless=yes}}\n{{CardPrintInfo|label=Shadowless Holo|class=Holographic|shadowless=yes}}\n{{CardPrintInfo|label=Unlimited Holo|class=Holographic|unlimited=yes}}\n"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

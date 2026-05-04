@@ -1,0 +1,12 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "ns": 0,
+        "title": "NonexistentCard (Made Up Set 999)",
+        "missing": true
+      }
+    ]
+  }
+}
