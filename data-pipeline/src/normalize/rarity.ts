@@ -46,15 +46,31 @@ const tcgdexEn: RarityMappingTable = {
   'Rare Holo EX': 'ULTRA_RARE',
   'Rare Holo GX': 'ULTRA_RARE',
   'Rare Holo LV.X': 'ULTRA_RARE',
+  // TCGdex word order varies for the same mechanics; the SWSH-era
+  // /v2/en/cards endpoint returns "Holo Rare V" / "Holo Rare VSTAR"
+  // (e.g. swsh9-018 Charizard VSTAR). Mirror the "Rare Holo …" set
+  // above so we don't have to fall through to the case-insensitive
+  // path on every lookup.
+  'Holo Rare V': 'ULTRA_RARE',
+  'Holo Rare VMAX': 'ULTRA_RARE',
+  'Holo Rare VSTAR': 'ULTRA_RARE',
+  'Holo Rare EX': 'ULTRA_RARE',
+  'Holo Rare GX': 'ULTRA_RARE',
+  'Holo Rare LV.X': 'ULTRA_RARE',
   'Rare Ultra': 'ULTRA_RARE',
   'Ultra Rare': 'ULTRA_RARE',
   // SV-era "Double Rare" is the lowercase `ex` cards.
   'Double Rare': 'DOUBLE_RARE',
   // SV-era illustration tier is split: Illustration Rare (artwork only,
   // shared art with secret/full art counterpart) and Special
-  // Illustration Rare (alt-art).
+  // Illustration Rare (alt-art). TCGdex SV-era emits the lowercase
+  // 'rare' form ("Illustration rare", "Special illustration rare",
+  // "Hyper rare"); we add both so case-insensitive fallback isn't on
+  // the hot path.
   'Illustration Rare': 'ILLUSTRATION_RARE',
+  'Illustration rare': 'ILLUSTRATION_RARE',
   'Special Illustration Rare': 'SPECIAL_ILLUSTRATION_RARE',
+  'Special illustration rare': 'SPECIAL_ILLUSTRATION_RARE',
   // Numbered above printed_total. The classifier may already have
   // assigned variant_class=SECRET_RARE; the rarity slot still records
   // the source's reading of the rarity tier.
@@ -62,6 +78,7 @@ const tcgdexEn: RarityMappingTable = {
   'Secret Rare': 'SECRET_RARE',
   // Hyper Rare = gold cards in modern sets.
   'Hyper Rare': 'HYPER_RARE',
+  'Hyper rare': 'HYPER_RARE',
   'Rare Rainbow': 'RAINBOW_RARE',
   'Rainbow Rare': 'RAINBOW_RARE',
   'Radiant Rare': 'RADIANT_RARE',

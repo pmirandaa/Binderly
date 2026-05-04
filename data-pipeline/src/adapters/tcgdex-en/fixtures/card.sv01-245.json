@@ -1,0 +1,53 @@
+{
+  "category": "Pokemon",
+  "id": "sv01-245",
+  "illustrator": "Jiro Sasumo",
+  "image": "https://assets.tcgdex.net/en/sv/sv01/245",
+  "localId": "245",
+  "name": "Gardevoir ex",
+  "rarity": "Special illustration rare",
+  "set": {
+    "cardCount": {
+      "official": 198,
+      "total": 258
+    },
+    "id": "sv01",
+    "logo": "https://assets.tcgdex.net/en/sv/sv01/logo",
+    "name": "Scarlet & Violet",
+    "symbol": "https://assets.tcgdex.net/univ/sv/sv01/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": false,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "dexId": [282],
+  "hp": 310,
+  "types": ["Psychic"],
+  "evolveFrom": "Kirlia",
+  "stage": "Stage2",
+  "abilities": [
+    {
+      "type": "Ability",
+      "name": "Psychic Embrace",
+      "effect": "As often as you like during your turn, you may attach a Basic {P} Energy card from your discard pile to 1 of your {P} Pokémon. If you attached Energy to a Pokémon in this way, put 2 damage counters on that Pokémon. You can't use this Ability on a Pokémon that would be Knocked Out."
+    }
+  ],
+  "attacks": [
+    {
+      "cost": ["Psychic", "Psychic", "Colorless"],
+      "name": "Miracle Force",
+      "effect": "This Pokémon recovers from all Special Conditions.",
+      "damage": 190
+    }
+  ],
+  "retreat": 2,
+  "regulationMark": "G",
+  "legal": {
+    "standard": true,
+    "expanded": true
+  },
+  "updated": "2026-01-24T23:10:00+01:00"
+}

@@ -1,0 +1,45 @@
+{
+  "category": "Pokemon",
+  "id": "sv01-199",
+  "illustrator": "Miki Tanaka",
+  "image": "https://assets.tcgdex.net/en/sv/sv01/199",
+  "localId": "199",
+  "name": "Tarountula",
+  "rarity": "Illustration rare",
+  "set": {
+    "cardCount": {
+      "official": 198,
+      "total": 258
+    },
+    "id": "sv01",
+    "logo": "https://assets.tcgdex.net/en/sv/sv01/logo",
+    "name": "Scarlet & Violet",
+    "symbol": "https://assets.tcgdex.net/univ/sv/sv01/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": false,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "dexId": [917],
+  "hp": 40,
+  "types": ["Grass"],
+  "stage": "Basic",
+  "attacks": [
+    {
+      "cost": ["Grass", "Colorless"],
+      "name": "String Shot",
+      "effect": "Flip a coin. If heads, your opponent's Active Pokémon is now Paralyzed.",
+      "damage": 20
+    }
+  ],
+  "retreat": 1,
+  "regulationMark": "G",
+  "legal": {
+    "standard": true,
+    "expanded": true
+  },
+  "updated": "2026-01-24T23:08:30+01:00"
+}

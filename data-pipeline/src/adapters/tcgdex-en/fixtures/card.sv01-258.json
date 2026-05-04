@@ -1,0 +1,32 @@
+{
+  "category": "Energy",
+  "id": "sv01-258",
+  "image": "https://assets.tcgdex.net/en/sv/sv01/258",
+  "localId": "258",
+  "name": "Basic Fighting Energy",
+  "rarity": "Hyper rare",
+  "set": {
+    "cardCount": {
+      "official": 198,
+      "total": 258
+    },
+    "id": "sv01",
+    "logo": "https://assets.tcgdex.net/en/sv/sv01/logo",
+    "name": "Scarlet & Violet",
+    "symbol": "https://assets.tcgdex.net/univ/sv/sv01/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": false,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "types": ["Fighting"],
+  "energyType": "Normal",
+  "legal": {
+    "standard": true,
+    "expanded": true
+  },
+  "updated": "2025-12-23T20:44:27+01:00"
+}
