@@ -29,6 +29,20 @@
       "when": 1777916105014,
       "tag": "0003_catalog_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777917057359,
+      "tag": "0004_collection_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777917057360,
+      "tag": "0005_collections_rls",
+      "breakpoints": true
     }
   ]
 }
