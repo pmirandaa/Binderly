@@ -1,0 +1,40 @@
+{
+  "cardCount": {
+    "firstEd": 0,
+    "holo": 50,
+    "normal": 50,
+    "official": 100,
+    "reverse": 0,
+    "total": 172
+  },
+  "cards": [
+    {
+      "id": "s9-001",
+      "image": "https://assets.tcgdex.net/jp/swsh/s9/001",
+      "localId": "001",
+      "name": "ナエトル"
+    },
+    {
+      "id": "s9-018",
+      "image": "https://assets.tcgdex.net/jp/swsh/s9/018",
+      "localId": "018",
+      "name": "リザードンVSTAR"
+    }
+  ],
+  "id": "s9",
+  "logo": "https://assets.tcgdex.net/jp/swsh/s9/logo",
+  "name": "スターバース",
+  "releaseDate": "2022-01-14",
+  "serie": {
+    "id": "swsh",
+    "name": "ソード&シールド"
+  },
+  "symbol": "https://assets.tcgdex.net/univ/swsh/s9/symbol",
+  "abbreviation": {
+    "official": "S9"
+  },
+  "legal": {
+    "expanded": true,
+    "standard": false
+  }
+}

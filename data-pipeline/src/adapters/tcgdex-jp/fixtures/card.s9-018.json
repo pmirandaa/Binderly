@@ -1,0 +1,65 @@
+{
+  "category": "Pokemon",
+  "id": "s9-018",
+  "image": "https://assets.tcgdex.net/jp/swsh/s9/018",
+  "localId": "018",
+  "name": "リザードンVSTAR",
+  "rarity": "Holo Rare VSTAR",
+  "set": {
+    "cardCount": {
+      "official": 100,
+      "total": 172
+    },
+    "id": "s9",
+    "logo": "https://assets.tcgdex.net/jp/swsh/s9/logo",
+    "name": "スターバース",
+    "symbol": "https://assets.tcgdex.net/univ/swsh/s9/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": true,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "variants_detailed": [
+    {
+      "type": "holo",
+      "size": "standard",
+      "variantId": "generated"
+    }
+  ],
+  "dexId": [6],
+  "hp": 280,
+  "types": ["Fire"],
+  "evolveFrom": "リザードンV",
+  "stage": "VSTAR",
+  "suffix": "V",
+  "attacks": [
+    {
+      "cost": ["Fire", "Fire", "Colorless"],
+      "name": "ばくれつファイヤー",
+      "effect": "このポケモンにダメカンがのっているなら、ダメージは100大きくなる。",
+      "damage": "130+"
+    },
+    {
+      "cost": ["Fire", "Fire", "Fire", "Colorless"],
+      "name": "スターブレイズ",
+      "effect": "このポケモンからエネルギーを2個トラッシュする。（VSTARパワーは1ゲームに1度しか使えない）",
+      "damage": 320
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Water",
+      "value": "×2"
+    }
+  ],
+  "retreat": 2,
+  "regulationMark": "F",
+  "legal": {
+    "standard": false,
+    "expanded": true
+  },
+  "updated": "2025-08-16T20:39:55Z"
+}

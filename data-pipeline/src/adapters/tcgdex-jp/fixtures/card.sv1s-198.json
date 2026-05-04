@@ -1,0 +1,50 @@
+{
+  "category": "Pokemon",
+  "id": "sv1s-198",
+  "image": "https://assets.tcgdex.net/jp/sv/sv1s/198",
+  "localId": "198",
+  "name": "ニャオハ",
+  "rarity": "Special Art Rare",
+  "set": {
+    "cardCount": {
+      "official": 71,
+      "total": 108
+    },
+    "id": "sv1s",
+    "logo": "https://assets.tcgdex.net/jp/sv/sv1s/logo",
+    "name": "トリプレットビート",
+    "symbol": "https://assets.tcgdex.net/univ/sv/sv1s/symbol"
+  },
+  "variants": {
+    "firstEdition": false,
+    "holo": false,
+    "normal": false,
+    "reverse": false,
+    "wPromo": false
+  },
+  "dexId": [906],
+  "hp": 70,
+  "types": ["Grass"],
+  "stage": "Basic",
+  "illustrator": "Akira Komayama",
+  "attacks": [
+    {
+      "cost": ["Grass"],
+      "name": "ひっかく",
+      "damage": 20
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fire",
+      "value": "×2"
+    }
+  ],
+  "retreat": 1,
+  "regulationMark": "G",
+  "legal": {
+    "standard": true,
+    "expanded": true
+  },
+  "updated": "2025-08-16T20:39:55Z"
+}

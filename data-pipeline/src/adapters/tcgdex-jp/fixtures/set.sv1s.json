@@ -1,0 +1,46 @@
+{
+  "cardCount": {
+    "firstEd": 0,
+    "holo": 30,
+    "normal": 50,
+    "official": 71,
+    "reverse": 0,
+    "total": 108
+  },
+  "cards": [
+    {
+      "id": "sv1s-073",
+      "image": "https://assets.tcgdex.net/jp/sv/sv1s/073",
+      "localId": "073",
+      "name": "ニャオハ"
+    },
+    {
+      "id": "sv1s-108",
+      "image": "https://assets.tcgdex.net/jp/sv/sv1s/108",
+      "localId": "108",
+      "name": "基本草エネルギー"
+    },
+    {
+      "id": "sv1s-198",
+      "image": "https://assets.tcgdex.net/jp/sv/sv1s/198",
+      "localId": "198",
+      "name": "ニャオハ"
+    }
+  ],
+  "id": "sv1s",
+  "logo": "https://assets.tcgdex.net/jp/sv/sv1s/logo",
+  "name": "トリプレットビート",
+  "releaseDate": "2023-03-10",
+  "serie": {
+    "id": "sv",
+    "name": "スカーレット&バイオレット"
+  },
+  "symbol": "https://assets.tcgdex.net/univ/sv/sv1s/symbol",
+  "abbreviation": {
+    "official": "SV1S"
+  },
+  "legal": {
+    "expanded": true,
+    "standard": true
+  }
+}
