@@ -5,6 +5,14 @@
   "description": "Drizzle ORM schemas, generated SQL migrations, and the typed Postgres client for Binderly.",
   "license": "UNLICENSED",
   "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
   "prettier": "@binderly/prettier-config",
   "scripts": {
     "build": "tsc -p .",

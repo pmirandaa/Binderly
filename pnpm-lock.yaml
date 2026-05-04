@@ -26,9 +26,15 @@ importers:
       bottleneck:
         specifier: 2.19.5
         version: 2.19.5
+      drizzle-orm:
+        specifier: 0.45.2
+        version: 0.45.2(postgres@3.4.9)
       pino:
         specifier: 9.5.0
         version: 9.5.0
+      postgres:
+        specifier: 3.4.9
+        version: 3.4.9
       sharp:
         specifier: 0.33.5
         version: 0.33.5
