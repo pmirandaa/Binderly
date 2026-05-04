@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 5 near-close (IMAGE-PIPELINE + RLS-POLICIES merged); EBAY-LISTING-PARSER still in flight
+# Build status — Phase 1 iter 5 CLOSED; iter 6 dispatching (SEED-INGEST + 2 follow-ups)
 
-**Phase:** 1 — Data layer (23/109 tasks merged)
-**Merged:** 23 / 109 tasks
-**In progress:** 1 (T-DL-EBAY-LISTING-PARSER)
+**Phase:** 1 — Data layer (24/109 tasks merged)
+**Merged:** 24 / 109 tasks
+**In progress:** 3 (T-DL-SEED-INGEST, T-DL-PROFILE-GRANTS-FIX, T-DL-FX-RATES)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -76,7 +76,10 @@ schema task) section is still pre-staged + commented.
 | T-DL-SOURCE-BULBAPEDIA | merged | #25 (`4afde4d`) |
 | T-DL-SOURCE-TCGDEX-JP | merged | #26 (`4c30cf0`; agent hung post-commit, orchestrator validated + opened PR) |
 | T-DL-IMAGE-PIPELINE | merged | #27 (`9be37c0`; +printing_image table; mig 0010/0011) |
-| T-DL-EBAY-LISTING-PARSER | in_progress (iter 5) | — |
+| T-DL-EBAY-LISTING-PARSER | merged | #30 (`2b2d144`; 8-pass; 108-entry corpus; 310 new tests) |
+| T-DL-SEED-INGEST | in_progress (iter 6) | — |
+| T-DL-PROFILE-GRANTS-FIX | in_progress (iter 6) | — |
+| T-DL-FX-RATES | in_progress (iter 6) | — |
 | T-DL-RLS-POLICIES | merged | #28 (`3c448db`; verify-rls suite + posture docs; surfaced Q-003) |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
 | T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
@@ -87,35 +90,32 @@ schema task) section is still pre-staged + commented.
 | T-DL-SEED-INGEST | blocked on adapters + MASTER-SET-RULES + IMAGE-PIPELINE + RLS-POLICIES | — |
 | ... ~14 more pending Phase 1 tasks | pending | — |
 
-## Iter 5 dispatch (3 in flight, MAX_PARALLEL=3)
+## Iter 6 dispatch (3 in flight, MAX_PARALLEL=3)
 
-Three folder-disjoint, ready, high-impact tasks. All stubs;
-elaborate-then-ship prompt pattern.
+The Phase 1 integration moment. Three folder-disjoint tasks
+(no shared barrels, no shared SQL files).
 
 | Task | Effort | Owns_paths | Why this iter |
 |---|---|---|---|
-| T-DL-IMAGE-PIPELINE | L | `data-pipeline/src/images/` + `infra/r2/` | Unblocks SEED-INGEST + SC-EMBED-MODEL + R2-PROD; only blocking SEED-INGEST dep alongside RLS-POLICIES |
-| T-DL-EBAY-LISTING-PARSER | L | `data-pipeline/src/parsers/ebay-listing/` | Unblocks PRICING-EBAY-BROWSE → PRICING-ROLLUP → PRICING-CURRENT-VIEW chain |
-| T-DL-RLS-POLICIES | M (shrunk) | `packages/db/src/migrations/rls/` (RLS-only SQL; pre-staged folder) | Unblocks SEED-INGEST, AUTH, EDGE-FUNCTIONS, SUPABASE-PROD; remaining scope = data_conflict + admin debug surfaces only (per-table RLS landed inline with each schema task) |
+| **T-DL-SEED-INGEST** | L | `data-pipeline/src/jobs/seed.ts` + `data-pipeline/scripts/` | The crown jewel: adapters → resolver → master-set rules → DB upsert → image pipeline, end-to-end. First true integration of all Phase 1 work. Sole owner; running alone-ish maximizes range for the integration sub-agent. |
+| T-DL-PROFILE-GRANTS-FIX | XS | `packages/db/src/migrations/0012_profile_grants_fix.sql` | Closes Q-003 (verify-rls 4 failures). Additive migration; same GRANT/REVOKE pattern as 0003/0005/0007/0009. Unblocks T-BE-AUTH local-Supabase work. |
+| T-DL-FX-RATES | S | `data-pipeline/src/jobs/fx-rates.ts` + `data-pipeline/src/adapters/fx/` | Quick-win. Frankfurter or ECB. Unblocks T-SP-PRICING-DISPLAY (Phase 3 shared-packages). |
 
-Coordination notes:
-- All three are folder-disjoint (no shared barrels, no shared
-  registry edits expected).
-- IMAGE-PIPELINE and SEED-INGEST share `infra/r2/` paths — but
-  SEED-INGEST isn't in flight, so no conflict.
-- RLS-POLICIES will likely add migrations 0010+; no parallelism
-  with other DB-touching tasks this iter.
+Migration coordination:
+- T-DL-PROFILE-GRANTS-FIX takes migration 0012 (next free).
+- T-DL-SEED-INGEST is dispatched with explicit instruction NOT
+  to add a migration (no new tables; only writes via @binderly/db).
+- T-DL-FX-RATES does not need a new migration (the `fx_rate`
+  table already exists from T-DL-SCHEMA-PRICING; the job inserts
+  into it).
 
-## Held to iter 6 (post-iter-5)
+## Held to iter 7
 
-- **T-DL-SEED-INGEST** (now FULLY UNBLOCKED — both IMAGE-PIPELINE and RLS-POLICIES merged. The crown-jewel integration of Phase 1.)
-- T-DL-PROFILE-GRANTS-FIX (XS; closes Q-003; additive 0012 migration; should land before T-BE-AUTH)
-- T-DL-PRICING-AGGREGATOR + T-DL-PRICING-EBAY-BROWSE (parallel pair)
-- T-DL-PRICING-ROLLUP (depends on the pricing-aggregator pair)
-- T-DL-PRICING-CURRENT-VIEW (depends on PRICING-ROLLUP)
-- T-DL-FX-RATES (S effort; quick win; could land iter 6)
-- T-DL-DATA-CONFLICT-TABLE (S; new follow-up from RLS-POLICIES elaboration)
-- T-DL-ADMIN-DEBUG-SURFACES (S; new follow-up from RLS-POLICIES elaboration)
+- T-DL-PRICING-AGGREGATOR + T-DL-PRICING-EBAY-BROWSE (parallel pair; depend on EBAY-LISTING-PARSER which is now merged)
+- T-DL-PRICING-ROLLUP (depends on the pair)
+- T-DL-PRICING-CURRENT-VIEW (depends on ROLLUP)
+- T-DL-DATA-CONFLICT-TABLE (S; resolver disagreement persistence)
+- T-DL-ADMIN-DEBUG-SURFACES (S; pg_stat_statements + admin views)
 
 ## Open questions
 
@@ -133,11 +133,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-EBAY-LISTING-PARSER — `2b2d144` (8-pass deterministic parser; 108-entry hand-crafted corpus; 15 variant-hint flags; 0..1 confidence; ParserCatalogReader joiner; 310 new tests, package total 837; closes iter 5)
 - T-DL-RLS-POLICIES — `3c448db` (RLS posture docs + verify-rls TS suite; live Supabase: 93 passed / 4 failed; 4 failures are real gap → Q-003 → T-DL-PROFILE-GRANTS-FIX queued)
 - T-DL-IMAGE-PIPELINE — `9be37c0` (sharp+S3+R2 image ingestion; 4-step variant ladder thumb/card/large/original; deterministic key shape; SHA-256 dedup via printing_image sidecar; Bulbapedia auto-excluded by EXCLUDED_IMAGE_SOURCES; mig 0010/0011; 42 new tests, package total 569)
 - T-DL-SOURCE-TCGDEX-JP — `4c30cf0` (primary JP TCGdex + filler JP Pokemon-Card.com; reuses isTcgdexPromoSet from EN; pokemoncardJpToTcgdexJp matcher bridges id systems; 99 new tests, package total 527; closes iter 4)
 - T-DL-SOURCE-BULBAPEDIA — `4afde4d` (filler-tier English; wiki-shaped; raw-wikitext brace-counted parser; CC-BY-NC-SA-compliant — no images persisted; 108 new tests, package total 367; first parser-heavy adapter)
-- T-DL-SOURCE-PTCGIO — `c8b2de0` (validation-tier English adapter; tcgplayer.prices key set + rarity-string class signals; X-Api-Key support; 61 new tests, package total 313; rarity registry pre-seeded by SOURCE-INTERFACES)
 
 ## Known follow-ups (logged, non-blocking)
 
