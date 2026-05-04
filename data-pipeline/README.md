@@ -109,13 +109,55 @@ The client honors `Retry-After` on `429` and `503` and applies
 exponential backoff on other 5xx. `4xx` (other than `429`) does not
 retry.
 
+## How to seed
+
+The seed-ingest job (`src/jobs/seed.ts`, exposed as
+`pnpm --filter @binderly/data-pipeline seed`) glues every Phase-1
+module together. It fans out across primary adapters, resolves each
+canonical set via the resolver, classifies variants, decides
+master-set membership, upserts to the catalog tables, and pipes
+each printing's image through the image pipeline.
+
+```sh
+# Required env (defaults work against infra/docker-compose.yml):
+export DATABASE_URL='postgres://postgres:postgres@localhost:54322/postgres'
+export BINDERLY_DATA_PIPELINE_UA='Binderly/0.1 (contact: legal@binderly.app)'
+export S3_ENDPOINT_URL='http://localhost:9000'
+export MINIO_ROOT_USER='minio'
+export MINIO_ROOT_PASSWORD='minio12345'
+export IMAGES_BUCKET='images'
+# Optional:
+export BINDERLY_PTCGIO_API_KEY=...
+export IMAGES_PUBLIC_URL_PREFIX='http://localhost:9000/images'
+
+# Single source, single set (smoke test):
+pnpm --filter @binderly/data-pipeline seed --source tcgdex-en --set en-swsh9
+
+# Smoke test with no DB writes / no R2 uploads:
+pnpm --filter @binderly/data-pipeline seed --dry-run --no-images --limit-sets 1
+
+# Full run:
+pnpm --filter @binderly/data-pipeline seed
+```
+
+End-of-run report is printed to stdout and persisted to
+`data-pipeline/scripts/output/seed-run-<ISO_TIMESTAMP>.json`. The
+`scripts/output/` directory is git-ignored except for `.gitkeep`.
+
+The job is idempotent at the row level: re-running against the same
+catalog re-upserts the same `canonical_key` rows, and the image
+pipeline short-circuits via `printing_image (source, original_sha256)`
+dedup so already-transcoded images cost zero CPU + zero R2 PUTs.
+
+See `tasks/01-data-layer/T-DL-SEED-INGEST.md` for the full spec
+(run-shape diagram, concurrency model, idempotency strategy,
+failure handling, reporting contract).
+
 ## What this package is NOT
 
-- It does not write to the database. The seed-ingest task
-  (T-DL-SEED-INGEST) wires `resolveCanonical` to `@binderly/db` upserts.
-- It does not download images. The image pipeline
-  (T-DL-IMAGE-PIPELINE) consumes `image_source_url` from the canonical
-  output.
+- It does not download images outside of the seed-ingest job. The
+  image pipeline (`src/images/`) is invoked by `runSeedIngest`; other
+  callers must wire it themselves.
 - It does not own the master-set rules engine. That lives at
   `data-pipeline/src/master-set/` (T-DL-MASTER-SET-RULES) and reads the
   variant classifier output as input.

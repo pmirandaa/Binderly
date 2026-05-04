@@ -1,0 +1,4 @@
+# Seed-ingest run reports — JSON artefacts of every `pnpm seed`.
+# We persist them locally for debugging but never commit them.
+scripts/output/*
+!scripts/output/.gitkeep

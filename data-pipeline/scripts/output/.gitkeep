@@ -1,0 +1,8 @@
+# Run-report output directory.
+#
+# `pnpm --filter @binderly/data-pipeline seed` writes
+# seed-run-<ISO_TIMESTAMP>.json into this directory.
+#
+# Reports are intentionally NOT committed; .gitignore at the
+# data-pipeline package root excludes `scripts/output/*` except
+# this .gitkeep.
