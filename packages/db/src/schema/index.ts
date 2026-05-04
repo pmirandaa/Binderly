@@ -40,7 +40,7 @@ export * from './grading.js';
 // ============================================================
 // === T-DL-SCHEMA-PRICING ===
 // ============================================================
-// export * from "./prices.js";
-// export * from "./price_snapshots.js";
+export * from './prices.js';
+export * from './price_snapshots.js';
 
 export {};
