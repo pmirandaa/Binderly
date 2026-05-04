@@ -269,18 +269,65 @@ Energy subtypes: `BASIC, SPECIAL`.
 
 ## 8. The "Variant Decision Tree" for adapters
 
-When an adapter encounters a printing of a card:
+The decision tree below is what `data-pipeline/src/variant-classify.ts`
+implements. It has been refined during T-DL-SOURCE-INTERFACES from an
+earlier "secret rare wins first" formulation, because explicit visual
+class signals reflect collector intuition more accurately:
+**Brilliant Stars Charizard VSTAR Rainbow #174 (with `printed_total =
+172`) is a `RAINBOW`, not a `SECRET_RARE`.** Secret-rare numbering
+remains the primary signal *only* when no other class is asserted.
 
-1. Is the card number > printed_total? → `SECRET_RARE` class.
-2. Else, does the source explicitly mark it Full Art / Alt Art / Gold /
-   Rainbow / Textured? → use that class.
-3. Else, is it the reverse-holo print run? → `REVERSE_HOLO`. Then check
-   for pattern flag (Cosmos, Galaxy, Poké Ball, Master Ball).
-4. Else, is it a holographic main-set card? → `HOLO`.
-5. Else → `NON_HOLO`.
+When an adapter encounters a printing of a card, evaluate these in
+order. The first matching rule wins:
 
-Then layer flags: 1st Edition, Shadowless, Unlimited (vintage), stamped
-(prerelease/staff/league/etc.), error.
+1. **Trainer Gallery / Galarian Gallery.** Source explicitly flags
+   `isTrainerGallery` OR card number starts with `TG` / `GG` →
+   `TRAINER_GALLERY`.
+2. **Gold / Hyper Rare.** Source flags `isGoldRare` → `GOLD`.
+3. **Rainbow Rare.** Source flags `isRainbowRare` → `RAINBOW`.
+4. **Alt Art (Special Illustration Rare).** Source flags `isAltArt` →
+   `ALT_ART`.
+5. **Full Art.** Source flags `isFullArt` → `FULL_ART`.
+6. **Textured Rare.** Source flags `isTextured` AND no other special
+   class signal → `TEXTURED`. (When another class is also asserted,
+   `TEXTURED` becomes a flag instead of the class.)
+7. **Promo set.** Source flags `isPromo` (or the set is a known promo
+   set in `normalize/set-code.ts`) → `PROMO`.
+8. **Secret rare (numerical).** Card number is purely numeric AND
+   `> printed_total` AND no rule above fired → `SECRET_RARE`.
+9. **Reverse Holo.** Source flags `isReverseHolo` → `REVERSE_HOLO`.
+   Pattern flag (Cosmos, Galaxy, Poké Ball, Master Ball) layers from
+   `RawPrinting.pattern`.
+10. **Holo.** Source flags `isHolo` → `HOLO`.
+11. **Else** → `NON_HOLO`.
+
+Then layer flags (orthogonal — they stack on whatever class won):
+
+- `FIRST_EDITION` from `isFirstEdition`
+- `SHADOWLESS` from `isShadowless`
+- `UNLIMITED` from `extra.isUnlimited === true` (explicit only —
+  vintage prints with no `isFirstEdition` / `isShadowless` are NOT
+  auto-marked Unlimited; the source must say so)
+- Pattern flag (`POKE_BALL_PATTERN` / `MASTER_BALL_PATTERN` /
+  `COSMOS_PATTERN` / `GALAXY_PATTERN`) from `RawPrinting.pattern`
+- Stamp flag (`STAMPED_PRERELEASE` / `STAMPED_STAFF` / `STAMPED_LEAGUE`
+  / `STAMPED_BUILDBATTLE` / `STAMPED_CHAMPIONSHIP`) from
+  `RawPrinting.stamp`
+- `TEXTURED` flag when texture is reported on a non-`TEXTURED` class
+- `ERROR` from `isError`
 
 The decision tree is implemented in `data-pipeline/src/variant-classify.ts`
-and unit tested per source.
+and unit tested per source. Every § 3 edge case has at least one named
+test case.
+
+### `include_in_master_set_default`
+
+The classifier emits a *default* boolean for whether a printing belongs
+in the master set. The master-set rules engine
+(`data-pipeline/src/master-set/`, T-DL-MASTER-SET-RULES) reads this and
+applies per-set overrides from `set.master_set_rules`. Defaults:
+
+- `false` for `ERROR` flag and `STAMPED_STAFF` flag
+- `true` for `SECRET_RARE`, `REVERSE_HOLO`, `TRAINER_GALLERY`, `HOLO`,
+  `NON_HOLO`, `FULL_ART`, `ALT_ART`, `RAINBOW`, `GOLD`, `TEXTURED`,
+  `PROMO`
