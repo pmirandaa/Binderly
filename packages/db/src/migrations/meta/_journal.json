@@ -15,6 +15,20 @@
       "when": 1777914687165,
       "tag": "0001_users_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1777916105013,
+      "tag": "0002_catalog_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1777916105014,
+      "tag": "0003_catalog_rls",
+      "breakpoints": true
     }
   ]
 }

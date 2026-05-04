@@ -14,9 +14,9 @@
 // ============================================================
 // === T-DL-SCHEMA-CARDS ===
 // ============================================================
-// export * from "./sets.js";
-// export * from "./cards.js";
-// export * from "./printings.js";
+export * from './sets.js';
+export * from './cards.js';
+export * from './printings.js';
 
 // ============================================================
 // === T-DL-SCHEMA-USERS ===
