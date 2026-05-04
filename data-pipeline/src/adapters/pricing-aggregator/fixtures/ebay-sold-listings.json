@@ -1,0 +1,146 @@
+[
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987001",
+    "listingTitle": "PSA 10 Charizard 4/102 Base Set Shadowless Holo Pokemon",
+    "listingUrl": "https://example.test/ebay/154321987001",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "PSA_10",
+    "price": "14250.00",
+    "shipping": "25.00",
+    "observedAt": "2026-04-30T19:32:11Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "seller": "vintage-cards-llc",
+      "ebayCategoryId": "183454"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987002",
+    "listingTitle": "Charizard 4/102 Base Set Holo Pokemon NM",
+    "listingUrl": "https://example.test/ebay/154321987002",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "RAW_NM",
+    "price": "395.00",
+    "shipping": "5.00",
+    "observedAt": "2026-04-30T15:18:04Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "seller": "raw-card-emporium",
+      "ebayCategoryId": "183454"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987003",
+    "listingTitle": "PSA 10 Sylveon V Alt Art 091/069 Evolving Skies",
+    "listingUrl": "https://example.test/ebay/154321987003",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "PSA_10",
+    "price": "475.00",
+    "shipping": "0.00",
+    "observedAt": "2026-04-30T20:01:55Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "seller": "modern-singles",
+      "ebayCategoryId": "183454"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987004",
+    "listingTitle": "Pikachu Reverse Holo 58/102 Base Set NM Pokemon",
+    "listingUrl": "https://example.test/ebay/154321987004",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "RAW_NM",
+    "price": "11.50",
+    "shipping": "4.00",
+    "observedAt": "2026-04-30T11:22:44Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "seller": "binder-collector",
+      "ebayCategoryId": "183454"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987005",
+    "listingTitle": "Pokemon Lot of 50 Cards Bulk Vintage Holo Rares",
+    "listingUrl": "https://example.test/ebay/154321987005",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "RAW_UNKNOWN",
+    "price": "320.00",
+    "shipping": "12.00",
+    "observedAt": "2026-04-30T17:45:09Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "seller": "lot-flipper",
+      "note": "lot listing — runner should drop"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987006",
+    "listingTitle": "Eldritch Horror 999/999 Unknown Set Holo",
+    "listingUrl": "https://example.test/ebay/154321987006",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "RAW_UNKNOWN",
+    "price": "10.00",
+    "shipping": "0.00",
+    "observedAt": "2026-04-30T22:00:00Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "seller": "noise-account",
+      "note": "unresolved listing — runner should record an error"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987007",
+    "listingTitle": "BGS 9.5 Charizard 4/102 Base Set Holo Pokemon",
+    "listingUrl": "https://example.test/ebay/154321987007",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "BGS_9_5",
+    "price": "5400.00",
+    "shipping": "20.00",
+    "observedAt": "2026-04-29T14:40:00Z",
+    "observedDate": "2026-04-29",
+    "rawPayload": {
+      "seller": "graded-collector",
+      "ebayCategoryId": "183454"
+    }
+  },
+  {
+    "kind": "ebay_sold_listing",
+    "vendor": "mock",
+    "listingId": "154321987008",
+    "listingTitle": "PSA 9 Charizard 4/102 Base Set Holo Pokemon",
+    "listingUrl": "https://example.test/ebay/154321987008",
+    "market": "EBAY_US",
+    "currency": "USD",
+    "gradeTier": "PSA_9",
+    "price": "3900.00",
+    "shipping": "20.00",
+    "observedAt": "2026-04-28T13:10:00Z",
+    "observedDate": "2026-04-28",
+    "rawPayload": {
+      "seller": "graded-collector",
+      "ebayCategoryId": "183454"
+    }
+  }
+]

@@ -284,14 +284,13 @@ tasks:
     stage: 01-data-layer
     title: Pricing aggregator adapter (Layer 1 — eBay sold + Cardmarket via paid API)
     agent_role: data
-    status: in_progress
-    depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING]
+    status: review
+    depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING, T-DL-EBAY-LISTING-PARSER]
     parallel_safe_with: [T-DL-PRICING-EBAY-BROWSE, T-DL-EBAY-LISTING-PARSER, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [adapter:pricing-aggregator]
     owns_paths: [data-pipeline/src/adapters/pricing-aggregator/]
     task_file: tasks/01-data-layer/T-DL-PRICING-AGGREGATOR.md
     est_effort: M
-    stub: true
 
   - id: T-DL-EBAY-LISTING-PARSER
     stage: 01-data-layer

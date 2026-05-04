@@ -32,3 +32,8 @@ export * from './pokemoncard-jp/index.js';
 // === T-DL-FX-RATES === (Frankfurter FX rates)
 // ============================================================
 export * from './fx/index.js';
+
+// ============================================================
+// === T-DL-PRICING-AGGREGATOR === (Layer 1 pricing — eBay sold + Cardmarket via paid API)
+// ============================================================
+export * from './pricing-aggregator/index.js';
