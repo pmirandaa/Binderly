@@ -176,4 +176,93 @@ field removed in dependencies.yaml.
 
 ---
 
+## Q-003 — `0001_users_rls.sql` ships RLS without companion SQL grants
+
+**Raised:** 2026-05-04
+**Blocking:** none directly (verify-rls reports 4 failures against local
+Supabase, all pointing at the same posture gap; PR
+T-DL-RLS-POLICIES merges with the failures documented). Future work
+that exercises `profile` / `subscription` against PostgREST locally
+(notably T-BE-AUTH and any web-app surface) will hit the same
+"permission denied for table profile" until this is resolved.
+
+**Context:** The new `pnpm --filter @binderly/db verify-rls` script
+(shipped in T-DL-RLS-POLICIES) drives every catalog table through the
+documented RLS posture. It surfaced a real gap in
+`0001_users_rls.sql` — that migration authors RLS policies for
+`profile` and `subscription` but does **not** ship explicit
+`REVOKE` / `GRANT` statements. Migrations `0003_catalog_rls.sql`,
+`0005_collections_rls.sql`, `0007_grading_rls.sql`, and
+`0009_pricing_rls.sql` all ship the defense-in-depth grants pattern;
+`0001` is the outlier.
+
+In hosted Supabase, the platform runs
+`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,
+authenticated, service_role` before migrations, so new tables get the
+grants for free. In Supabase CLI 2.98.1 + PG17 locally,
+`pg_default_acl` for the `public` schema is empty, so `profile` ends
+up with no privileges for the three application roles. PostgREST
+checks privileges before RLS, so the policies never fire — every
+SELECT against `profile` from any non-superuser role fails with
+"permission denied for table profile".
+
+This is exactly the kind of finding the verify-rls script was designed
+to catch. Per the task's escalation hook ("STOP, surface to
+orchestrator with full repro; do NOT silently patch the existing
+migration"), the merged migration is **not** modified by
+T-DL-RLS-POLICIES; the finding is documented in the README and surfaced
+here for ratification.
+
+**Reproduction:**
+
+```sh
+# from /Users/pmiranda/Stuff/Binderly (or any branch with 0001 applied)
+SUPABASE_DB_URL=postgresql://postgres:postgres@localhost:54322/postgres \
+  pnpm --filter @binderly/db verify-rls
+# 93 passed, 4 failed — all four "permission denied for table profile".
+```
+
+```sh
+# Confirm the privilege snapshot directly:
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "SELECT grantee, privilege_type FROM information_schema.role_table_grants
+      WHERE table_schema='public' AND table_name='profile';"
+# returns ONLY postgres rows — no anon / authenticated / service_role.
+
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "SELECT grantee, privilege_type FROM information_schema.role_table_grants
+      WHERE table_schema='public' AND table_name='set';"
+# returns the expected anon/authenticated SELECT + service_role full DML
+# (because 0003_catalog_rls.sql ships explicit GRANTs).
+```
+
+**Options:**
+
+1. **Ship a corrective additive migration `0010_users_rls_grants_fix.sql`** that
+   `REVOKE`s the unwanted writes on `profile` / `subscription` and
+   `GRANT`s the per-policy minimum, mirroring the
+   `0003_catalog_rls.sql` / `0005_collections_rls.sql` precedent for
+   the same tables. Inert in hosted Supabase (the grants either match
+   what's already there or are no-ops); fixes local. Recommended.
+2. **Document the local-only quirk and leave the migration alone.**
+   Argue that hosted Supabase's `ALTER DEFAULT PRIVILEGES` covers it
+   and the local-only failure isn't worth a corrective migration. Not
+   recommended — the verify-rls script will keep failing locally
+   forever, and the asymmetry between 0001 and the other RLS
+   migrations is a defense-in-depth gap regardless of platform.
+3. **Re-author 0001 in place.** Rewrites `main`'s history; explicitly
+   forbidden by the T-DL-RLS-POLICIES escalation rules. Not on the
+   table.
+
+**Recommendation:** Option 1. Add a new task **T-DL-PROFILE-GRANTS-FIX**
+to `dependencies.yaml` (S effort), depending on T-DL-RLS-POLICIES.
+Stage the migration, apply locally, watch verify-rls go to "97
+passed, 0 failed". The web/edge-function tasks downstream that touch
+`profile` will rely on this being fixed locally before they can
+exercise PostgREST against profile.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
 _(no other open questions yet)_

@@ -98,4 +98,25 @@ Stop and append to `open-questions.md` (and surface to orchestrator) if:
 
 ## Notes from execution
 
-(Sub-agent appends here at end. Empty until then.)
+- Phase 1 (elaboration) committed as `docs(tasks): elaborate T-DL-RLS-POLICIES`.
+- Phase 2 ships per the planned scope: README + verify-rls TS suite + `verify-rls`
+  package script. No new migration; no admin debug surfaces; no `data_conflict`
+  table (orchestrator's stated default = defer). Both deferrals are documented
+  in § 11 of `packages/db/src/migrations/rls/README.md`.
+- **Real posture finding surfaced by the verify-rls script** —
+  `0001_users_rls.sql` ships RLS policies for `profile` / `subscription` but
+  **no** explicit GRANT/REVOKE statements. Migrations 0003/0005/0007/0009 do.
+  In hosted Supabase the platform's `ALTER DEFAULT PRIVILEGES` covers the gap;
+  in local Supabase CLI 2.98.1 + PG17 the `pg_default_acl` for `public` is
+  empty, so `profile` ends up with no privileges for `anon` / `authenticated` /
+  `service_role` and PostgREST denies the SELECT before RLS can run. Per the
+  task's escalation hook the merged migration is **not** modified by this PR;
+  the finding is logged as Q-003 in `open-questions.md` with a recommended
+  corrective additive migration (`T-DL-PROFILE-GRANTS-FIX`). The verify-rls
+  output ends "93 passed, 4 failed" against local Supabase — all four failures
+  are the same posture gap, exactly as Q-003 predicts.
+- The Supabase CLI was already running with migrations 0000–0009 applied at
+  dispatch time, so the verify-rls script ran end-to-end live (no Docker /
+  paste-able fallback was needed). Exit code 1 from the script reflects the
+  Q-003 finding; the structural assertions and the rest of the behavioral
+  matrix all pass.

@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "test": "echo \"@binderly/db: no tests yet\" && exit 0",
     "db:generate": "tsx scripts/generate.ts",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "verify-rls": "tsx scripts/verify-rls.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
