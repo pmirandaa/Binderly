@@ -281,6 +281,112 @@ documented per-second ceiling — and `--max-queries` lets you cap
 each scheduled run's quota draw. Production cron is one
 `--set <set-key>` call per primary set per day.
 
+### `pricing-rollup` — daily rollup into `price_aggregate` (T-DL-PRICING-ROLLUP)
+
+Aggregates yesterday's `price_observation` rows into the
+`price_aggregate` table per
+`(printing_id, grade_tier, market, currency, observed_date)`,
+applying the canonical filters (`parse_confidence < 0.7` excluded;
+top/bottom 5% trimmed when `sample_count >= 20`) per
+[`context/data-model.md` § price_aggregate](../context/data-model.md).
+Currency is part of the group key; we **do not** convert at rollup
+time — display-time conversion lives in
+`packages/pricing-display`. Idempotent via the table's composite
+PK and `ON CONFLICT … DO UPDATE`.
+
+#### CLI usage
+
+```sh
+# Roll up yesterday-UTC (production daily cron)
+pnpm --filter @binderly/data-pipeline pricing-rollup --url <postgres://...>
+
+# A specific date
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date 2026-05-03 --url <postgres://...>
+
+# Backfill the last 7 days
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date 2026-05-03 --days 7 --url <postgres://...>
+
+# Single-printing test
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date 2026-05-03 --printing 00000000-0000-4000-8000-000000000001 \
+  --url <postgres://...>
+
+# Dry-run against a real catalog (no DB writes)
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date 2026-05-03 --dry-run --url <postgres://...>
+
+# Smoke test with no DB / no network (synthetic fixtures)
+MOCK_PRICING_ROLLUP=1 pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date 2026-05-02 --dry-run
+
+# Multi-day mock smoke (exercises the multi-day driver + reader filter)
+MOCK_PRICING_ROLLUP=1 pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date 2026-05-03 --days 2 --dry-run
+```
+
+Modes:
+
+- **Live** (`MOCK_PRICING_ROLLUP` unset, `--url`/`DATABASE_URL`/
+  `SUPABASE_DB_URL` set): Drizzle reader over `price_observation`
+  - Drizzle repo over `price_aggregate`.
+- **Dry run** (`--dry-run` + URL): Drizzle reader (real catalog
+  scan), in-memory repo (no aggregates written).
+- **Mock** (`MOCK_PRICING_ROLLUP=1`): synthetic fixtures (two
+  printings, two grade tiers, two days, includes a
+  parse-confidence outlier so the filter is exercised); no
+  credentials, no network, no Postgres needed.
+
+Flags:
+
+- `--date YYYY-MM-DD` — END of the rollup window. Defaults to
+  yesterday-UTC.
+- `--days N` — Number of days ending at `--date` (≥ 1; default 1).
+- `--printing UUID` — Restrict the streamed observations to one
+  printing.
+- `--dry-run` — Skip repo writes; still emits the report.
+- `--url <conn>` (or `DATABASE_URL` / `SUPABASE_DB_URL`).
+
+The CLI prints a single line of JSON (the `PricingRollupReport`)
+to stdout on success and exits 0; on any unrecoverable error it
+prints a diagnostic to stderr and exits 1. Per-day failures
+during a multi-day backfill are recorded under `errors[]` and the
+run continues — same posture as `fx-rates` and
+`pricing-ebay-browse`.
+
+#### Live smoke (paste-able for Pablo)
+
+```sh
+cd /Users/pmiranda/Stuff/Binderly  # or your worktree
+git checkout main && git pull --ff-only
+export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
+pnpm install --prefer-offline
+
+# 1. Bring up Postgres + run migrations.
+docker compose -f infra/docker-compose.yml up -d postgres
+pnpm --filter @binderly/db db:migrate
+
+# 2. Seed a tiny pricing fixture (the eBay-browse mock writes
+#    real observations to the local DB):
+MOCK_PRICING_EBAY_BROWSE=1 pnpm --filter @binderly/data-pipeline \
+  pricing-ebay-browse --set en-swsh9 --max-queries 3
+
+# 3. Roll the day's observations up into price_aggregate.
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date "$(date -u -v-1d +%F)" --dry-run
+
+# 4. Same command without --dry-run writes the rows.
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date "$(date -u -v-1d +%F)"
+
+# 5. Inspect:
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "SELECT printing_id, grade_tier, market, currency,
+             period_start, sample_count, mean_price
+        FROM price_aggregate ORDER BY period_start DESC LIMIT 10;"
+```
+
 ## Testing
 
 ```sh
