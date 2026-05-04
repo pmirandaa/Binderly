@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 2 closed; iter 3 dispatching (last schema + first adapter + master-set rules)
+# Build status — Phase 1 iter 3 partial: MASTER-SET-RULES merged; PRICING + TCGDEX-EN in flight
 
-**Phase:** 1 — Data layer (15/109 tasks merged)
-**Merged:** 15 / 109 tasks
-**In progress:** 3 (T-DL-SCHEMA-PRICING, T-DL-SOURCE-TCGDEX-EN, T-DL-MASTER-SET-RULES)
+**Phase:** 1 — Data layer (16/109 tasks merged)
+**Merged:** 16 / 109 tasks
+**In progress:** 2 (T-DL-SCHEMA-PRICING, T-DL-SOURCE-TCGDEX-EN)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -55,9 +55,9 @@ schema task) section is still pre-staged + commented.
 | T-DL-SCHEMA-COLLECTIONS | merged | #17 (`c131903`) |
 | T-DL-SCHEMA-GRADING | merged | #18 (`77d18d0`, renumber `ffc4d34`) |
 | T-DL-SOURCE-INTERFACES | merged | #19 (`51b3727`) |
+| T-DL-MASTER-SET-RULES | merged | #21 (`d531dc7`) |
 | T-DL-SCHEMA-PRICING | in_progress (iter 3) | — |
 | T-DL-SOURCE-TCGDEX-EN | in_progress (iter 3) | — |
-| T-DL-MASTER-SET-RULES | in_progress (iter 3) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
 | T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
 | T-DL-EBAY-LISTING-PARSER | ready (queued) | — |
@@ -89,11 +89,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; mirrors variant-classifier defaults with runtime drift guard)
 - T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154/154 tests; tcg-domain.md § 8 patched per allowed escalation)
 - T-DL-SCHEMA-GRADING — `77d18d0` (grading_submission + grading_training_sample; cross-schema FK; service-role-only training corpus; renumbered 0006/0007)
 - T-DL-SCHEMA-COLLECTIONS — `c131903` (5 tables + 0004/0005; NULLS NOT DISTINCT; nested-table RLS via EXISTS; shareable slug-gated public-read)
 - T-DL-SCHEMA-CARDS — `24b0fd4` (catalog tables + RLS; renumbered 0002/0003; snapshot hand-merge)
-- T-DL-SCHEMA-USERS — `e9b4f38` (profile + subscription; cross-schema FK to auth.users; user-side RLS)
 
 ## Known follow-ups (logged, non-blocking)
 
