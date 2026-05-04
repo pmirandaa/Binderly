@@ -197,6 +197,90 @@ business day; the runner stores rows keyed on Frankfurter's returned
 `date`, which is what the display layer's "fall back to most recent
 prior date" rule already expects.
 
+### `pricing-ebay-browse` — Layer 2 active-listing ingest (T-DL-PRICING-EBAY-BROWSE)
+
+Hits eBay's [Browse API](https://developer.ebay.com/api-docs/buy/browse/overview.html)
+(`api.ebay.com/buy/browse/v1/item_summary/search`), parses each
+listing title via `parseEbayListing()`, joins to a printing via
+`resolveListingToPrinting()`, and upserts the resolved
+`RawPriceObservation` rows into `price_observation` keyed on
+`(source = 'ebay_browse', source_listing_id = itemId)`. Per
+`PROJECT.md` § 13, this is the _independent_ (Layer 2) data trail —
+free, no approval required, growing in coverage and history every
+day from launch.
+
+#### One-time setup — eBay developer credentials
+
+1. Create a developer account at <https://developer.ebay.com/my/keys>.
+2. Create a "Production" keyset and record:
+   - `App ID (Client ID)` → `EBAY_CLIENT_ID`
+   - `Cert ID (Client Secret)` → `EBAY_CLIENT_SECRET`
+3. Export them in any environment that runs the job:
+
+   ```sh
+   export EBAY_CLIENT_ID='YourCompany-Binderly-PRD-...'
+   export EBAY_CLIENT_SECRET='PRD-...-...'
+   ```
+
+The runtime exchanges them for a short-lived Application Token via
+the OAuth client-credentials grant; the token is cached in-process
+and refreshed ~120 s before expiry.
+
+#### CLI usage
+
+```sh
+# Ingest active listings for one canonical set (one query per card)
+pnpm --filter @binderly/data-pipeline pricing-ebay-browse \
+  --set en-swsh9 --max-queries 10 --url <postgres://...>
+
+# Ingest a single free-text query
+pnpm --filter @binderly/data-pipeline pricing-ebay-browse \
+  --query "Charizard VMAX 020/172 Brilliant Stars" --url <postgres://...>
+
+# Sandbox / no-credentials smoke test (synthetic fixtures, in-memory repo)
+MOCK_PRICING_EBAY_BROWSE=1 \
+  pnpm --filter @binderly/data-pipeline pricing-ebay-browse \
+  --set en-swsh9 --max-queries 3
+```
+
+Modes:
+
+- **Live** (`MOCK_PRICING_EBAY_BROWSE` unset, `EBAY_CLIENT_ID` /
+  `EBAY_CLIENT_SECRET` exported): hits `api.ebay.com` with a real
+  Application Token; writes to the configured Postgres unless
+  `--dry-run`.
+- **Mock** (`MOCK_PRICING_EBAY_BROWSE=1`): synthetic fixtures (a
+  PSA 10, a BGS 9.5, a raw NM, and one lot listing per query); no
+  credentials, no network, no Postgres needed.
+- **Dry run** (`--dry-run` + URL): real catalog reads; in-memory
+  repo (no observations written).
+
+Flags:
+
+- `--query "<text>"` — repeatable; or `--set <canonical-set-key>`
+  (e.g. `en-swsh9`). Mutually exclusive.
+- `--marketplace EBAY_US` (default) | `EBAY_GB` | `EBAY_DE` |
+  `EBAY_JP`.
+- `--max-queries N` — cap on queries dispatched per run (daily
+  quota guard rail).
+- `--page-size N` (≤ 200), `--max-pages-per-query N`,
+  `--max-listings-per-query N`.
+- `--url <conn>` (or `DATABASE_URL` / `SUPABASE_DB_URL`).
+
+The CLI prints a single line of JSON (the
+`PricingEbayBrowseReport`) to stdout on success and exits 0;
+on any unrecoverable error it prints a diagnostic to stderr and
+exits 1. Per-query 404s + low-confidence drops + lot drops are
+all reported under `errors[]` / counters and the run continues.
+
+#### Rate-limit posture
+
+eBay's free Application Token tier ships ~5 000 calls/day. The
+limiter is configured at 1 rps / burst 5 — well under the
+documented per-second ceiling — and `--max-queries` lets you cap
+each scheduled run's quota draw. Production cron is one
+`--set <set-key>` call per primary set per day.
+
 ## Testing
 
 ```sh
