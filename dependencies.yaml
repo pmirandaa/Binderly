@@ -322,7 +322,7 @@ tasks:
     stage: 01-data-layer
     title: Daily price observation -> aggregate rollup job (idempotent)
     agent_role: data
-    status: in_progress
+    status: review
     depends_on: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE]
     parallel_safe_with: []
     provides: [job:pricing-rollup]
