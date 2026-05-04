@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 4 near-close (PTCGIO + BULBAPEDIA merged); TCGDEX-JP still in flight
+# Build status — Phase 1 iter 4 CLOSED (5 source adapters merged); iter 5 dispatching
 
-**Phase:** 1 — Data layer (20/109 tasks merged)
-**Merged:** 20 / 109 tasks
-**In progress:** 1 (T-DL-SOURCE-TCGDEX-JP)
+**Phase:** 1 — Data layer (21/109 tasks merged)
+**Merged:** 21 / 109 tasks
+**In progress:** 3 (T-DL-IMAGE-PIPELINE, T-DL-EBAY-LISTING-PARSER, T-DL-RLS-POLICIES)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -10,9 +10,15 @@
 (USERS, CARDS, COLLECTIONS, GRADING, PRICING) merged. 13 schema
 modules and 10 monotonic migrations (0000–0009) on main.
 
-**Phase 1 source-pipeline foundation done.** SOURCE-INTERFACES,
-MASTER-SET-RULES, and the first concrete adapter (TCGDEX-EN) are
-all merged. Adapter framework is battle-tested.
+**Phase 1 source-pipeline milestone reached.** All 5 source
+adapters merged: TCGDEX-EN (primary EN), PTCGIO (validation EN),
+BULBAPEDIA (filler EN, wiki-shaped), TCGDEX-JP (primary JP),
+POKEMONCARD-JP (filler JP, HTML-scraping). Pre-staged barrel +
+additive rarity registry held up across 4 sibling-adapter merges
+with zero 3-way conflicts.
+
+**Phase 1 now ~50% done.** SEED-INGEST is unblocked once
+IMAGE-PIPELINE + RLS-POLICIES land (this iter).
 
 ## Dispatch loop status
 
@@ -68,7 +74,10 @@ schema task) section is still pre-staged + commented.
 | T-DL-SOURCE-TCGDEX-EN | merged | #23 (`1a741ab`, includes `4f0a36c` reconciliation) |
 | T-DL-SOURCE-PTCGIO | merged | #24 (`c8b2de0`) |
 | T-DL-SOURCE-BULBAPEDIA | merged | #25 (`4afde4d`) |
-| T-DL-SOURCE-TCGDEX-JP | in_progress (iter 4) | — |
+| T-DL-SOURCE-TCGDEX-JP | merged | #26 (`4c30cf0`; agent hung post-commit, orchestrator validated + opened PR) |
+| T-DL-IMAGE-PIPELINE | in_progress (iter 5) | — |
+| T-DL-EBAY-LISTING-PARSER | in_progress (iter 5) | — |
+| T-DL-RLS-POLICIES | in_progress (iter 5; scope shrunk) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
 | T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
 | T-DL-EBAY-LISTING-PARSER | ready (queued) | — |
@@ -78,37 +87,32 @@ schema task) section is still pre-staged + commented.
 | T-DL-SEED-INGEST | blocked on adapters + MASTER-SET-RULES + IMAGE-PIPELINE + RLS-POLICIES | — |
 | ... ~14 more pending Phase 1 tasks | pending | — |
 
-## Iter 4 dispatch (3 in flight, MAX_PARALLEL=3)
+## Iter 5 dispatch (3 in flight, MAX_PARALLEL=3)
 
-Three sibling adapter tasks. Owns_paths are folder-disjoint
-(`adapters/ptcgio/`, `adapters/bulbapedia/`, `adapters/tcgdex-jp/`
-+ `adapters/pokemoncard-jp/`); the shared coordination surfaces are:
-- `data-pipeline/src/adapters/index.ts` — pre-staged with sectioned
-  uncomment-only headers (same playbook as the schema barrel; PR
-  #23's TCGDEX-EN line is already in place; each new adapter
-  uncomments its own section).
-- `data-pipeline/src/normalize/rarity.ts` — additive registry; each
-  adapter adds its own source key. Git's auto-merge handles
-  language-disjoint additions cleanly.
+Three folder-disjoint, ready, high-impact tasks. All stubs;
+elaborate-then-ship prompt pattern.
 
-| Task | Tier | Language | Folder |
+| Task | Effort | Owns_paths | Why this iter |
 |---|---|---|---|
-| T-DL-SOURCE-PTCGIO | validation | en | `data-pipeline/src/adapters/ptcgio/` |
-| T-DL-SOURCE-BULBAPEDIA | validation/filler | en | `data-pipeline/src/adapters/bulbapedia/` |
-| T-DL-SOURCE-TCGDEX-JP | primary | jp | `data-pipeline/src/adapters/tcgdex-jp/` + `pokemoncard-jp/` |
+| T-DL-IMAGE-PIPELINE | L | `data-pipeline/src/images/` + `infra/r2/` | Unblocks SEED-INGEST + SC-EMBED-MODEL + R2-PROD; only blocking SEED-INGEST dep alongside RLS-POLICIES |
+| T-DL-EBAY-LISTING-PARSER | L | `data-pipeline/src/parsers/ebay-listing/` | Unblocks PRICING-EBAY-BROWSE → PRICING-ROLLUP → PRICING-CURRENT-VIEW chain |
+| T-DL-RLS-POLICIES | M (shrunk) | `packages/db/src/migrations/rls/` (RLS-only SQL; pre-staged folder) | Unblocks SEED-INGEST, AUTH, EDGE-FUNCTIONS, SUPABASE-PROD; remaining scope = data_conflict + admin debug surfaces only (per-table RLS landed inline with each schema task) |
 
-All three are stubs dispatched with the elaborate-then-ship prompt
-pattern. The TCGDEX-EN PR body's "Notes for the 3 sibling adapter
-tasks" is the canonical playbook (folder layout, FetchShim test
-pattern, sourceKey convention, raw-signals-only contract, etc.).
+Coordination notes:
+- All three are folder-disjoint (no shared barrels, no shared
+  registry edits expected).
+- IMAGE-PIPELINE and SEED-INGEST share `infra/r2/` paths — but
+  SEED-INGEST isn't in flight, so no conflict.
+- RLS-POLICIES will likely add migrations 0010+; no parallelism
+  with other DB-touching tasks this iter.
 
-## Held to iter 5 (post-iter-4)
+## Held to iter 6 (post-iter-5)
 
-- T-DL-EBAY-LISTING-PARSER (depends on SOURCE-INTERFACES + CARDS)
-- T-DL-IMAGE-PIPELINE (depends on CARDS + SOURCE-INTERFACES)
-- T-DL-PRICING-AGGREGATOR / -EBAY-BROWSE (need adapters + SCHEMA-PRICING)
-- T-DL-FX-RATES (depends on SCHEMA-PRICING)
-- T-DL-RLS-POLICIES (scope shrunk to data_conflict + admin debug; may roll into a later docs PR)
+- T-DL-SEED-INGEST (unblocked once IMAGE-PIPELINE + RLS-POLICIES land)
+- T-DL-PRICING-AGGREGATOR + T-DL-PRICING-EBAY-BROWSE (parallel pair)
+- T-DL-PRICING-ROLLUP (depends on the pricing-aggregator pair)
+- T-DL-PRICING-CURRENT-VIEW (depends on PRICING-ROLLUP)
+- T-DL-FX-RATES (S effort; quick win; could land iter 5 if a slot opens)
 
 ## Phase 0 ledger (closed)
 
@@ -117,11 +121,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-SOURCE-TCGDEX-JP — `4c30cf0` (primary JP TCGdex + filler JP Pokemon-Card.com; reuses isTcgdexPromoSet from EN; pokemoncardJpToTcgdexJp matcher bridges id systems; 99 new tests, package total 527; closes iter 4)
 - T-DL-SOURCE-BULBAPEDIA — `4afde4d` (filler-tier English; wiki-shaped; raw-wikitext brace-counted parser; CC-BY-NC-SA-compliant — no images persisted; 108 new tests, package total 367; first parser-heavy adapter)
 - T-DL-SOURCE-PTCGIO — `c8b2de0` (validation-tier English adapter; tcgplayer.prices key set + rarity-string class signals; X-Api-Key support; 61 new tests, package total 313; rarity registry pre-seeded by SOURCE-INTERFACES)
 - T-DL-SOURCE-TCGDEX-EN — `1a741ab` (first concrete adapter; primary English; FetchShim test pattern; 45 new tests, package total 199; canonical adapter playbook for siblings)
 - T-DL-SCHEMA-PRICING — `a99fc0b` (4 tables: market + price_observation + price_aggregate + fx_rate; idempotent 7-market seed; observation-internal RLS; 11/11 ACs PASS live; closes Phase 1 schema surface)
-- T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; runtime drift guard against classifier defaults)
 
 ## Known follow-ups (logged, non-blocking)
 

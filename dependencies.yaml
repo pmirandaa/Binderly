@@ -207,7 +207,7 @@ tasks:
     stage: 01-data-layer
     title: Supabase RLS policies for all user tables
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-USERS, T-DL-SCHEMA-GRADING]
     parallel_safe_with: []
     provides: [security:rls]
@@ -271,7 +271,7 @@ tasks:
     stage: 01-data-layer
     title: TCGdex JP adapter + Pokemon-Card.com fallback (Japanese primary)
     agent_role: data
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA]
     provides: [adapter:tcgdex-jp, adapter:pokemoncard-jp]
@@ -297,7 +297,7 @@ tasks:
     stage: 01-data-layer
     title: eBay listing title parser (slab + grade + condition + card identification)
     agent_role: data
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-CARDS]
     parallel_safe_with: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [util:ebay-listing-parser]
@@ -388,7 +388,7 @@ tasks:
     stage: 01-data-layer
     title: Image ingestion → R2 with WebP variants and provenance metadata
     agent_role: data
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [pipeline:images]
