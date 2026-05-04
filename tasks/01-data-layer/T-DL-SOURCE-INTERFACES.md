@@ -117,4 +117,42 @@ adapter tasks depend on.
   primary-wins rule — flag and pick a default in the same PR.
 
 ## Notes from execution
-_(empty)_
+
+PR: https://github.com/pmirandaa/Binderly/pull/19
+
+### Decision-tree refinement (context patch)
+
+The original `context/tcg-domain.md` § 8 ordered the secret-rare
+numerical check ("number > printed_total → SECRET_RARE") as step 1.
+This mis-classified the documented § 1 example "Brilliant Stars
+Charizard VSTAR Rainbow #174" (printed_total 172) as `SECRET_RARE`
+instead of `RAINBOW`. The fix (allowed escalation per the task's
+escalation triggers — same PR) puts explicit special-class signals
+(`TRAINER_GALLERY`, `GOLD`, `RAINBOW`, `ALT_ART`, `FULL_ART`,
+`TEXTURED`, `PROMO`) BEFORE the numeric check. The full ordered
+11-rule tree + flag layering + `include_in_master_set_default`
+defaults are now spelled out in § 8.
+
+### Test counts
+
+154 tests, 9 files, all passing. See PR body for the per-module
+breakdown.
+
+### Notes for downstream adapter tasks
+
+1. Adapters implement `SourceAdapter`, emit `Raw*` shapes, and
+   never assign `variant_class` directly — the central classifier
+   owns that taxonomy.
+2. Use `RateLimitedClient` for every external HTTP call. Per-source
+   floors documented in the PR body (TCGdex 10 r/s, ptcgio 5 r/s,
+   Bulbapedia 1 r/s, PSA 1 r/s).
+3. Per-source vocabulary lives in `normalize/*` — extend via
+   `registerRarityMapping(source, table)`.
+4. Adapters surface raw boolean signals (`isHolo`, `isReverseHolo`,
+   `pattern`, `stamp`, etc.) — parse "Reverse Holo Cosmos" string
+   blobs into booleans + enums in the adapter, not the classifier.
+5. `canonicalSetKey` / `canonicalCardKey` / `printingVariantKey`
+   are the upsert keys; never use UUIDs for cross-source joins.
+6. Tests must use fixtures (the `fetchImpl` injection point on
+   `RateLimitedClient` is the cleanest path) — no live network.
+
