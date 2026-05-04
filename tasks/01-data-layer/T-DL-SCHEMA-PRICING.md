@@ -426,4 +426,210 @@ if:
   / snapshot files all schema tasks necessarily emit).
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+### Deliverables landed
+
+- `packages/db/src/schema/prices.ts` — two Drizzle tables in one
+  file: `marketTable` (6 columns, PK on `code`, `tier` CHECK
+  constraint pinning `{primary, secondary}`) and
+  `priceObservationTable` (15 columns, PK on `id`, in-public FKs
+  to `printing(id)` and `market(code)`, `observation_kind` CHECK
+  constraint pinning `{sold, active_listing, aggregator_quote}`,
+  UNIQUE on `(source, source_listing_id)` for idempotent
+  ingestion, two indexes: composite
+  `(printing_id, grade_tier, market, observed_at desc)` and
+  `(observed_date)`). Exported `$inferSelect` / `$inferInsert`
+  types for both.
+- `packages/db/src/schema/price_snapshots.ts` — two Drizzle
+  tables in one file: `priceAggregateTable` (14 columns,
+  composite PK
+  `(printing_id, grade_tier, market, currency, period_start)`,
+  in-public FKs to `printing(id)` and `market(code)`) and
+  `fxRateTable` (6 columns, composite PK
+  `(rate_date, base_currency, quote_currency)`, forward-lookup
+  index `(rate_date desc, quote_currency)`). Exported
+  `$inferSelect` / `$inferInsert` types for both.
+- `packages/db/src/schema/index.ts` — uncommented the two
+  pre-staged lines in the `T-DL-SCHEMA-PRICING` section. No
+  other section touched. Trailing `export {};` placeholder
+  left in place.
+- `packages/db/src/migrations/0008_pricing_tables.sql` — drizzle-
+  kit generated. Used `--name pricing_tables` to keep the
+  conventional `NNNN_<snake_case_summary>.sql` filename without
+  renaming. Auto-generated `meta/0008_snapshot.json` ships
+  alongside.
+- `packages/db/src/migrations/0009_pricing_rls.sql` — hand-
+  authored. Three concerns bundled:
+  1. Idempotent market seed (`INSERT … ON CONFLICT (code) DO
+     NOTHING`) for the seven canonical codes.
+  2. RLS enabled on all four tables.
+  3. Public-read policies on `market`, `price_aggregate`,
+     `fx_rate`; **no** permissive policies on
+     `price_observation`. Defense-in-depth REVOKE of permissive
+     Supabase-default grants followed by explicit GRANT for the
+     roles that should have access (`anon, authenticated` →
+     SELECT on the consumer-facing tables; `service_role` →
+     full DML on all four). Idempotent:
+     `DROP POLICY IF EXISTS … / CREATE POLICY` mirroring
+     `0007_grading_rls.sql`.
+- `packages/db/src/migrations/meta/_journal.json` — appended an
+  entry for `0009_pricing_rls` (drizzle-kit wrote the
+  `0008_pricing_tables` entry automatically during
+  `db:generate`).
+
+### Acceptance-criteria results
+
+| AC | Status | Proof |
+|---|---|---|
+| AC-1: drizzle migration applies to fresh local Supabase | PASS | `DROP SCHEMA public CASCADE → CREATE SCHEMA public → migrate.ts → "ok"`; all four pricing tables visible in `\dt public.*`. |
+| AC-2: hand-authored RLS migration applies idempotently | PASS | RLS enabled on all four tables (`pg_class.relrowsecurity = t,t,t,t`); re-running `db:migrate` is a no-op (`pg_policies` count unchanged at 3, `market` row count unchanged at 7). |
+| AC-3: market seed + tier CHECK | PASS | `SELECT count(*) FROM market` = 7; `EBAY_US` is primary. INSERT with `tier = 'tertiary'` → `violates check constraint "market_tier_check"`. |
+| AC-4: price_observation constraints | PASS | INSERT with fabricated `printing_id` → `foreign_key_violation` on `price_observation_printing_id_printing_id_fk`. INSERT with `'EBAY_NEVERLAND'` → `foreign_key_violation` on `price_observation_market_market_code_fk`. INSERT with `observation_kind = 'rumor'` → `violates check constraint "price_observation_observation_kind_check"`. Duplicate `(source = 'ebay_browse', source_listing_id = 'lst-1')` → `duplicate key value violates unique constraint "price_observation_source_source_listing_id_unique"`. Two NULL-`source_listing_id` inserts under the same `source` succeed (NULLS DISTINCT default, intentional per spec). |
+| AC-5: price_aggregate constraints | PASS | Duplicate `(printing_id, grade_tier, market, currency, period_start)` → `duplicate key value violates unique constraint "price_aggregate_pkey"`. Fabricated `printing_id` and `'EBAY_NEVERLAND'` market both rejected with FK violations. |
+| AC-6: fx_rate composite PK | PASS | Duplicate `(rate_date, base_currency, quote_currency)` rejected with `duplicate key value violates unique constraint "fx_rate_pkey"`. |
+| AC-7: RLS posture verified live | PASS | As `anon`/`authenticated`: SELECT on `market`/`price_aggregate`/`fx_rate` returns rows; SELECT on `price_observation` → `permission denied for table price_observation`. INSERT/UPDATE/DELETE on every pricing table → `permission denied`. As `service_role`: full DML on all four tables (BYPASSRLS). |
+| AC-8: PROJECT.md § 13 product requirements reflected | PASS | `market` FK on every observation/aggregate row (no collapse). `observed_currency` (NOT NULL) on observation; `currency` (NOT NULL) on aggregate; no FX-conversion column. `grade_tier` NOT NULL on every row. `source` NOT NULL; `raw_metadata` jsonb carries debug fields. `observation_kind` enum `{sold, active_listing, aggregator_quote}` covers all three layers. `(source, source_listing_id)` UNIQUE for idempotent ingestion. `observed_date date` exists for FX joins. |
+| AC-9: indexes for documented query patterns | PASS | `pg_indexes` snapshot shows `price_observation_printing_grade_market_observed_idx (printing_id, grade_tier, market, observed_at desc)`, `price_observation_observed_date_idx`, and `fx_rate_rate_date_quote_currency_idx (rate_date desc, quote_currency)`. `price_aggregate` has only the composite PK as planned. |
+| AC-10: no edits outside `owns_paths` + pre-staged uncomment | PASS | `git diff --stat` against `main` shows only the 7 expected files: `prices.ts` (new), `price_snapshots.ts` (new), `index.ts` (2-line uncomment), `0008_pricing_tables.sql` (new), `0009_pricing_rls.sql` (new), `_journal.json` (1 entry appended), `0008_snapshot.json` (new, drizzle-emitted). The elaboration commit on `T-DL-SCHEMA-PRICING.md` is a separate commit. |
+| AC-11: build + typecheck + lint + format:check clean | PASS | `tsc -p .` (build) clean; `tsc --noEmit` clean; `eslint --max-warnings=0 .` clean (after one fix to remove an unused `sql` import in `price_snapshots.ts`); `prettier --check .` clean (after one `prettier --write` pass on both new files). |
+
+### Spec-vs-orchestrator resolution
+
+- **Four tables across two files.** The orchestrator dispatch
+  brief named `prices.ts` and `price_snapshots.ts` as the two
+  owned schema files; the `data-model.md` pricing surface
+  defines four tables (`market`, `price_observation`,
+  `fx_rate`, `price_aggregate`). Split: `prices.ts` carries the
+  live-pricing surface (`market` catalog + `price_observation`
+  raw signal); `price_snapshots.ts` carries the daily-snapshot
+  surface (`price_aggregate` daily rollup + `fx_rate` daily
+  exchange rates). Both `_snapshots`-side tables are calendar-
+  date-keyed and consumed by display / rollup / view jobs,
+  which makes the file naming consistent.
+- **`mv_current_price` deferred to T-DL-PRICING-CURRENT-VIEW.**
+  That task already owns `packages/db/src/views/`, so this task
+  ships only the four base tables it consumes. The composite
+  PK on `price_aggregate` already provides the
+  `(printing_id, grade_tier, market)` lookup prefix
+  `mv_current_price` will materialize.
+- **Two file split (vs three or one).** Considered putting
+  `market` in its own catalog-style file, but it is small,
+  has no logic of its own, and is conceptually inseparable
+  from the `price_observation` table that FK-references it on
+  every insert. Keeping them in `prices.ts` matches the
+  precedent of `cards.ts` (no separate `card_metadata.ts`) and
+  keeps the import graph shallow.
+- **RLS ships in this task** (mirroring CARDS / GRADING /
+  COLLECTIONS iter-1/2 precedent). T-DL-RLS-POLICIES inherits
+  a tighter scope: it does not need to re-author RLS for any
+  pricing table.
+- **Fixtures + round-trip tests deferred** (mirroring the
+  CARDS / GRADING / USERS pattern). The dispatch `owns_paths`
+  does not enumerate `packages/db/src/fixtures/pricing.ts` and
+  no test runner is configured for `@binderly/db` yet
+  (T-DL-DB-TEST-INFRA is the precondition). The
+  `$inferSelect` / `$inferInsert` exports are in place so the
+  future fixture task has typed builders out of the box.
+- **`grade_tier` left as free-form `text`** (not a CHECK
+  constraint), matching the data-model.md pricing-table
+  reference. The canonical enum (≈25 values across RAW / PSA /
+  BGS / CGC / OTHER_GRADED) is expected to grow as new graders
+  / sub-tiers emerge; validation lives at the
+  adapter/application layer per the `card.rarity` /
+  `printing.variant_class` precedent.
+- **`numeric(12, 2)` for prices** (not integer cents) per the
+  data-model.md spec. The escalation trigger flagged this as
+  a possible deviation point, but the spec is explicit
+  (`numeric(12,2)` on `observed_price`, `shipping`,
+  `median_price`, etc.); kept as-specified.
+
+### Other notes
+
+- **Migration numbering.** Current journal indices were 0–7
+  (USERS: 0000–0001; CARDS: 0002–0003; COLLECTIONS: 0004–0005;
+  GRADING: 0006–0007). drizzle-kit picked `0008` for
+  `pricing_tables`; the hand-authored RLS migration is `0009`.
+  No collisions — this was the only schema task in flight.
+- **Sandbox quirk for `db:generate` / `db:migrate`.** The
+  default `tsx`-based wrapper scripts hit
+  `EPERM: operation not permitted /var/folders/.../tsx-501/*.pipe`
+  under the Cursor sandbox (tsx's IPC pipe creation fails). Per
+  the dispatch brief, `pnpm exec drizzle-kit generate --config
+  packages/db/drizzle.config.ts --name pricing_tables` was used
+  directly for migration generation. For the AC verification
+  step, a temporary `scripts/_migrate.mjs` (plain ESM,
+  `node`-runnable) was used and deleted before commit. The SQL
+  output is identical; the wrapper's only added value is
+  convention checks.
+- **Local Supabase Postgres on `:54322` only.** Per
+  `packages/db/README.md` § Targets. Test fixtures (a single
+  set/card/printing chain plus a few observation/aggregate/
+  fx_rate rows) were inserted, exercised against the ACs, and
+  then `DELETE`d before commit. `\dt public.*` after the
+  verification run shows the four pricing tables empty (with
+  the seven seeded markets).
+- **Prettier write.** Initial `prices.ts` and `price_snapshots.ts`
+  failed `prettier --check` (line-length wraps on the longer
+  comment blocks). One `prettier --write` pass fixed the
+  formatting; verified clean afterwards. No structural changes.
+- **Lint fix.** Initial `price_snapshots.ts` carried an unused
+  `sql` import (no `default(sql\`…\`)` columns in either of
+  its tables); removed.
+
+### Notes for downstream tasks
+
+- **T-DL-PRICING-AGGREGATOR (Layer 1)** writes to
+  `price_observation` with `source = 'aggregator_<name>'`,
+  `observation_kind = 'aggregator_quote'` (and
+  `observation_kind = 'sold'` when the aggregator surfaces
+  sold-listing data for us). Idempotent re-ingestion: upsert
+  on `(source, source_listing_id)`. If the aggregator has no
+  stable upstream id for a quote, synthesize one (e.g.
+  `aggregator_x:<printing_id>:<grade_tier>:<observed_date>`)
+  to keep dedup at the SQL layer.
+- **T-DL-PRICING-EBAY-BROWSE (Layer 2)** writes to
+  `price_observation` with `source = 'ebay_browse'`,
+  `observation_kind = 'active_listing'`. The eBay item id is
+  the natural `source_listing_id`. Use the listing's local
+  marketplace (`EBAY_US`, `EBAY_DE`, etc.) as the `market`
+  FK. `observed_currency` follows the listing's pricing
+  currency, not the marketplace's default.
+- **T-DL-EBAY-LISTING-PARSER** populates `grade_tier` and
+  potentially `printing_id` from listing titles. The
+  `grade_tier` value must come from the canonical enum in
+  `context/data-model.md` § "Grade tiers"; the parser is
+  responsible for normalizing — there is no SQL-level CHECK.
+- **T-DL-PRICING-ROLLUP** scans
+  `price_observation WHERE observed_date = $1 AND
+  parse_confidence >= 0.7` (or `parse_confidence IS NULL`),
+  groups by `(printing_id, grade_tier, market, currency)`,
+  applies outlier filtering (drop top/bottom 5% if
+  sample_count ≥ 20), and upserts into `price_aggregate` on
+  the composite PK. Idempotent re-running is mandatory —
+  `INSERT … ON CONFLICT (printing_id, grade_tier, market,
+  currency, period_start) DO UPDATE SET …`.
+- **T-DL-FX-RATES** writes to `fx_rate` daily. Composite PK
+  `(rate_date, base_currency, quote_currency)`. Backfill
+  history via the chosen source's historical API; the
+  display-layer fallback is to use the most recent prior
+  date and flag as "approx." (PROJECT.md § 13).
+- **T-DL-PRICING-CURRENT-VIEW** materializes
+  `mv_current_price` over `price_aggregate` for the primary-
+  market headline price. The composite PK on
+  `price_aggregate` answers the
+  `(printing_id, grade_tier, market)` lookup directly; the
+  view computes the 30-day median, trend percentages, and
+  freshness flag per the spec in `data-model.md` §
+  "mv_current_price". Refresh after the rollup job runs each
+  night.
+- **T-SP-PRICING-DISPLAY** is the only place currency
+  conversion happens (`rules/01-data-layer.md`). It joins
+  `price_aggregate.period_start = fx_rate.rate_date` and
+  converts each daily aggregate using *that day's* rate so
+  historical points reflect what the user would have paid that
+  day, not today.
+- **`price_observation` is service-role-only.** The display
+  layer / API package must read from `price_aggregate` or
+  `mv_current_price` only. Direct SELECT from
+  `price_observation` from the `anon` / `authenticated`
+  roles fails with `permission denied`; this is intentional.
