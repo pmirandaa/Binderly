@@ -1,8 +1,8 @@
-# Build status — Phase 1 iter 5 CLOSED; iter 6 dispatching (SEED-INGEST + 2 follow-ups)
+# Build status — Phase 1 iter 6 partial (PROFILE-GRANTS-FIX merged); SEED-INGEST + FX-RATES still in flight
 
-**Phase:** 1 — Data layer (24/109 tasks merged)
-**Merged:** 24 / 109 tasks
-**In progress:** 3 (T-DL-SEED-INGEST, T-DL-PROFILE-GRANTS-FIX, T-DL-FX-RATES)
+**Phase:** 1 — Data layer (25/109 tasks merged)
+**Merged:** 25 / 109 tasks
+**In progress:** 2 (T-DL-SEED-INGEST, T-DL-FX-RATES)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -78,7 +78,7 @@ schema task) section is still pre-staged + commented.
 | T-DL-IMAGE-PIPELINE | merged | #27 (`9be37c0`; +printing_image table; mig 0010/0011) |
 | T-DL-EBAY-LISTING-PARSER | merged | #30 (`2b2d144`; 8-pass; 108-entry corpus; 310 new tests) |
 | T-DL-SEED-INGEST | in_progress (iter 6) | — |
-| T-DL-PROFILE-GRANTS-FIX | in_progress (iter 6) | — |
+| T-DL-PROFILE-GRANTS-FIX | merged | #31 (`1fe1fbd`; mig 0012; closes Q-003 pending Pablo's verify-rls smoke test) |
 | T-DL-FX-RATES | in_progress (iter 6) | — |
 | T-DL-RLS-POLICIES | merged | #28 (`3c448db`; verify-rls suite + posture docs; surfaced Q-003) |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
@@ -119,12 +119,14 @@ Migration coordination:
 
 ## Open questions
 
-- **Q-003** (raised by T-DL-RLS-POLICIES, PR #28): `0001_users_rls.sql`
-  ships RLS policies for `profile`/`subscription` without companion
-  `GRANT/REVOKE` statements. Hosted Supabase covers via
-  `ALTER DEFAULT PRIVILEGES`; local Supabase CLI (PG17) does not.
-  verify-rls reports 4 failures (all the same gap). Fix is additive:
-  T-DL-PROFILE-GRANTS-FIX (XS; queued for iter 6).
+- **Q-003** (raised by T-DL-RLS-POLICIES, PR #28; **fix shipped** in
+  T-DL-PROFILE-GRANTS-FIX, PR #31, mig 0012): canonical REVOKE/GRANT
+  pattern from 0003/0005/0007/0009/0011 applied to profile +
+  subscription. Migration was authored against spec; sub-agent could
+  not run live verify-rls (sandbox tsx-IPC + psql blocks). **Pending
+  Pablo's smoke test** to confirm verify-rls goes from 93/4 → 97/0.
+  If post-fix run reports anything other than 97/97, that's a
+  follow-up additive migration (do NOT silently amend 0012).
 
 ## Phase 0 ledger (closed)
 
@@ -133,11 +135,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-PROFILE-GRANTS-FIX — `1fe1fbd` (additive 0012 mirroring canonical REVOKE/GRANT pattern from 0003/0005/0007/0009/0011; closes Q-003 pending Pablo's verify-rls smoke test)
 - T-DL-EBAY-LISTING-PARSER — `2b2d144` (8-pass deterministic parser; 108-entry hand-crafted corpus; 15 variant-hint flags; 0..1 confidence; ParserCatalogReader joiner; 310 new tests, package total 837; closes iter 5)
 - T-DL-RLS-POLICIES — `3c448db` (RLS posture docs + verify-rls TS suite; live Supabase: 93 passed / 4 failed; 4 failures are real gap → Q-003 → T-DL-PROFILE-GRANTS-FIX queued)
 - T-DL-IMAGE-PIPELINE — `9be37c0` (sharp+S3+R2 image ingestion; 4-step variant ladder thumb/card/large/original; deterministic key shape; SHA-256 dedup via printing_image sidecar; Bulbapedia auto-excluded by EXCLUDED_IMAGE_SOURCES; mig 0010/0011; 42 new tests, package total 569)
 - T-DL-SOURCE-TCGDEX-JP — `4c30cf0` (primary JP TCGdex + filler JP Pokemon-Card.com; reuses isTcgdexPromoSet from EN; pokemoncardJpToTcgdexJp matcher bridges id systems; 99 new tests, package total 527; closes iter 4)
-- T-DL-SOURCE-BULBAPEDIA — `4afde4d` (filler-tier English; wiki-shaped; raw-wikitext brace-counted parser; CC-BY-NC-SA-compliant — no images persisted; 108 new tests, package total 367; first parser-heavy adapter)
 
 ## Known follow-ups (logged, non-blocking)
 

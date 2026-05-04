@@ -416,7 +416,7 @@ tasks:
     stage: 01-data-layer
     title: Additive migration to fix Q-003 (profile/subscription grants gap)
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-DL-EBAY-LISTING-PARSER, T-DL-FX-RATES, T-DL-DATA-CONFLICT-TABLE, T-DL-ADMIN-DEBUG-SURFACES]
     provides: [security:profile-grants-fix]
