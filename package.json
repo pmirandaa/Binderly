@@ -15,9 +15,13 @@
     "test": "turbo run test",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "format": "turbo run format"
+    "format": "turbo run format",
+    "db:start": "supabase start --workdir infra",
+    "db:stop": "supabase stop --workdir infra",
+    "db:reset": "supabase db reset --workdir infra"
   },
   "devDependencies": {
+    "supabase": "2.98.1",
     "turbo": "2.9.6"
   }
 }
