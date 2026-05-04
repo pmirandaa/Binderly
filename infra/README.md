@@ -5,8 +5,9 @@ backing services that Binderly needs: Postgres, MinIO (R2 emulator with
 auto-created buckets), and Mailpit (capture-everything dev SMTP).
 
 The Supabase services (Auth, Storage, Edge Functions, Studio, gateway)
-run separately via the **Supabase CLI** — see `T-FN-SUPABASE-LOCAL`.
-Host ports here are picked so the two stacks can run side-by-side.
+run separately via the **Supabase CLI** — see
+[`infra/supabase/README.md`](./supabase/README.md). Host ports here are
+picked so the two stacks can run side-by-side.
 
 ---
 

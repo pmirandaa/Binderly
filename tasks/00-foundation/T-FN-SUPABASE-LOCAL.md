@@ -77,4 +77,115 @@ clearly documented).
   drift.
 
 ## Notes from execution
-_(empty)_
+
+### Pinned versions
+- **Supabase CLI: `2.98.1`** — pinned via root `package.json`
+  `devDependencies` (npm wrapper, the official `supabase` package on
+  npm). The wrapper bakes a real Go binary into `node_modules/` so
+  `pnpm install` is sufficient — no global install required, no
+  divergence between developers' machines, and no Homebrew dependency.
+- **Supabase Postgres major: `17`** — the CLI's default in 2.98.x. See
+  divergence note below.
+
+### Deviations from spec
+
+1. **CLI pinning approach.** Spec offered both Homebrew tap and the
+   `supabase` npm wrapper. I went with the **npm wrapper** because the
+   sandbox blocked `brew install supabase/tap/supabase` (operation not
+   permitted on `/opt/homebrew/Library/Taps`). The npm wrapper installs
+   the same Go binary into `node_modules/.bin/supabase` and pins
+   exactly via `package.json`. As a side-effect `pnpm-lock.yaml` picks
+   up the supabase package + its transitive deps (`bin-links`,
+   `chownr`, `cmd-shim`, `agent-base`, `https-proxy-agent`,
+   `node-fetch`, `tar`, etc.). Diff is purely additive.
+
+2. **Workdir flag in `db:*` scripts.** Spec said the scripts should use
+   `supabase X --workdir infra/supabase`. The Supabase CLI looks for
+   the config at `<workdir>/supabase/config.toml` — so `--workdir
+   infra/supabase` would expect `infra/supabase/supabase/config.toml`,
+   which doesn't exist. The deliverable path (`infra/supabase/config.toml`)
+   is what the spec wanted; the scripts have to use **`--workdir infra`**
+   to match. Verified empirically: `supabase status --workdir infra`
+   resolves project_id="binderly" (correct), `--workdir infra/supabase`
+   falls back to project_id="supabase" (the directory basename, no
+   config loaded). Documented in `infra/supabase/README.md`.
+
+3. **Postgres version divergence (escalation trigger surfaced — not
+   blocking).** Supabase CLI 2.98.1 defaults to Postgres major **17**;
+   `infra/docker-compose.yml` (T-FN-DOCKER) pins **16**. The two
+   stacks are isolated:
+   - The Supabase Postgres on **54322** holds the **app schema** (RLS,
+     auth, app tables, edge-function-driven mutations). Production is
+     Supabase Cloud, which provisions PG17 today.
+   - The Compose Postgres on **5433** is for **data-pipeline
+     workflows** — ETL/ingestion staging, never sees the app schema.
+
+   Per the task's escalation triggers list, this divergence is
+   surfaced for the orchestrator's review but does not block delivery
+   because the two stacks share no data and migrations target only
+   Supabase. Recommend NOT bumping T-FN-DOCKER to PG17 on this basis
+   alone — bump it if T-DL- tasks want pg17-only features in pipeline
+   workflows. The discrepancy is documented in
+   `infra/supabase/README.md` § "Postgres version note" and inline in
+   `infra/supabase/config.toml`.
+
+### Live verification status
+
+Live Docker-driven verification (`pnpm db:start`, `curl localhost:54323`,
+`psql localhost:54322`) was **not executed by the sub-agent** because
+the agent shell's sandbox denied access to the Docker daemon socket
+(`unix:///Users/pmiranda/.docker/run/docker.sock: operation not
+permitted`). All static / non-Docker verification passed:
+
+- `pnpm exec supabase --version` → `2.98.1` ✓
+- `pnpm exec supabase services --workdir infra` parses `config.toml`
+  cleanly and prints all service image versions ✓
+- `pnpm exec supabase status --workdir infra --debug` shows the CLI
+  loads `project_id="binderly"` from our config and (only) fails when
+  it tries to talk to Docker ✓
+- All four ports (54321 / 54322 / 54323 / 54324) are present in
+  `config.toml`; no collision with Compose ports (1025, 5433, 8025,
+  9000, 9001) ✓
+- All four auth providers (Google, Apple, Discord, magic-link) are
+  configured with placeholder client IDs; secrets are wired via
+  `env(...)` substitution ✓
+- `.env.example` documents both Postgres endpoints (5433 vs 54322) and
+  ships the well-known dev anon / service-role JWTs ✓
+- All file modifications stay inside `owns_paths` + the explicit
+  spec-allowed extras (root `package.json`, root `.env.example`,
+  one-line cross-link in `infra/README.md`) ✓
+
+The sub-agent recommends the orchestrator (or Pablo) run the
+end-to-end smoke from a non-sandboxed shell once, before merging:
+
+```bash
+pnpm db:start                              # ~5–10 min cold cache
+pnpm exec supabase status --workdir infra  # confirms keys + URLs
+curl -fsSI http://localhost:54323          # Studio: HTTP/1.1 200 OK
+psql postgresql://postgres:postgres@localhost:54322/postgres -c 'select 1'
+docker compose -f infra/docker-compose.yml up -d   # coexistence check
+docker ps                                          # both stacks visible
+docker compose -f infra/docker-compose.yml down -v
+pnpm db:stop
+```
+
+If `supabase status` prints anon / service-role JWTs that differ from
+the values in `.env.example` (newer CLI versions occasionally rotate
+the dev JWT issuer / exp), update `.env.example` accordingly — the
+seeded values are the long-standing demo defaults but Supabase has
+been moving toward per-project signing keys, so a delta is plausible.
+
+### Notes for downstream tasks
+
+- **T-FN-DB-MIGRATIONS** — target the Supabase Postgres at port
+  **54322** (`SUPABASE_DB_URL` in `.env.example`). Migrations
+  `supabase migration up --workdir infra`. The Compose Postgres on
+  5433 is **not** the migration target.
+- **T-FN-ENV-CONVENTIONS** — the new `# ===== SUPABASE LOCAL =====`
+  block in `.env.example` is appended at the bottom; canonicalize per
+  scope conventions (e.g., dual `WEB_SUPABASE_URL` /
+  `MOBILE_SUPABASE_URL` pointing at the same dev URL) when this task
+  runs.
+- **Apps (Next.js / Expo)** — point clients at `SUPABASE_URL`
+  (54321) and use `SUPABASE_ANON_KEY` for browser/mobile-side, never
+  `SUPABASE_SERVICE_ROLE_KEY`.
