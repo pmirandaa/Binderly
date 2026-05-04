@@ -162,6 +162,41 @@ failure handling, reporting contract).
   `data-pipeline/src/master-set/` (T-DL-MASTER-SET-RULES) and reads the
   variant classifier output as input.
 
+## Jobs (cron-runnable runners)
+
+The `src/jobs/` folder holds the cron-runnable runners that consume the
+adapters and write to `@binderly/db`. Each ships a CLI under `scripts/`
+for ad-hoc / local invocation.
+
+### `fx-rates` — daily FX-rate ingest (T-DL-FX-RATES)
+
+Pulls from the [Frankfurter](https://frankfurter.dev) FX API and upserts
+into `fx_rate`. Source = `frankfurter`; base = `USD`; quotes = `EUR,
+GBP, JPY, AUD, CAD, MXN`. Runs idempotently via the table's
+`(rate_date, base_currency, quote_currency)` PK.
+
+```sh
+# Yesterday's rates (most common — daily cron)
+pnpm --filter @binderly/data-pipeline fx-rates --latest
+
+# A specific historical date
+pnpm --filter @binderly/data-pipeline fx-rates --date 2026-04-30
+
+# A backfill range (uses Frankfurter's range endpoint)
+pnpm --filter @binderly/data-pipeline fx-rates \
+  --from-date 2026-04-01 --to-date 2026-04-30
+```
+
+DB connection precedence: `--url <conn>` > `DATABASE_URL` >
+`SUPABASE_DB_URL`. The CLI prints a single line of JSON
+(the `FxRatesReport`) to stdout on success.
+
+ECB doesn't publish on weekends or TARGET2 holidays. Frankfurter
+silently remaps weekend / holiday requests to the most recent prior
+business day; the runner stores rows keyed on Frankfurter's returned
+`date`, which is what the display layer's "fall back to most recent
+prior date" rule already expects.
+
 ## Testing
 
 ```sh

@@ -336,7 +336,7 @@ tasks:
     stage: 01-data-layer
     title: Daily FX rate ingestion (Frankfurter / ECB) for display-time conversion
     agent_role: data
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SCHEMA-PRICING]
     parallel_safe_with: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE, T-DL-EBAY-LISTING-PARSER, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [job:fx-rates]
@@ -416,7 +416,7 @@ tasks:
     stage: 01-data-layer
     title: Additive migration to fix Q-003 (profile/subscription grants gap)
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-DL-EBAY-LISTING-PARSER, T-DL-FX-RATES, T-DL-DATA-CONFLICT-TABLE, T-DL-ADMIN-DEBUG-SURFACES]
     provides: [security:profile-grants-fix]

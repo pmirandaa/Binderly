@@ -85,6 +85,13 @@
       "when": 1777920000001,
       "tag": "0011_image_provenance_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1777920000002,
+      "tag": "0012_profile_grants_fix",
+      "breakpoints": true
     }
   ]
 }
