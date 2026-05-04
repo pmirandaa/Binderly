@@ -311,4 +311,121 @@ unblocking deviation in the PR review)_
 
 ---
 
+## Q-005 — Seed image pipeline used catalog API client for CDN fetches; 341/341 image errors silently shaped as `{ cause: {} }`
+
+**Raised:** 2026-05-04 (T-DL-IMAGE-PIPELINE-CROSSHOST-FIX, hotfix on PR #33)
+**Blocking:** none directly (catalog write side already worked — 1 set / 216 cards
+/ 341 printings upserted clean). Ships zero-image catalog rows on every seed
+run until merged; downstream surfaces that read `printing_image` (the future
+`/printings/{id}` API, the web Browse view) will see no rows.
+
+**Context:** Live SEED-INGEST smoke (Pablo, 2026-05-04, run report
+`data-pipeline/scripts/output/seed-run-2026-05-04T22-32-29-381Z.json`) showed
+`imagePipeline: { transcoded: 0, cached: 0, errors: 341 }` — every printing
+in `en-swsh9` failed its image fetch. All 341 errors had the same shape:
+`{ kind: "image_pipeline", error: { kind: "fetch", target:
+"https://assets.tcgdex.net/...", cause: {} } }`. Two distinct bugs:
+
+1. **Wrong host on the image client.** TCGdex serves card data at
+   `api.tcgdex.net` and card images at `assets.tcgdex.net`. The seed CLI
+   (`data-pipeline/scripts/seed.ts` ~line 200) creates one
+   `RateLimitedClient` per source pinned to `TCGDEX_HOST = 'api.tcgdex.net'`
+   and reuses it for image fetches via `imageHttpProvider.forSource('tcgdex-en')`
+   (~line 228). `RateLimitedClient.executeWithRetries`
+   (`data-pipeline/src/http/rate-limited-client.ts:329`) enforces a per-host
+   pin (`u.host !== this.host` → throws). Every image fetch crossed hosts
+   and threw. PTCGIO has the same split (`api.pokemontcg.io` vs
+   `images.pokemontcg.io`); the smoke test didn't trip it because PTCGIO
+   ran in validation tier and contributed no primary image fetches, but
+   the bug is identical and would have fired on the first PTCGIO-primary run.
+
+2. **Error serialization dropped the underlying cause.** The cross-host
+   guard throws a plain `new Error(...)`, NOT an `AdapterError`, so
+   `data-pipeline/src/images/processor.ts:117` wraps it as
+   `new FetchError({ ..., cause: err })`. JSON's default serializer
+   skips `Error`'s non-enumerable props (`name` / `message` / `stack`),
+   so `cause` round-trips as `{}` in the run report. The operator
+   couldn't tell from the report what failed; only `git blame` on the
+   processor told the story.
+
+**Fix (T-DL-IMAGE-PIPELINE-CROSSHOST-FIX, hotfix branch
+`agent/T-DL-IMAGE-PIPELINE-CROSSHOST-FIX` off `main`):**
+
+1. Added `TCGDEX_ASSETS_HOST = 'assets.tcgdex.net' as const` next to
+   `TCGDEX_HOST` in `data-pipeline/src/adapters/tcgdex-en/adapter.ts`,
+   and `PTCGIO_ASSETS_HOST = 'images.pokemontcg.io' as const` next to
+   `PTCGIO_HOST` in `data-pipeline/src/adapters/ptcgio/adapter.ts`.
+   Re-exported from each adapter's barrel.
+2. Added `data-pipeline/src/jobs/seed/image-http-clients.ts` with
+   `createImagePipelineHttpClients({ userAgent })` (factory for the two
+   CDN clients) and `buildImageHttpProvider(clients)` (maps `ImageSource`
+   → CDN client). Both helpers exported through the
+   `data-pipeline/src/jobs/seed.ts` barrel so unit tests can pin the
+   wiring without touching the CLI script. The seed CLI now wires both
+   helpers in `buildProductionWiring()` and registers each CDN client's
+   `stop()` in `closeFns`. Same RPS/burst as the API client (5/10) for
+   safety — the CDNs tolerate higher rates, but matching the API rate
+   keeps run-time bounded by the slower upstream.
+3. Overrode `toJSON()` on `ImagePipelineError`
+   (`data-pipeline/src/images/types.ts`) and `AdapterError`
+   (`data-pipeline/src/interfaces/adapter.ts`) to emit
+   `{ name, kind, message, source, target, cause }` where `cause` is
+   `{ name, message }` for `Error` instances, the original string for
+   string causes, or undefined for absent causes — never `{}`.
+   `FetchError.toJSON` extends the base shape to include the
+   `upstream: AdapterError` field for full provenance.
+4. Tests added:
+   - `data-pipeline/src/jobs/seed/image-http-clients.test.ts` — pins the
+     regression: `provider.forSource('tcgdex-en' | 'tcgdex-jp').host ===
+     'assets.tcgdex.net'`, `provider.forSource('ptcgio').host ===
+     'images.pokemontcg.io'`, and the negative assertion that no CDN
+     client ever returns the API host.
+   - `data-pipeline/src/images/processor.test.ts` — two new tests cover
+     `JSON.stringify(new FetchError(..., { cause: new Error('refusing
+     cross-host call ...') }))` producing `"cause":{"name":"Error",
+     "message":"refusing cross-host call ..."}` (NOT `"cause":{}`), and
+     the `upstream` field round-tripping when the cause is a
+     `TransientError`.
+   - `data-pipeline/src/interfaces/adapter.test.ts` — covers the same
+     `toJSON` contract for every concrete `AdapterError` subclass.
+
+**Verification (re-run sequence Pablo can paste):**
+
+```sh
+cd /Users/pmiranda/Stuff/Binderly
+git fetch origin main
+git checkout main && git pull --ff-only
+
+# Apply the hotfix locally (after merge):
+# git pull --ff-only
+
+export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
+pnpm install --prefer-offline
+
+# Pablo's same env-var prelude as the 2026-05-04 smoke, with the
+# DATABASE_URL pointed at the local Supabase Postgres where the
+# migrations are applied (port 54322; the default 5433 in
+# .env.example is wrong for the smoke test).
+export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
+export BINDERLY_DATA_PIPELINE_UA='Binderly/0.1 (contact: legal@binderly.app)'
+export S3_ENDPOINT_URL='http://localhost:9000'
+export MINIO_ROOT_USER='minioadmin'
+export MINIO_ROOT_PASSWORD='minioadmin'
+export IMAGES_BUCKET='images'
+export IMAGES_PUBLIC_URL_PREFIX='http://localhost:9000/images'
+
+pnpm --filter @binderly/data-pipeline seed --source tcgdex-en --set en-swsh9
+```
+
+Expected: `imagePipeline.transcoded === 341` (or `transcoded + cached
+=== 341` on a re-run that hits dedup), `imagePipeline.errors === 0`.
+The run-report JSON in `data-pipeline/scripts/output/` MUST NOT
+contain `"cause":{}` anywhere; if any image-pipeline error survives,
+its `cause` will now carry the real `name` + `message`.
+
+**Pablo's answer:** _(empty — informational; no decision needed; flagged
+here for the record per the orchestrator's hotfix-coordination protocol)_
+
+---
+
 _(no other open questions yet)_

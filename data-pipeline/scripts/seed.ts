@@ -58,15 +58,15 @@ import {
   type SourceAdapter,
 } from '../src/index.js';
 import {
+  buildImageHttpProvider,
+  createImagePipelineHttpClients,
   DrizzleCatalogWriter,
   DrizzleImageDedupResolver,
   formatSeedRunSummary,
   runSeedIngest,
+  type ImageHttpProvider,
   type SeedRunReport,
 } from '../src/jobs/seed.js';
-
-import type { ImageSource } from '../src/images/index.js';
-import type { ImageHttpProvider } from '../src/jobs/seed/image-pipeline-runner.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -216,23 +216,19 @@ function buildProductionWiring(): ProductionWiring {
     userAgent,
   });
 
+  // Image-pipeline CDN clients pinned to the asset hosts
+  // (`assets.tcgdex.net`, `images.pokemontcg.io`). Separate from the
+  // API clients above because `RateLimitedClient.executeWithRetries`
+  // refuses cross-host calls. Q-005 / 2026-05-04 SEED-INGEST smoke.
+  const imageHttpClients = createImagePipelineHttpClients({ userAgent });
+  const imageHttpProvider: ImageHttpProvider = buildImageHttpProvider(imageHttpClients);
+
   const adapters: SourceAdapter[] = [
     new TCGdexEnAdapter({ http: tcgdexClient }),
     new TCGdexJpAdapter({ http: tcgdexClient }),
     new PTCGIOAdapter({ http: ptcgioClient }),
     new BulbapediaAdapter({ http: bulbapediaClient }),
   ];
-
-  const imageHttpProvider: ImageHttpProvider = {
-    forSource(source: ImageSource): RateLimitedClient | null {
-      if (source === 'tcgdex-en' || source === 'tcgdex-jp') return tcgdexClient;
-      if (source === 'ptcgio') return ptcgioClient;
-      // pokemoncard-jp images and bulbapedia-en images are handled
-      // elsewhere (or excluded). Return null to skip rather than
-      // accidentally route through a wrong host.
-      return null;
-    },
-  };
 
   return {
     adapters,
@@ -244,6 +240,8 @@ function buildProductionWiring(): ProductionWiring {
       () => tcgdexClient.stop(),
       () => ptcgioClient.stop(),
       () => bulbapediaClient.stop(),
+      () => imageHttpClients.tcgdexAssets.stop(),
+      () => imageHttpClients.ptcgioAssets.stop(),
       () => (s3Client.destroy() as unknown as Promise<void>) ?? Promise.resolve(),
       async () => {
         await db.$client.end({ timeout: 5 });
