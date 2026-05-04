@@ -18,7 +18,8 @@
     "format": "turbo run format",
     "db:start": "supabase start --workdir infra",
     "db:stop": "supabase stop --workdir infra",
-    "db:reset": "supabase db reset --workdir infra"
+    "db:reset": "supabase db reset --workdir infra",
+    "check:env": "bash scripts/check-env.sh .env.local"
   },
   "devDependencies": {
     "supabase": "2.98.1",
