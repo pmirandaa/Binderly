@@ -265,4 +265,38 @@ exercise PostgREST against profile.
 
 ---
 
+## Q-004 — `@binderly/db` package.json was missing `main`/`types`/`exports`
+
+**Raised:** 2026-05-04 (T-DL-SEED-INGEST)
+**Blocking:** Any package that imports `@binderly/db` from non-test
+source files (e.g. `data-pipeline/src/jobs/seed/db-upsert.ts`).
+
+**Context:** The `@binderly/db` package was missing `main`, `types`,
+and `exports` fields in its `package.json`. Existing consumers got
+away with this because every prior import of `@binderly/db` lived in
+a `*.test.ts` file (e.g. `data-pipeline/src/types.alignment.test.ts`),
+which is excluded from `tsc -p . --noEmit` via the `exclude` glob.
+Vitest's resolver (Vite-based) doesn't need the fields. As soon as
+T-DL-SEED-INGEST landed non-test imports
+(`data-pipeline/src/jobs/seed/db-upsert.ts`,
+`data-pipeline/src/jobs/seed/image-dedup.ts`,
+`data-pipeline/src/jobs/seed.ts`), `pnpm typecheck` started
+failing with `TS2307: Cannot find module '@binderly/db'`.
+
+**Resolution:** Added the three fields pointing to the package's
+`dist/src/index.{js,d.ts}` artefacts, which are produced by the
+existing `pnpm --filter @binderly/db build` script. Verified
+`@binderly/db`'s typecheck/lint/format:check are still clean.
+
+This is a deviation from the `T-DL-SEED-INGEST` `owns_paths`. The
+fix is one-shot, additive, and unblocks every future package that
+will need `@binderly/db` (Edge Functions, the future pricing job,
+backfill scripts). Documented here so the orchestrator can fold
+the deviation into the merge review without surprise.
+
+**Pablo's answer:** _(no answer needed — orchestrator approved as
+unblocking deviation in the PR review)_
+
+---
+
 _(no other open questions yet)_
