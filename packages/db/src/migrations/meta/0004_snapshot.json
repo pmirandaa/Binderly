@@ -1,5 +1,5 @@
 {
-  "id": "073f11c9-5060-468f-9829-11797b74a174",
+  "id": "863ee6f3-9e3d-4578-93c6-72f8630e5d76",
   "prevId": "1205d8f2-e3ab-46ae-afdd-96aaf0b367aa",
   "version": "7",
   "dialect": "postgresql",
@@ -627,8 +627,8 @@
       },
       "isRLSEnabled": false
     },
-    "public.grading_submission": {
-      "name": "grading_submission",
+    "public.collection_item": {
+      "name": "collection_item",
       "schema": "",
       "columns": {
         "id": {
@@ -648,50 +648,71 @@
           "name": "printing_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
-        },
-        "front_url": {
-          "name": "front_url",
-          "type": "text",
-          "primaryKey": false,
           "notNull": true
         },
-        "back_url": {
-          "name": "back_url",
-          "type": "text",
+        "quantity": {
+          "name": "quantity",
+          "type": "integer",
           "primaryKey": false,
-          "notNull": true
+          "notNull": true,
+          "default": 1
         },
-        "corner_urls": {
-          "name": "corner_urls",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "surface_url": {
-          "name": "surface_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "predicted": {
-          "name": "predicted",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "actual": {
-          "name": "actual",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
+        "condition": {
+          "name": "condition",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'predicted'"
+          "default": "'NEAR_MINT'"
+        },
+        "grade_company": {
+          "name": "grade_company",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "grade": {
+          "name": "grade",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acquired_at": {
+          "name": "acquired_at",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acquired_price": {
+          "name": "acquired_price",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acquired_currency": {
+          "name": "acquired_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "photo_urls": {
+          "name": "photo_urls",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "ARRAY[]::text[]"
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
         },
         "created_at": {
           "name": "created_at",
@@ -709,8 +730,29 @@
         }
       },
       "indexes": {
-        "grading_submission_user_id_created_at_idx": {
-          "name": "grading_submission_user_id_created_at_idx",
+        "collection_item_user_id_printing_id_idx": {
+          "name": "collection_item_user_id_printing_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "printing_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "collection_item_user_id_created_at_idx": {
+          "name": "collection_item_user_id_created_at_idx",
           "columns": [
             {
               "expression": "user_id",
@@ -729,27 +771,12 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "grading_submission_printing_id_idx": {
-          "name": "grading_submission_printing_id_idx",
-          "columns": [
-            {
-              "expression": "printing_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
-        "grading_submission_printing_id_printing_id_fk": {
-          "name": "grading_submission_printing_id_printing_id_fk",
-          "tableFrom": "grading_submission",
+        "collection_item_printing_id_printing_id_fk": {
+          "name": "collection_item_printing_id_printing_id_fk",
+          "tableFrom": "collection_item",
           "tableTo": "printing",
           "columnsFrom": [
             "printing_id"
@@ -757,27 +784,35 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "collection_item_owner_state_unique": {
+          "name": "collection_item_owner_state_unique",
+          "nullsNotDistinct": true,
+          "columns": [
+            "user_id",
+            "printing_id",
+            "condition",
+            "grade_company",
+            "grade"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {
-        "grading_submission_status_check": {
-          "name": "grading_submission_status_check",
-          "value": "\"grading_submission\".\"status\" IN ('predicted', 'submitted_for_grading', 'graded')"
-        },
-        "grading_submission_corner_urls_length_check": {
-          "name": "grading_submission_corner_urls_length_check",
-          "value": "array_length(\"grading_submission\".\"corner_urls\", 1) = 4"
+        "collection_item_quantity_check": {
+          "name": "collection_item_quantity_check",
+          "value": "\"collection_item\".\"quantity\" >= 1"
         }
       },
       "isRLSEnabled": false
     },
-    "public.grading_training_sample": {
-      "name": "grading_training_sample",
+    "public.custom_collection": {
+      "name": "custom_collection",
       "schema": "",
       "columns": {
         "id": {
@@ -787,74 +822,41 @@
           "notNull": true,
           "default": "gen_random_uuid()"
         },
-        "source": {
-          "name": "source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_id": {
-          "name": "source_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source_url": {
-          "name": "source_url",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "printing_id": {
-          "name": "printing_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
-        "grade_company": {
-          "name": "grade_company",
+        "name": {
+          "name": "name",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "grade": {
-          "name": "grade",
-          "type": "numeric(3, 1)",
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "subgrades": {
-          "name": "subgrades",
-          "type": "jsonb",
+        "cover_url": {
+          "name": "cover_url",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
-        },
-        "images": {
-          "name": "images",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "parse_confidence": {
-          "name": "parse_confidence",
-          "type": "numeric(3, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "raw_metadata": {
-          "name": "raw_metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "ingested_at": {
-          "name": "ingested_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
         },
         "created_at": {
           "name": "created_at",
@@ -871,48 +873,70 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "grading_training_sample_printing_id_idx": {
-          "name": "grading_training_sample_printing_id_idx",
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "custom_collection_user_id_slug_unique": {
+          "name": "custom_collection_user_id_slug_unique",
+          "nullsNotDistinct": false,
           "columns": [
-            {
-              "expression": "printing_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "grading_training_sample_grade_company_grade_idx": {
-          "name": "grading_training_sample_grade_company_grade_idx",
-          "columns": [
-            {
-              "expression": "grade_company",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "grade",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
+            "user_id",
+            "slug"
+          ]
         }
       },
+      "policies": {},
+      "checkConstraints": {
+        "custom_collection_kind_check": {
+          "name": "custom_collection_kind_check",
+          "value": "\"custom_collection\".\"kind\" IN ('manual', 'smart')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.custom_collection_item": {
+      "name": "custom_collection_item",
+      "schema": "",
+      "columns": {
+        "custom_collection_id": {
+          "name": "custom_collection_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "printing_id": {
+          "name": "printing_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "added_at": {
+          "name": "added_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
       "foreignKeys": {
-        "grading_training_sample_printing_id_printing_id_fk": {
-          "name": "grading_training_sample_printing_id_printing_id_fk",
-          "tableFrom": "grading_training_sample",
+        "custom_collection_item_custom_collection_id_custom_collection_id_fk": {
+          "name": "custom_collection_item_custom_collection_id_custom_collection_id_fk",
+          "tableFrom": "custom_collection_item",
+          "tableTo": "custom_collection",
+          "columnsFrom": [
+            "custom_collection_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "custom_collection_item_printing_id_printing_id_fk": {
+          "name": "custom_collection_item_printing_id_printing_id_fk",
+          "tableFrom": "custom_collection_item",
           "tableTo": "printing",
           "columnsFrom": [
             "printing_id"
@@ -920,30 +944,159 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "custom_collection_item_pkey": {
+          "name": "custom_collection_item_pkey",
+          "columns": [
+            "custom_collection_id",
+            "printing_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.smart_collection_rule": {
+      "name": "smart_collection_rule",
+      "schema": "",
+      "columns": {
+        "custom_collection_id": {
+          "name": "custom_collection_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "expression": {
+          "name": "expression",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_evaluated_at": {
+          "name": "last_evaluated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "smart_collection_rule_custom_collection_id_custom_collection_id_fk": {
+          "name": "smart_collection_rule_custom_collection_id_custom_collection_id_fk",
+          "tableFrom": "smart_collection_rule",
+          "tableTo": "custom_collection",
+          "columnsFrom": [
+            "custom_collection_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.shareable": {
+      "name": "shareable",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target": {
+          "name": "target",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "theme": {
+          "name": "theme",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'default'"
+        },
+        "show_values": {
+          "name": "show_values",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "show_missing": {
+          "name": "show_missing",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "show_photos": {
+          "name": "show_photos",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "grading_training_sample_source_source_id_unique": {
-          "name": "grading_training_sample_source_source_id_unique",
+        "shareable_user_id_slug_unique": {
+          "name": "shareable_user_id_slug_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "source",
-            "source_id"
+            "user_id",
+            "slug"
           ]
         }
       },
       "policies": {},
       "checkConstraints": {
-        "grading_training_sample_source_check": {
-          "name": "grading_training_sample_source_check",
-          "value": "\"grading_training_sample\".\"source\" IN ('psa_cert', 'ebay_sold', 'auction_pwcc', 'auction_goldin', 'community_flywheel')"
-        },
-        "grading_training_sample_grade_company_check": {
-          "name": "grading_training_sample_grade_company_check",
-          "value": "\"grading_training_sample\".\"grade_company\" IN ('PSA', 'BGS', 'CGC', 'SGC', 'OTHER')"
+        "shareable_target_kind_check": {
+          "name": "shareable_target_kind_check",
+          "value": "\"shareable\".\"target\" ? 'kind' AND \"shareable\".\"target\"->>'kind' IN ('full', 'custom')"
         }
       },
       "isRLSEnabled": false

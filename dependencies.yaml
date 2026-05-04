@@ -169,7 +169,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for collection_items, custom_collections, smart rules, shareables
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-USERS]
     parallel_safe_with: [T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [schema:collections, schema:smart_rules, schema:shareables]
