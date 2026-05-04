@@ -1,0 +1,73 @@
+{
+  "id": "swsh9-1",
+  "name": "Exeggcute",
+  "supertype": "Pokémon",
+  "subtypes": ["Basic"],
+  "hp": "50",
+  "types": ["Grass"],
+  "evolvesTo": ["Exeggutor"],
+  "attacks": [
+    {
+      "name": "Ram",
+      "cost": ["Colorless"],
+      "convertedEnergyCost": 1,
+      "damage": "10",
+      "text": ""
+    },
+    {
+      "name": "Seed Bomb",
+      "cost": ["Grass", "Colorless"],
+      "convertedEnergyCost": 2,
+      "damage": "20",
+      "text": ""
+    }
+  ],
+  "weaknesses": [
+    {
+      "type": "Fire",
+      "value": "×2"
+    }
+  ],
+  "retreatCost": ["Colorless"],
+  "convertedRetreatCost": 1,
+  "set": {
+    "id": "swsh9",
+    "name": "Brilliant Stars",
+    "series": "Sword & Shield",
+    "printedTotal": 172,
+    "total": 186,
+    "legalities": {
+      "unlimited": "Legal",
+      "standard": "Legal",
+      "expanded": "Legal"
+    },
+    "ptcgoCode": "BRS",
+    "releaseDate": "2022/02/25",
+    "updatedAt": "2022/02/23 09:45:00",
+    "images": {
+      "symbol": "https://images.pokemontcg.io/swsh9/symbol.png",
+      "logo": "https://images.pokemontcg.io/swsh9/logo.png"
+    }
+  },
+  "number": "1",
+  "artist": "0313",
+  "rarity": "Common",
+  "flavorText": "Though it may look like it's just a bunch of eggs, it's a proper Pokémon. Exeggcute communicates with others of its kind via telepathy, apparently.",
+  "nationalPokedexNumbers": [102],
+  "legalities": {
+    "unlimited": "Legal",
+    "standard": "Legal",
+    "expanded": "Legal"
+  },
+  "regulationMark": "F",
+  "images": {
+    "small": "https://images.pokemontcg.io/swsh9/1.png",
+    "large": "https://images.pokemontcg.io/swsh9/1_hires.png"
+  },
+  "tcgplayer": {
+    "prices": {
+      "normal": {},
+      "reverseHolofoil": {}
+    }
+  }
+}
