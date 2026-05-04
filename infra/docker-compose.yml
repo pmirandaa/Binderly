@@ -1,0 +1,111 @@
+# Binderly local development stack.
+#
+# Brings up Postgres, MinIO (R2 emulator + bucket bootstrap), and Mailpit
+# (magic-link inbox). Designed to run alongside the Supabase CLI's local
+# stack — host ports here are picked to avoid Supabase's defaults
+# (5432 / 54321-54324).
+#
+# All images are pinned by both tag and digest. All four images have
+# native linux/arm64 manifests; Apple Silicon runs without emulation.
+#
+# Bring up:    docker compose -f infra/docker-compose.yml up -d
+# Tear down:   docker compose -f infra/docker-compose.yml down -v
+# Logs:        docker compose -f infra/docker-compose.yml logs -f
+#
+# Compose v2: the top-level `version:` key is intentionally omitted.
+
+name: binderly
+
+services:
+  # ----- Postgres ----------------------------------------------------------
+  # Local Postgres for app data when not using Supabase. Host port 5433 to
+  # avoid colliding with Supabase CLI's Postgres on 54322 and any host
+  # Postgres on 5432.
+  postgres:
+    image: postgres:16.13@sha256:71e27bf60b70bded003791b5573f8b808365613f341df20ffcf0c1ed7bc13ddf
+    container_name: binderly-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-binderly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-binderly}
+      POSTGRES_DB: ${POSTGRES_DB:-binderly}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # init.sql runs only on a fresh data volume (Postgres entrypoint
+      # convention). `down -v` resets state and triggers a re-run.
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/00-extensions.sql:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER:-binderly}" -d "$${POSTGRES_DB:-binderly}"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ----- MinIO (R2 emulator) ----------------------------------------------
+  # S3-compatible object storage that mirrors the production R2 surface for
+  # card images, ANN indexes, model artifacts, and shareable OG cache.
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    container_name: binderly-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniominio}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ----- MinIO bucket bootstrap (one-shot) --------------------------------
+  # Creates the buckets the app expects, then exits 0. Idempotent — uses
+  # `mc mb --ignore-existing` so re-running the stack is a no-op when the
+  # buckets already exist.
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    container_name: binderly-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-miniominio}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"
+        mc mb --ignore-existing local/images
+        mc mb --ignore-existing local/models
+        mc mb --ignore-existing local/ann
+        mc mb --ignore-existing local/user-uploads
+        echo "buckets ready: images, models, ann, user-uploads"
+
+  # ----- Mailpit (dev SMTP + web UI) --------------------------------------
+  # Captures every outbound email so magic-link / OAuth flows are testable
+  # without external SMTP. Web inbox at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.29.7@sha256:757f22b56c1da03570afdb3d259effe5091018008a81bbedc8158cee7e16fdbc
+    container_name: binderly-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+
+volumes:
+  postgres-data:
+    name: binderly-postgres-data
+  minio-data:
+    name: binderly-minio-data
