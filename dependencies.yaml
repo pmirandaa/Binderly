@@ -81,19 +81,20 @@ tasks:
     stage: 00-foundation
     title: Docker Compose for local dev (Postgres, MinIO, Mailpit)
     agent_role: devops
-    status: merged
+    status: blocked
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
     provides: [infra:local-docker]
     owns_paths: [infra/docker-compose.yml, infra/docker/, .env.example]
     task_file: tasks/00-foundation/T-FN-DOCKER.md
     est_effort: M
+    blocked_on: Q-002
 
   - id: T-FN-SUPABASE-LOCAL
     stage: 00-foundation
     title: Supabase local dev via supabase-cli
     agent_role: devops
-    status: merged
+    status: pending
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: []
     provides: [infra:supabase-local]
@@ -105,7 +106,7 @@ tasks:
     stage: 00-foundation
     title: Drizzle ORM + migration tooling
     agent_role: backend
-    status: merged
+    status: pending
     depends_on: [T-FN-SUPABASE-LOCAL, T-FN-TS-CONFIG]
     parallel_safe_with: []
     provides: [db:migrations]
@@ -129,7 +130,7 @@ tasks:
     stage: 00-foundation
     title: Environment variable conventions and .env.example
     agent_role: devops
-    status: merged
+    status: pending
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: [T-FN-SUPABASE-LOCAL, T-FN-ORCHESTRATOR-SCRIPTS]
     provides: [config:env]
@@ -144,7 +145,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for sets, cards, printings
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-FN-DB-MIGRATIONS]
     parallel_safe_with: [T-DL-SCHEMA-USERS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [schema:cards, schema:sets, schema:printings]
@@ -156,7 +157,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for profiles + subscriptions
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-FN-DB-MIGRATIONS]
     parallel_safe_with: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [schema:profiles, schema:subscriptions]
@@ -168,7 +169,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for collection_items, custom_collections, smart rules, shareables
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-USERS]
     parallel_safe_with: [T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [schema:collections, schema:smart_rules, schema:shareables]
@@ -180,7 +181,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for grading_submissions and training data
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-USERS]
     parallel_safe_with: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-PRICING]
     provides: [schema:grading]
@@ -219,7 +220,7 @@ tasks:
     stage: 01-data-layer
     title: Standardization layer — source adapter interfaces and resolver
     agent_role: data
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-CARDS]
     parallel_safe_with: [T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [pipeline:interfaces, pipeline:resolver]
