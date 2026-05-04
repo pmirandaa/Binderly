@@ -181,7 +181,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for grading_submissions and training data
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-DL-SCHEMA-USERS]
     parallel_safe_with: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-PRICING]
     provides: [schema:grading]
