@@ -27,10 +27,10 @@ export * from './subscriptions.js';
 // ============================================================
 // === T-DL-SCHEMA-COLLECTIONS ===
 // ============================================================
-// export * from "./collections.js";
-// export * from "./custom_collections.js";
-// export * from "./smart_rules.js";
-// export * from "./shareables.js";
+export * from './collections.js';
+export * from './custom_collections.js';
+export * from './smart_rules.js';
+export * from './shareables.js';
 
 // ============================================================
 // === T-DL-SCHEMA-GRADING ===
