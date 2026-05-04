@@ -287,4 +287,146 @@ if:
 
 ## Notes from execution
 
-_(empty until the sub-agent runs)_
+### Deliverables landed
+
+- `packages/db/src/schema/grading.ts` — two Drizzle tables in one file:
+  `gradingSubmissionTable` (12 columns, PK on `id`, FK to `printing(id)`
+  with `ON DELETE SET NULL`, status + corner-urls-length-4 CHECK
+  constraints, two indexes) and `gradingTrainingSampleTable`
+  (14 columns, unique `(source, source_id)`, FK to `printing(id)` with
+  `ON DELETE SET NULL`, source + grade_company CHECK constraints, two
+  indexes). Exported `$inferSelect`/`$inferInsert` types for both.
+- `packages/db/src/schema/index.ts` — uncommented the single
+  pre-staged line in the `T-DL-SCHEMA-GRADING` section. No other
+  section touched. Trailing `export {};` placeholder left in place.
+- `packages/db/src/migrations/0004_grading_tables.sql` — drizzle-kit
+  generated. Used `--name grading_tables` to keep the conventional
+  `NNNN_<snake_case_summary>.sql` filename without renaming. Auto-
+  generated `meta/0004_snapshot.json` ships alongside.
+- `packages/db/src/migrations/0005_grading_rls.sql` — hand-authored.
+  Cross-schema FK `grading_submission.user_id → auth.users(id) ON
+  DELETE CASCADE`, RLS enabled on both tables, owner-CRUD policies on
+  `grading_submission` for `authenticated` (`auth.uid() = user_id`),
+  no `anon` and no permissive policies on `grading_training_sample`.
+  Defense-in-depth `REVOKE` of the permissive Supabase-default grants
+  followed by explicit `GRANT` for the roles that should have access
+  (`authenticated` → SELECT/INSERT/UPDATE/DELETE on
+  `grading_submission`; `service_role` → full DML on both tables).
+  Idempotent: `DROP POLICY IF EXISTS … / CREATE POLICY` mirroring
+  `0001_users_rls.sql`. (The `ALTER TABLE … ADD CONSTRAINT` for the
+  cross-schema FK isn't `IF NOT EXISTS`-able in Postgres, but the
+  drizzle migrator dedupes by hash so re-runs of `db:migrate` are
+  no-ops; matches the precedent set by `0001_users_rls.sql`.)
+- `packages/db/src/migrations/meta/_journal.json` — appended an entry
+  for `0005_grading_rls` (drizzle-kit wrote the `0004_grading_tables`
+  entry automatically during `db:generate`).
+
+### Acceptance-criteria results
+
+| AC | Status | Proof |
+|---|---|---|
+| AC-1: drizzle migration applies to fresh local Supabase | PASS | `psql DROP TABLE/SCHEMA → node migrate.ts → "success"` (6 entries in `drizzle.__drizzle_migrations`). |
+| AC-2: hand-authored RLS migration applies idempotently | PASS | RLS enabled on both tables (`pg_class.relrowsecurity = t`); re-running `db:migrate` is a no-op (count of `__drizzle_migrations` rows unchanged at 6). |
+| AC-3: cross-schema FK to `auth.users(id)` ON DELETE CASCADE | PASS | INSERT with fabricated `user_id` → `foreign_key_violation`. INSERT with real `user_id` → accepted. `DELETE FROM auth.users WHERE id = …` → `grading_submission` row count for that user drops to 0. |
+| AC-4: `printing_id` FK ON DELETE SET NULL | PASS | INSERT with fabricated `printing_id` → `foreign_key_violation`. `DELETE FROM printing WHERE id = …` → existing submission's `printing_id` becomes NULL, row preserved. |
+| AC-5: `status` enum CHECK | PASS | INSERT with `status = 'totally_made_up'` → `violates check constraint "grading_submission_status_check"`. Default is `'predicted'`. |
+| AC-6: `corner_urls` length-4 CHECK | PASS | INSERTs with arrays of length 3 and 5 both rejected with `violates check constraint "grading_submission_corner_urls_length_check"`. |
+| AC-7: `grading_training_sample` constraints | PASS | Duplicate `(source, source_id)` rejected. Out-of-enum `source` ('not_a_source') rejected. Out-of-enum `grade_company` ('NOTACO') rejected. `source = 'community_flywheel'` accepted. |
+| AC-8: RLS posture verified live | PASS | `BEGIN; SET LOCAL ROLE anon; SELECT … FROM grading_submission` → `permission denied` (no SELECT grant). Same for `grading_training_sample`. As `authenticated` with `request.jwt.claims.sub = user2`, only user2's rows visible (3 of 4 in fixture); attempting INSERT with `user_id = user1` → `new row violates row-level security policy`. As `authenticated` against `grading_training_sample` → `permission denied`. As `service_role` → full SELECT + INSERT on both. |
+| AC-9: PROJECT.md § 12 product requirements reflected | PASS | front_url / back_url / corner_urls (×4 enforced) / surface_url all NOT NULL on `grading_submission`; `predicted` is the AI score column; `actual` carries the slab payload (nullable until graded); `status` enum tracks lifecycle; `grading_training_sample.source` enum covers PSA cert / eBay sold / auction (PWCC, Goldin) / community flywheel exactly. |
+| AC-10: no edits outside `owns_paths` + pre-staged uncomment | PASS | `git diff --stat` shows only `packages/db/src/schema/grading.ts` (new), `packages/db/src/schema/index.ts` (1-line uncomment in own section), `packages/db/src/migrations/0004_grading_tables.sql` (new), `packages/db/src/migrations/0005_grading_rls.sql` (new), `packages/db/src/migrations/meta/_journal.json` (1 entry appended), `packages/db/src/migrations/meta/0004_snapshot.json` (new, drizzle-emitted). |
+| AC-11: build + typecheck + lint + format:check clean | PASS | `tsc -p .` (build) clean; `tsc --noEmit` clean; `eslint --max-warnings=0 .` clean; `prettier --check .` clean (after one prettier-write pass on `grading.ts` for indentation). |
+
+`has_table_privilege` snapshot confirms the SQL-level grants match
+the policy posture:
+
+```
+ anon_sel_sub | anon_ins_sub | anon_sel_train | auth_sel_sub |
+ auth_ins_sub | auth_sel_train | svc_ins_sub | svc_ins_train
+--------------+--------------+----------------+--------------+
+ f            | f            | f              | t            |
+ t            | f              | t           | t
+```
+
+### Spec-vs-orchestrator resolution
+
+- **Two tables in one file.** The orchestrator dispatch instructions
+  expected a possible `grading_training_sample` sibling
+  ("training-data table (if separate) likely has tighter access —
+  only service_role reads/writes; users never see it directly. Decide
+  based on PROJECT.md § grading"). The data-model.md spec only
+  details `grading_submission`; PROJECT.md § 12 names three external
+  ingestion pipelines (PSA cert lookup, eBay sold listings, auction
+  archives — PWCC, Goldin) plus the community-submission flywheel
+  whose data shape (no user_id, variable image count, optional
+  printing match) does not fit `grading_submission`. Splitting them
+  also keeps user PII out of the training corpus. Both tables fit in
+  the single owned file `packages/db/src/schema/grading.ts`; no
+  expansion of `owns_paths` was needed.
+- **RLS ships in this task** (mirroring CARDS / USERS iter-1
+  precedent). T-DL-RLS-POLICIES inherits a tighter scope: it does
+  not need to re-author RLS for `grading_submission` /
+  `grading_training_sample`. The grading tables' RLS lives directly
+  under `migrations/`, not the `migrations/rls/` directory
+  T-DL-RLS-POLICIES owns, so there's no path collision.
+- **Fixtures + round-trip tests deferred** (mirroring CARDS / USERS).
+  The dispatch `owns_paths` does not enumerate
+  `packages/db/src/fixtures/grading.ts`, and no test runner is
+  configured for `@binderly/db` yet (CARDS' AC-8 deferral noted that
+  `T-DL-DB-TEST-INFRA` is the precondition). The `$inferSelect` /
+  `$inferInsert` exports are in place so the future fixture task
+  has typed builders out of the box.
+
+### Other notes
+
+- **Migration numbering.** Current journal indices are 0–3 (USERS:
+  0000–0001; CARDS: 0002–0003). drizzle-kit picked `0004` for
+  `grading_tables`; the hand-authored RLS migration is `0005`. The
+  orchestrator can renumber at merge time if a sibling task collides;
+  the migrator keys by `tag` (journal) and content hash, not
+  filename position.
+- **Prettier write.** Initial `grading.ts` failed `prettier --check`
+  (multi-line `references()` arg). One `prettier --write` pass fixed
+  the formatting; verified clean afterwards. No structural changes.
+- **Local Supabase only — Compose Postgres on :5433 was not used.**
+  Per `packages/db/README.md` § Targets, migrations target the
+  Supabase CLI Postgres on `:54322`; the Compose Postgres on `:5433`
+  is for the data-pipeline only. Live AC verification ran against
+  `:54322`. Test fixtures (`auth.users`, a fixture set/card/printing,
+  grading submissions and training samples) were truncated /
+  deleted after verification. `\dt public.*` in the local DB now
+  contains: `card, grading_submission, grading_training_sample,
+  printing, profile, set, subscription` — all empty.
+
+### Notes for downstream tasks
+
+- **T-DL-RLS-POLICIES** inherits a smaller scope: catalog tables and
+  user tables already have RLS; collections, grading, and pricing
+  schemas ship RLS inline in their own tasks. T-DL-RLS-POLICIES likely
+  reduces to admin-only surfaces (`data_conflict`), the
+  `card_report` table, any audit-log tables, and consolidating
+  cross-table policy invariants — not re-doing per-table RLS.
+- **T-GR-DATA-PSA / T-GR-DATA-EBAY / T-GR-DATA-AUCTIONS** (stage 7)
+  write to `grading_training_sample` exclusively via the service-role
+  key. The dedup key is `(source, source_id)`; idempotent re-ingestion
+  is "INSERT … ON CONFLICT (source, source_id) DO UPDATE SET …".
+  When matching to a `printing_id`, leave it NULL when the match is
+  uncertain rather than corrupting the catalog join. The `images`
+  jsonb column accepts a flexible shape — single shot, partial corner
+  set, full multi-shot — so a single ingestion pipeline handles the
+  full quality spectrum named in PROJECT.md § 12.
+- **Community flywheel job** (probably in stage 10 alongside
+  T-PB-ENTITLEMENTS) reads `grading_submission` rows where
+  `status = 'graded'` and the owner's
+  `profile.preferences.grading_flywheel_opt_in = true`, then writes
+  a row to `grading_training_sample` with
+  `source = 'community_flywheel'` and
+  `source_id = grading_submission.id`. The opt-in check is enforced
+  in application code; RLS at the row level cannot easily express
+  "service role can read row X if profile preference Y is set",
+  so the gate lives in the cron job.
+- **T-BE-STORAGE-POLICIES** owns RLS for the user-uploaded image
+  bytes themselves (the URLs in `front_url`, `back_url`,
+  `corner_urls`, `surface_url`, and `actual.slab_url` point at a
+  Supabase Storage bucket). Bucket policy must be owner-only-read,
+  matching the `grading_submission` owner-CRUD posture.

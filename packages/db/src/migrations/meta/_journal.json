@@ -29,6 +29,20 @@
       "when": 1777916105014,
       "tag": "0003_catalog_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1777917259686,
+      "tag": "0004_grading_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1777917259687,
+      "tag": "0005_grading_rls",
+      "breakpoints": true
     }
   ]
 }
