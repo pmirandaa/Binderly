@@ -105,7 +105,7 @@ tasks:
     stage: 00-foundation
     title: Drizzle ORM + migration tooling
     agent_role: backend
-    status: in_progress
+    status: merged
     depends_on: [T-FN-SUPABASE-LOCAL, T-FN-TS-CONFIG]
     parallel_safe_with: []
     provides: [db:migrations]
@@ -144,7 +144,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for sets, cards, printings
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-FN-DB-MIGRATIONS]
     parallel_safe_with: [T-DL-SCHEMA-USERS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [schema:cards, schema:sets, schema:printings]
@@ -156,7 +156,7 @@ tasks:
     stage: 01-data-layer
     title: DB schema for profiles + subscriptions
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-FN-DB-MIGRATIONS]
     parallel_safe_with: [T-DL-SCHEMA-CARDS, T-DL-SCHEMA-COLLECTIONS, T-DL-SCHEMA-GRADING, T-DL-SCHEMA-PRICING]
     provides: [schema:profiles, schema:subscriptions]
