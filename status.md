@@ -1,8 +1,8 @@
-# Build status — Phase 1 iteration 1 done; iteration 2 dispatching
+# Build status — Phase 1 iter 2 partial: COLLECTIONS merged; SOURCE-INTERFACES + GRADING in flight
 
-**Phase:** 1 — Data layer (12/109 tasks merged)
-**Merged:** 12 / 109 tasks
-**In progress:** 0 (iteration 2 about to dispatch)
+**Phase:** 1 — Data layer (13/109 tasks merged)
+**Merged:** 13 / 109 tasks
+**In progress:** 2 (T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-GRADING)
 **Blocked:** 0
 **Blocked on humans:** 0
 
@@ -50,13 +50,23 @@ task graph, so they are intentionally narrow scope.
 |---|---|---|
 | T-DL-SCHEMA-USERS | merged | #15 (`e9b4f38`) |
 | T-DL-SCHEMA-CARDS | merged | #16 (`24b0fd4`, includes `b5af7f7` renumber) |
-| T-DL-SCHEMA-COLLECTIONS | dispatching | — |
-| T-DL-SCHEMA-GRADING | dispatching | — |
+| T-DL-SCHEMA-COLLECTIONS | merged | #17 (`c131903`) |
+| T-DL-SOURCE-INTERFACES | in_progress | — |
+| T-DL-SCHEMA-GRADING | in_progress | — |
 | T-DL-SCHEMA-PRICING | queued | — |
-| T-DL-SOURCE-INTERFACES | dispatching | — |
-| T-DL-RLS-POLICIES | blocked (waits on COLLECTIONS + GRADING) | — |
-| T-DL-SOURCE-* (4 adapters) | blocked (wait on SOURCE-INTERFACES) | — |
-| ... 25 more pending Phase 1 tasks | pending | — |
+| T-DL-RLS-POLICIES | blocked (waits on GRADING; scope shrunk: 5 collection tables already RLS'd) | — |
+| T-DL-SOURCE-* (4 adapters) | blocked (waits on SOURCE-INTERFACES) | — |
+| ... 24 more pending Phase 1 tasks | pending | — |
+
+Post-merge migration sequence on main:
+
+  0000_user_tables / 0001_users_rls / 0002_catalog_tables / 0003_catalog_rls / 0004_collection_tables / 0005_collections_rls
+
+GRADING is in flight — its drizzle-kit will likely emit 0004/0005
+inside its worktree (drizzle picks next-free relative to the worktree's
+journal), conflicting with the now-on-main 0004/0005. The orchestrator
+will renumber on merge using the iter-1 playbook (0004 -> 0006,
+0005 -> 0007 for GRADING, with hand-merged snapshot).
 
 ## Phase 0 ledger (closed)
 
@@ -65,17 +75,26 @@ All 10 foundation tasks merged. See git log between `7b4529e`
 
 ## Last 5 merges
 
+- T-DL-SCHEMA-COLLECTIONS — `c131903` (5 tables + 0004/0005 migrations; NULLS NOT DISTINCT on collection_item; nested-table RLS via EXISTS; shareable slug-gated public-read)
 - T-DL-SCHEMA-CARDS — `24b0fd4` (catalog tables + RLS; renumber 0002/0003; snapshot hand-merge)
 - T-DL-SCHEMA-USERS — `e9b4f38` (profile + subscription; cross-schema FK to auth.users; user-side RLS)
 - T-FN-DB-MIGRATIONS — `7b4529e` (Drizzle ORM + migration tooling; pre-staged schema barrel)
 - T-FN-ENV-CONVENTIONS — `cbd38f2` (73 vars / 11 sections / `docs/env.md` / `scripts/check-env.sh`)
-- T-FN-SUPABASE-LOCAL — `e81cb2f` (Supabase local stack; --workdir infra; PG17 vs PG16 inert)
 
 ## Known follow-ups (logged, non-blocking)
 
 1. **`T-DL-DB-TEST-INFRA` (proposed)** — stand up vitest in
-   `@binderly/db` so CARDS' deferred AC-8 (fixture round-trip test)
-   can land. Currently T-DL-SCHEMA-CARDS only has 7/8 ACs verified.
+   `@binderly/db` so CARDS' AC-8 (fixture round-trip test) and
+   COLLECTIONS' two deferred ACs can land. CARDS has 7/8 verified;
+   COLLECTIONS has 8/10 verified. Fixture builders shipped in both
+   PRs await a test runner before round-trip tests can execute.
+1a. **Sandbox + drizzle-kit wrapper** — COLLECTIONS sub-agent had to
+    invoke `pnpm exec drizzle-kit generate` directly because `tsx`
+    cannot create its IPC pipe under the Cursor sandbox (the wrapper
+    `pnpm db:generate` is a tsx script). SQL output is identical and
+    convention checks would have passed by inspection; future db
+    sub-agents may need the same workaround until the wrapper is
+    rewritten in plain Node or the sandbox grants IPC access.
 2. **One-shot snapshot regen** — Pablo can run
    `pnpm install && pnpm --filter @binderly/db db:generate` to confirm
    drizzle-kit produces a no-op diff against the hand-merged
