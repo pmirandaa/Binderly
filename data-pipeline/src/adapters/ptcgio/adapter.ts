@@ -59,6 +59,14 @@ import type { AdapterTier, Language, RawCard, RawPrinting, RawSet } from '../../
 export const PTCGIO_HOST = 'api.pokemontcg.io' as const;
 export const PTCGIO_DEFAULT_BASE_URL = 'https://api.pokemontcg.io' as const;
 export const PTCGIO_BASE_PATH = '/v2' as const;
+/**
+ * PTCGIO serves card images from a separate CDN host
+ * (`images.pokemontcg.io`). The seed-ingest job wires a dedicated
+ * `RateLimitedClient` pinned to this host for the image-pipeline fetch
+ * leg — the API client (pinned to `PTCGIO_HOST`) refuses cross-host
+ * calls. See Q-005 in `open-questions.md`.
+ */
+export const PTCGIO_ASSETS_HOST = 'images.pokemontcg.io' as const;
 /** Conservative free-API floor — see elaborated task spec. */
 export const PTCGIO_DEFAULT_RPS = 5;
 export const PTCGIO_DEFAULT_BURST = 10;

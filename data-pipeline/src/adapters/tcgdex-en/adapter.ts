@@ -44,6 +44,13 @@ import type { AdapterTier, Language, RawCard, RawPrinting, RawSet } from '../../
 export const TCGDEX_HOST = 'api.tcgdex.net' as const;
 export const TCGDEX_DEFAULT_BASE_URL = 'https://api.tcgdex.net' as const;
 export const TCGDEX_EN_BASE_PATH = '/v2/en' as const;
+/**
+ * TCGdex serves card images from a separate CDN host (`assets.tcgdex.net`).
+ * The seed-ingest job wires a dedicated `RateLimitedClient` pinned to this
+ * host for the image-pipeline fetch leg — the API client (pinned to
+ * `TCGDEX_HOST`) refuses cross-host calls. See Q-005 in `open-questions.md`.
+ */
+export const TCGDEX_ASSETS_HOST = 'assets.tcgdex.net' as const;
 /** Conservative free-API floor — see elaborated task spec. */
 export const TCGDEX_DEFAULT_RPS = 5;
 export const TCGDEX_DEFAULT_BURST = 10;

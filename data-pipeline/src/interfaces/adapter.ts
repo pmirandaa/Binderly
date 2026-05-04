@@ -107,6 +107,12 @@ export interface AdapterErrorContext {
 /**
  * Base class. Carries the `kind` discriminator so consumers can narrow
  * the union without `instanceof` chains.
+ *
+ * `toJSON` is overridden so this error round-trips through
+ * `JSON.stringify` without dropping `name` / `message` / `cause`.
+ * `Error`'s built-in fields are non-enumerable, so the default
+ * serializer would emit `{}` for an `AdapterError` whose `cause` is
+ * itself an `Error` (Q-005, 2026-05-04 SEED-INGEST smoke).
  */
 export abstract class AdapterError extends Error {
   abstract readonly kind: AdapterErrorKind;
@@ -120,6 +126,47 @@ export abstract class AdapterError extends Error {
     this.source = ctx.source;
     this.target = ctx.target;
     this.cause = ctx.cause;
+  }
+
+  toJSON(): {
+    name: string;
+    kind: AdapterErrorKind;
+    message: string;
+    source: string;
+    target: string | undefined;
+    cause: { name: string; message: string } | string | undefined;
+  } {
+    return {
+      name: this.name,
+      kind: this.kind,
+      message: this.message,
+      source: this.source,
+      target: this.target,
+      cause: serializeAdapterErrorCause(this.cause),
+    };
+  }
+}
+
+/**
+ * Coerce an `AdapterErrorContext.cause` into a shape that survives
+ * `JSON.stringify`. Plain `Error` instances have non-enumerable
+ * `name` / `message` / `stack`, so the default serializer drops
+ * them; string / number / object causes pass through untouched
+ * (the latter only stringified via `JSON.stringify` for safety).
+ */
+function serializeAdapterErrorCause(
+  cause: unknown,
+): { name: string; message: string } | string | undefined {
+  if (cause === undefined) return undefined;
+  if (cause instanceof Error) {
+    return { name: cause.name, message: cause.message };
+  }
+  if (typeof cause === 'string') return cause;
+  if (cause === null) return 'null';
+  try {
+    return JSON.stringify(cause);
+  } catch {
+    return String(cause);
   }
 }
 

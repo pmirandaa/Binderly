@@ -438,6 +438,12 @@ export {
   type RunImageOptions,
   runImagePipelineForPrintings,
 } from './seed/image-pipeline-runner.js';
+export {
+  type ImagePipelineHttpClients,
+  type CreateImagePipelineHttpClientsOptions,
+  buildImageHttpProvider,
+  createImagePipelineHttpClients,
+} from './seed/image-http-clients.js';
 export { concurrencyPool, type ConcurrencyPool } from './seed/concurrency.js';
 export {
   type SeedRunError,

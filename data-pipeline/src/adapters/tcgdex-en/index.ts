@@ -7,6 +7,7 @@
 export {
   TCGdexEnAdapter,
   createTCGdexEnAdapter,
+  TCGDEX_ASSETS_HOST,
   TCGDEX_DEFAULT_BASE_URL,
   TCGDEX_DEFAULT_BURST,
   TCGDEX_DEFAULT_RPS,
