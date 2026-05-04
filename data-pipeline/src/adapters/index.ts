@@ -20,7 +20,7 @@ export * from './tcgdex-en/index.js';
 // ============================================================
 // === T-DL-SOURCE-BULBAPEDIA === (validation/filler)
 // ============================================================
-// export * from './bulbapedia/index.js';
+export * from './bulbapedia/index.js';
 
 // ============================================================
 // === T-DL-SOURCE-TCGDEX-JP === (primary Japanese)

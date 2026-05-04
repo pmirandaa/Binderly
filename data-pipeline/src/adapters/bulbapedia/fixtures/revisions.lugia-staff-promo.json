@@ -1,0 +1,23 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 555555,
+        "ns": 0,
+        "title": "Lugia V (SWSH Black Star Promos 285)",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "contentmodel": "wikitext",
+                "contentformat": "text/x-wiki",
+                "content": "{{CardInfobox\n|cardname=Lugia V\n|jname=ルギアV\n|jtrans=Lugia V\n|image=LugiaVPromoSWSH285.jpg\n|caption=Illus. [[5ban Graphics]]\n|species=Lugia\n|evostage=Basic\n|type=C\n|hp=220\n|weakness=L\n|resistance=F\n|retreatcost=2\n|class=Holographic\n|rarity=Promo\n|cardno=SWSH285\n|expansion=SWSH Black Star Promos\n|stamp=Pokémon TCG Staff\n|setlist=SWSH Black Star Promos\n}}\n"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

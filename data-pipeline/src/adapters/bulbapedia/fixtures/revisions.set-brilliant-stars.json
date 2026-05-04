@@ -1,0 +1,23 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "pages": [
+      {
+        "pageid": 22222,
+        "ns": 0,
+        "title": "Brilliant Stars (TCG)",
+        "revisions": [
+          {
+            "slots": {
+              "main": {
+                "contentmodel": "wikitext",
+                "contentformat": "text/x-wiki",
+                "content": "{{SetInfobox\n|name=Brilliant Stars\n|jname=スターバース\n|series=Sword & Shield\n|cards=172\n|cardstotal=216\n|released=February 25, 2022\n}}\n"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
