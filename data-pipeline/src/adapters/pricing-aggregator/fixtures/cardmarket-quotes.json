@@ -1,0 +1,105 @@
+[
+  {
+    "kind": "cardmarket_quote",
+    "vendor": "mock",
+    "printingVariantKey": "en-base1-004-holo",
+    "market": "CARDMARKET_EU",
+    "currency": "EUR",
+    "gradeTier": "RAW_NM",
+    "price": "180.00",
+    "shipping": null,
+    "observedAt": "2026-04-30T06:00:00Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "trend30dEur": 180.0,
+      "lowEur": 142.5,
+      "samples": 28,
+      "sourceTrendUrl": "https://example.test/cardmarket/charizard-base"
+    }
+  },
+  {
+    "kind": "cardmarket_quote",
+    "vendor": "mock",
+    "printingVariantKey": "en-base1-004-holo",
+    "market": "CARDMARKET_EU",
+    "currency": "EUR",
+    "gradeTier": "PSA_10",
+    "price": "12500.00",
+    "shipping": null,
+    "observedAt": "2026-04-30T06:00:00Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "trend30dEur": 12500.0,
+      "samples": 4,
+      "sourceTrendUrl": "https://example.test/cardmarket/charizard-base-psa10"
+    }
+  },
+  {
+    "kind": "cardmarket_quote",
+    "vendor": "mock",
+    "printingVariantKey": "en-swsh7-091-altart",
+    "market": "CARDMARKET_EU",
+    "currency": "EUR",
+    "gradeTier": "RAW_NM",
+    "price": "95.50",
+    "shipping": null,
+    "observedAt": "2026-04-30T06:00:00Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "trend30dEur": 95.5,
+      "samples": 17,
+      "sourceTrendUrl": "https://example.test/cardmarket/sylveon-altart"
+    }
+  },
+  {
+    "kind": "cardmarket_quote",
+    "vendor": "mock",
+    "printingVariantKey": "en-swsh7-091-altart",
+    "market": "CARDMARKET_EU",
+    "currency": "EUR",
+    "gradeTier": "PSA_10",
+    "price": "420.00",
+    "shipping": null,
+    "observedAt": "2026-04-30T06:00:00Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "trend30dEur": 420.0,
+      "samples": 9,
+      "sourceTrendUrl": "https://example.test/cardmarket/sylveon-altart-psa10"
+    }
+  },
+  {
+    "kind": "cardmarket_quote",
+    "vendor": "mock",
+    "printingVariantKey": "en-base1-058-rh",
+    "market": "CARDMARKET_EU",
+    "currency": "EUR",
+    "gradeTier": "RAW_NM",
+    "price": "8.25",
+    "shipping": null,
+    "observedAt": "2026-04-30T06:00:00Z",
+    "observedDate": "2026-04-30",
+    "rawPayload": {
+      "trend30dEur": 8.25,
+      "samples": 64,
+      "sourceTrendUrl": "https://example.test/cardmarket/pikachu-rh"
+    }
+  },
+  {
+    "kind": "cardmarket_quote",
+    "vendor": "mock",
+    "printingVariantKey": "en-base1-058-rh",
+    "market": "CARDMARKET_EU",
+    "currency": "EUR",
+    "gradeTier": "RAW_NM",
+    "price": "9.10",
+    "shipping": null,
+    "observedAt": "2026-04-29T06:00:00Z",
+    "observedDate": "2026-04-29",
+    "rawPayload": {
+      "trend30dEur": 9.1,
+      "samples": 60,
+      "sourceTrendUrl": "https://example.test/cardmarket/pikachu-rh"
+    }
+  }
+]

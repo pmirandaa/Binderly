@@ -3,7 +3,7 @@
 **Stage:** 01-data-layer
 **Agent role:** data
 **Effort:** M (~half day)
-**Status:** in_progress
+**Status:** review
 
 ---
 
