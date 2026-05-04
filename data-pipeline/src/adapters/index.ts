@@ -27,3 +27,8 @@ export * from './bulbapedia/index.js';
 // ============================================================
 export * from './tcgdex-jp/index.js';
 export * from './pokemoncard-jp/index.js';
+
+// ============================================================
+// === T-DL-FX-RATES === (Frankfurter FX rates)
+// ============================================================
+export * from './fx/index.js';

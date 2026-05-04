@@ -13,6 +13,7 @@ export * from './resolver/resolver.js';
 export * from './master-set/index.js';
 export * from './adapters/index.js';
 export * from './images/index.js';
+export * from './jobs/index.js';
 
 // Normalize helpers — re-export both as namespaces (so consumers can
 // say `normalize.rarity('tcgdex-en', 'Rare Holo V')`) and as direct

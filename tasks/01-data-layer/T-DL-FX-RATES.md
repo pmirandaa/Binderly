@@ -219,4 +219,50 @@ Append to `open-questions.md` and STOP if:
 
 ## Notes from execution
 
-_(empty until the sub-agent runs)_
+- **Frankfurter host moved.** The long-standing `api.frankfurter.app`
+  host returned empty 200 bodies during a curl probe; `api.frankfurter.dev/v1`
+  is the canonical endpoint as of 2026-05. Adapter is pinned to the
+  new host. (If `api.frankfurter.app` ever comes back, no code change
+  is needed beyond the `FRANKFURTER_HOST` constant.)
+- **Schema PK confirmed at `(rate_date, base_currency, quote_currency)`.**
+  The task brief assumed `source` was part of the unique constraint
+  but the merged schema (`0008_pricing_tables.sql`) explicitly
+  excludes it. The runner's `ON CONFLICT` clause matches the actual
+  PK; the upsert clause writes `excluded.source` so re-running with a
+  different source overwrites in place. Documented inline in
+  `scripts/fx-rates.ts` and in the elaborated spec.
+- **Weekend / holiday remap.** Frankfurter silently substitutes the
+  most recent prior business day's rates for weekend / holiday
+  requests, with the response's `date` reflecting the actual rate
+  date. The runner stores rows keyed on Frankfurter's `date`. This
+  matches the display layer's documented "fall back to most recent
+  prior date" behavior and means `--latest` is naturally idempotent
+  on weekends (Friday's rates are already present after Sat / Sun
+  runs).
+- **`@binderly/db` has no runtime entrypoint yet.** The CLI script
+  uses deep-path imports (`@binderly/db/src/client.js`,
+  `@binderly/db/src/schema/price_snapshots.js`) which resolve via
+  the pnpm symlink + tsx's transpile-on-demand. Adding `"main"` /
+  `"exports"` to `@binderly/db/package.json` is a workspace-wide
+  cleanup outside this task's owns_paths; the deep-path posture
+  matches the existing `data-pipeline/src/types.alignment.test.ts`
+  pattern.
+- **Test count**: +30 tests (17 in `frankfurter.test.ts`, 13 in
+  `fx-rates.test.ts`) — full data-pipeline suite at 909 passing.
+- **Live integration smoke test (paste-able):**
+
+  ```sh
+  # Local Supabase Postgres (per packages/db/scripts/migrate.ts pattern)
+  pnpm --filter @binderly/db db:migrate \
+    --url postgres://postgres:postgres@localhost:54322/postgres
+  pnpm --filter @binderly/data-pipeline fx-rates --date 2026-04-30 \
+    --url postgres://postgres:postgres@localhost:54322/postgres
+  # Expected stdout (one JSON line):
+  #   {"source":"frankfurter","rangeRequested":{"kind":"single","date":"2026-04-30"},
+  #    "datesFetched":["2026-04-30"],"ratesFetched":6,"ratesUpserted":6,
+  #    "durationMs":...,"errors":[]}
+  ```
+
+  The orchestrator sandbox has no Docker, so this was not exercised
+  end-to-end here; the AC's "(Optional) Live integration" bullet is
+  intentionally documented rather than executed.
