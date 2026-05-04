@@ -78,10 +78,63 @@ describe('normalizeRarity — pokemontcg.io', () => {
 });
 
 describe('normalizeRarity — Bulbapedia EN', () => {
-  it('maps Bulbapedia rarity strings (cross-validation use only)', () => {
+  it('maps base rarity strings (cross-validation use only)', () => {
     expect(normalizeRarity('bulbapedia-en', 'Holo Rare')).toBe('HOLO_RARE');
     expect(normalizeRarity('bulbapedia-en', 'Ultra Rare')).toBe('ULTRA_RARE');
     expect(normalizeRarity('bulbapedia-en', 'Secret Rare')).toBe('SECRET_RARE');
+  });
+
+  it('maps the long tail of vintage / V / VMAX / VSTAR ultra rare flavors', () => {
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo EX')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo GX')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo V')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo VMAX')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo VSTAR')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo LV.X')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo Star')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Holo ex')).toBe('ULTRA_RARE');
+  });
+
+  it('maps BW / XY / SM-era one-off mechanics', () => {
+    expect(normalizeRarity('bulbapedia-en', 'Rare BREAK')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Prime')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare ACE')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Prism Star')).toBe('ULTRA_RARE');
+  });
+
+  it('maps Shining / Shiny variants', () => {
+    expect(normalizeRarity('bulbapedia-en', 'Rare Shining')).toBe('ULTRA_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Shiny')).toBe('ULTRA_RARE');
+  });
+
+  it('maps modern hyper / rainbow / illustration tiers', () => {
+    expect(normalizeRarity('bulbapedia-en', 'Hyper Rare')).toBe('HYPER_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Hyper rare')).toBe('HYPER_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rainbow Rare')).toBe('RAINBOW_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Rainbow')).toBe('RAINBOW_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Illustration Rare')).toBe('ILLUSTRATION_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Special Illustration Rare')).toBe(
+      'SPECIAL_ILLUSTRATION_RARE',
+    );
+    expect(normalizeRarity('bulbapedia-en', 'Full Art')).toBe('ILLUSTRATION_RARE');
+  });
+
+  it('maps Trainer Gallery and Double Rare tiers', () => {
+    // Trainer Gallery cards land on the HOLO_RARE rarity axis (the
+    // TG identity is `variant_class=TRAINER_GALLERY`, not a rarity).
+    expect(normalizeRarity('bulbapedia-en', 'Trainer Gallery Rare Holo')).toBe('HOLO_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Double Rare')).toBe('DOUBLE_RARE');
+  });
+
+  it('maps Amazing / Radiant tiers', () => {
+    expect(normalizeRarity('bulbapedia-en', 'Amazing Rare')).toBe('AMAZING_RARE');
+    expect(normalizeRarity('bulbapedia-en', 'Radiant Rare')).toBe('RADIANT_RARE');
+  });
+
+  it('maps promo flavors', () => {
+    expect(normalizeRarity('bulbapedia-en', 'Promo')).toBe('PROMO');
+    expect(normalizeRarity('bulbapedia-en', 'Rare Promo')).toBe('PROMO');
+    expect(normalizeRarity('bulbapedia-en', 'Black Star Promo')).toBe('PROMO');
   });
 });
 

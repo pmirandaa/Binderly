@@ -1,0 +1,11 @@
+<!-- Synthetic fixture: Bulbapedia "SWSH Black Star Promos (TCG)". -->
+{{SetInfobox
+|name=SWSH Black Star Promos
+|series=Sword & Shield
+|released=November 15, 2019
+|cards=313
+}}
+
+The '''SWSH Black Star Promos''' is a series of promotional cards
+released alongside the Sword & Shield Series. Cards are numbered
+SWSH001, SWSH002, …, SWSH313.

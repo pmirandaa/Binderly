@@ -122,24 +122,65 @@ const ptcgio: RarityMappingTable = {
 
 const bulbapediaEn: RarityMappingTable = {
   // Bulbapedia uses its own English-prose vocabulary. Used only for
-  // *cross-validation*; not a primary content source per the legal
-  // notes (`context/legal-and-brand.md`). Stripped to factual rarity
-  // tier.
+  // *cross-validation* / filler-tier joins; not a primary content
+  // source per the legal notes (`context/legal-and-brand.md`).
+  // Stripped to factual rarity tier.
   Common: 'COMMON',
   Uncommon: 'UNCOMMON',
   Rare: 'RARE',
+  // Both word orders observed across eras of card pages.
   'Rare Holo': 'HOLO_RARE',
   'Holo Rare': 'HOLO_RARE',
+  'Holographic Rare': 'HOLO_RARE',
+  // Vintage / EX / GX / V / VMAX / VSTAR ultra-rare flavors. T-DL-
+  // SOURCE-BULBAPEDIA expanded these with the long tail observed on
+  // historical card pages.
+  'Rare Holo EX': 'ULTRA_RARE',
+  'Rare Holo GX': 'ULTRA_RARE',
+  'Rare Holo V': 'ULTRA_RARE',
+  'Rare Holo VMAX': 'ULTRA_RARE',
+  'Rare Holo VSTAR': 'ULTRA_RARE',
+  'Rare Holo LV.X': 'ULTRA_RARE',
+  'Rare Holo Star': 'ULTRA_RARE',
+  // SV-era lowercase ex mechanic — Bulbapedia preserves casing.
+  'Rare Holo ex': 'ULTRA_RARE',
+  // BW / XY / SM-era one-off mechanics.
+  'Rare BREAK': 'ULTRA_RARE',
+  'Rare Prime': 'ULTRA_RARE',
+  'Rare ACE': 'ULTRA_RARE',
+  'Rare Prism Star': 'ULTRA_RARE',
+  // Shining / Shiny variants live alongside their Pokémon as
+  // distinct CARDS (not flags) per `context/tcg-domain.md` § 3, but
+  // their rarity tier still maps here.
+  'Rare Shining': 'ULTRA_RARE',
+  'Rare Shiny': 'ULTRA_RARE',
   'Ultra Rare': 'ULTRA_RARE',
+  'Rare Ultra': 'ULTRA_RARE',
+  // SV-era tier (separate from ULTRA_RARE in our enum).
+  'Double Rare': 'DOUBLE_RARE',
+  // Secret-rare numbering tier.
+  'Rare Secret': 'SECRET_RARE',
   'Secret Rare': 'SECRET_RARE',
+  // Modern hyper / rainbow / illustration tiers.
   'Hyper Rare': 'HYPER_RARE',
+  'Hyper rare': 'HYPER_RARE',
   'Rainbow Rare': 'RAINBOW_RARE',
+  'Rare Rainbow': 'RAINBOW_RARE',
   'Illustration Rare': 'ILLUSTRATION_RARE',
   'Special Illustration Rare': 'SPECIAL_ILLUSTRATION_RARE',
-  'Double Rare': 'DOUBLE_RARE',
+  // Pre-SV "Full Art" maps to our `ILLUSTRATION_RARE` tier (same
+  // visual axis); see § 6 of the elaborated spec.
+  'Full Art': 'ILLUSTRATION_RARE',
+  // Trainer Gallery cards (SWSH era) carry HOLO_RARE on the rarity
+  // axis; the variant_class is `TRAINER_GALLERY` (separate axis).
+  'Trainer Gallery Rare Holo': 'HOLO_RARE',
+  // SM-era / SWSH-era radiant + amazing tiers.
   'Amazing Rare': 'AMAZING_RARE',
   'Radiant Rare': 'RADIANT_RARE',
+  // Promo flavors.
   Promo: 'PROMO',
+  'Rare Promo': 'PROMO',
+  'Black Star Promo': 'PROMO',
 };
 
 const tcgdexJp: RarityMappingTable = {

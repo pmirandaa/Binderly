@@ -1,0 +1,43 @@
+<!-- Synthetic fixture authored against Bulbapedia's documented
+     CardInfobox / CardPrintInfo template format. See
+     `tasks/01-data-layer/T-DL-SOURCE-BULBAPEDIA.md` "Notes from execution"
+     for why fixtures are authored rather than live-captured. -->
+{{CardInfobox
+|cardname=Charizard
+|jname=リザードン
+|jtrans=Lizardon
+|image=CharizardBaseSet4.jpg
+|caption=Illus. [[Mitsuhiro Arita]]
+|species=Charizard
+|evostage=Stage 2
+|evoname=Charmeleon
+|type=R
+|hp=120
+|weakness=W
+|resistance=F
+|retreatcost=3
+|class=Holographic
+|rarity=Holo Rare
+|cardno=4/102
+|expansion=Base Set
+|setlist=Base Set
+|prev=Bulbasaur
+|prevnum=2
+|next=Clefairy
+|nextnum=5
+}}
+
+==Card text==
+{{Cardtext/Pokémon|name=Charizard|tcg=yes}}
+
+==Release information==
+This card was first released in three distinct print runs: the 1st
+Edition Shadowless print (the rarest), the (non-1st-Edition)
+Shadowless print, and the Unlimited print.
+
+{{CardPrintInfo|label=1st Edition Shadowless Holo|class=Holographic|1stEdition=yes|shadowless=yes}}
+{{CardPrintInfo|label=Shadowless Holo|class=Holographic|shadowless=yes}}
+{{CardPrintInfo|label=Unlimited Holo|class=Holographic|unlimited=yes}}
+
+==Trivia==
+This card is widely regarded as the most iconic Pokémon TCG card.

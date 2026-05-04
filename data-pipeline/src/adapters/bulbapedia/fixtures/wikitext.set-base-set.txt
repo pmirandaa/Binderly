@@ -1,0 +1,15 @@
+<!-- Synthetic fixture: Bulbapedia "Base Set (TCG)". -->
+{{SetInfobox
+|name=Base Set
+|jname=拡張パック 第1弾
+|series=Original
+|cards=102
+|cardstotal=102
+|released=January 9, 1999
+|prev=
+|next=Jungle
+}}
+
+The '''Base Set''' is the original [[Pokémon Trading Card Game]]
+expansion released in English. It contains 102 cards including the
+iconic Charizard, Blastoise, and Venusaur.
