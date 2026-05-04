@@ -1,14 +1,18 @@
-# Build status — Phase 1 schema work CLOSED; iter 3 has only TCGDEX-EN in flight
+# Build status — Phase 1 iter 3 closed; iter 4 dispatching (3 sibling adapters)
 
-**Phase:** 1 — Data layer (17/109 tasks merged)
-**Merged:** 17 / 109 tasks
-**In progress:** 1 (T-DL-SOURCE-TCGDEX-EN)
+**Phase:** 1 — Data layer (18/109 tasks merged)
+**Merged:** 18 / 109 tasks
+**In progress:** 3 (T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP)
 **Blocked:** 0
 **Blocked on humans:** 0
 
 **Phase 1 schema-work milestone reached.** All 5 schema tasks
 (USERS, CARDS, COLLECTIONS, GRADING, PRICING) merged. 13 schema
 modules and 10 monotonic migrations (0000–0009) on main.
+
+**Phase 1 source-pipeline foundation done.** SOURCE-INTERFACES,
+MASTER-SET-RULES, and the first concrete adapter (TCGDEX-EN) are
+all merged. Adapter framework is battle-tested.
 
 ## Dispatch loop status
 
@@ -61,7 +65,10 @@ schema task) section is still pre-staged + commented.
 | T-DL-SOURCE-INTERFACES | merged | #19 (`51b3727`) |
 | T-DL-MASTER-SET-RULES | merged | #21 (`d531dc7`) |
 | T-DL-SCHEMA-PRICING | merged | #22 (`a99fc0b`) |
-| T-DL-SOURCE-TCGDEX-EN | in_progress (iter 3) | — |
+| T-DL-SOURCE-TCGDEX-EN | merged | #23 (`1a741ab`, includes `4f0a36c` reconciliation) |
+| T-DL-SOURCE-PTCGIO | in_progress (iter 4) | — |
+| T-DL-SOURCE-BULBAPEDIA | in_progress (iter 4) | — |
+| T-DL-SOURCE-TCGDEX-JP | in_progress (iter 4) | — |
 | T-DL-RLS-POLICIES | ready; scope reduced to data_conflict + admin debug | — |
 | T-DL-SOURCE-PTCGIO / -BULBAPEDIA / -TCGDEX-JP | ready (queued) | — |
 | T-DL-EBAY-LISTING-PARSER | ready (queued) | — |
@@ -71,20 +78,37 @@ schema task) section is still pre-staged + commented.
 | T-DL-SEED-INGEST | blocked on adapters + MASTER-SET-RULES + IMAGE-PIPELINE + RLS-POLICIES | — |
 | ... ~14 more pending Phase 1 tasks | pending | — |
 
-## Iter 3 dispatch (3 in flight, MAX_PARALLEL=3)
+## Iter 4 dispatch (3 in flight, MAX_PARALLEL=3)
 
-Owns_paths are pairwise disjoint, so all 3 run safely in parallel:
+Three sibling adapter tasks. Owns_paths are folder-disjoint
+(`adapters/ptcgio/`, `adapters/bulbapedia/`, `adapters/tcgdex-jp/`
++ `adapters/pokemoncard-jp/`); the shared coordination surfaces are:
+- `data-pipeline/src/adapters/index.ts` — pre-staged with sectioned
+  uncomment-only headers (same playbook as the schema barrel; PR
+  #23's TCGDEX-EN line is already in place; each new adapter
+  uncomments its own section).
+- `data-pipeline/src/normalize/rarity.ts` — additive registry; each
+  adapter adds its own source key. Git's auto-merge handles
+  language-disjoint additions cleanly.
 
-| Task | Scope | Owns_paths |
-|---|---|---|
-| T-DL-SCHEMA-PRICING | Last schema task in Phase 1; finalizes the DB surface for the pricing branch. Migrations land cleanly at 0008/0009 (no other schema in flight). | `packages/db/src/schema/{prices,price_snapshots}.ts` + barrel uncomment + new migrations |
-| T-DL-SOURCE-TCGDEX-EN | First concrete adapter; primary English source. Validates the @binderly/data-pipeline contract from the consumer side. | `data-pipeline/src/adapters/tcgdex-en/` |
-| T-DL-MASTER-SET-RULES | Master set decision logic; consumes the variant classifier from SOURCE-INTERFACES; emits `printing.include_in_master_set` writes. | `data-pipeline/src/master-set/` |
+| Task | Tier | Language | Folder |
+|---|---|---|---|
+| T-DL-SOURCE-PTCGIO | validation | en | `data-pipeline/src/adapters/ptcgio/` |
+| T-DL-SOURCE-BULBAPEDIA | validation/filler | en | `data-pipeline/src/adapters/bulbapedia/` |
+| T-DL-SOURCE-TCGDEX-JP | primary | jp | `data-pipeline/src/adapters/tcgdex-jp/` + `pokemoncard-jp/` |
 
-All three are stubs flagged for elaboration (the orchestrator's
-"elaborate-then-ship" prompt pattern from GRADING is reused). RLS-
-POLICIES held: its remaining scope (data_conflict + admin debug
-surfaces) may roll into a later docs PR.
+All three are stubs dispatched with the elaborate-then-ship prompt
+pattern. The TCGDEX-EN PR body's "Notes for the 3 sibling adapter
+tasks" is the canonical playbook (folder layout, FetchShim test
+pattern, sourceKey convention, raw-signals-only contract, etc.).
+
+## Held to iter 5 (post-iter-4)
+
+- T-DL-EBAY-LISTING-PARSER (depends on SOURCE-INTERFACES + CARDS)
+- T-DL-IMAGE-PIPELINE (depends on CARDS + SOURCE-INTERFACES)
+- T-DL-PRICING-AGGREGATOR / -EBAY-BROWSE (need adapters + SCHEMA-PRICING)
+- T-DL-FX-RATES (depends on SCHEMA-PRICING)
+- T-DL-RLS-POLICIES (scope shrunk to data_conflict + admin debug; may roll into a later docs PR)
 
 ## Phase 0 ledger (closed)
 
@@ -93,11 +117,11 @@ All 10 foundation tasks merged. See git log between `7df9f12`
 
 ## Last 5 merges
 
+- T-DL-SOURCE-TCGDEX-EN — `1a741ab` (first concrete adapter; primary English; FetchShim test pattern; 45 new tests, package total 199; canonical adapter playbook for siblings)
 - T-DL-SCHEMA-PRICING — `a99fc0b` (4 tables: market + price_observation + price_aggregate + fx_rate; idempotent 7-market seed; observation-internal RLS; 11/11 ACs PASS live; closes Phase 1 schema surface)
 - T-DL-MASTER-SET-RULES — `d531dc7` (pure decideMasterSetMembership engine; zod-validated overrides; 53 new tests, package total 207; runtime drift guard against classifier defaults)
 - T-DL-SOURCE-INTERFACES — `51b3727` (@binderly/data-pipeline package; SourceAdapter / RateLimitedClient / resolver / variant-classifier / canonical-keys; 154 tests; tcg-domain.md § 8 patched)
 - T-DL-SCHEMA-GRADING — `77d18d0` (grading_submission + grading_training_sample; cross-schema FK; service-role-only training corpus; renumbered 0006/0007)
-- T-DL-SCHEMA-COLLECTIONS — `c131903` (5 tables + 0004/0005; NULLS NOT DISTINCT; nested-table RLS via EXISTS; shareable slug-gated public-read)
 
 ## Known follow-ups (logged, non-blocking)
 
