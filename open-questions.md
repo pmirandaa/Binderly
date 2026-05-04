@@ -261,7 +261,19 @@ passed, 0 failed". The web/edge-function tasks downstream that touch
 `profile` will rely on this being fixed locally before they can
 exercise PostgREST against profile.
 
-**Pablo's answer:** _(empty until answered)_
+**Pablo's answer:** do option 1
+
+**Resolution (orchestrator, 2026-05-04):** Shipped as
+**T-DL-PROFILE-GRANTS-FIX**, PR #31 (`1fe1fbd`, additive migration
+`packages/db/src/migrations/0012_profile_grants_fix.sql`). Final
+migration index ended up at **0012** instead of option 1's
+recommended 0010 because **T-DL-IMAGE-PIPELINE** (PR #27, merged
+in iter 5) claimed 0010 + 0011 for the `printing_image`
+provenance + RLS pair. Migration content otherwise mirrors option
+1 verbatim — same canonical REVOKE/GRANT pattern as
+`0003_catalog_rls.sql` / `0005_collections_rls.sql` /
+`0007_grading_rls.sql` / `0009_pricing_rls.sql`. Live verify-rls
+smoke test pending Pablo's run; expected to go from 93/4 → 97/0.
 
 ---
 
