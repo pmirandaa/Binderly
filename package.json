@@ -19,6 +19,9 @@
     "db:start": "supabase start --workdir infra",
     "db:stop": "supabase stop --workdir infra",
     "db:reset": "supabase db reset --workdir infra",
+    "db:generate": "pnpm --filter @binderly/db db:generate",
+    "db:migrate": "pnpm --filter @binderly/db db:migrate",
+    "db:migrate:local": "pnpm --filter @binderly/db db:migrate -- --url $SUPABASE_DB_URL",
     "check:env": "bash scripts/check-env.sh .env.local"
   },
   "devDependencies": {
