@@ -361,7 +361,7 @@ tasks:
     stage: 01-data-layer
     title: mv_current_price materialized view + nightly refresh
     agent_role: backend
-    status: in_progress
+    status: review
     depends_on: [T-DL-PRICING-ROLLUP]
     parallel_safe_with: []
     provides: [view:current-price]

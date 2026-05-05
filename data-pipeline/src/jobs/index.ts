@@ -25,3 +25,8 @@ export * from './pricing-ebay-browse.js';
 // === T-DL-PRICING-ROLLUP ===
 // ============================================================
 export * from './pricing-rollup.js';
+
+// ============================================================
+// === T-DL-PRICING-CURRENT-VIEW ===
+// ============================================================
+export * from './pricing-current-view.js';

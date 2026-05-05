@@ -92,6 +92,13 @@
       "when": 1777920000002,
       "tag": "0012_profile_grants_fix",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1777920000003,
+      "tag": "0013_mv_current_price",
+      "breakpoints": true
     }
   ]
 }
