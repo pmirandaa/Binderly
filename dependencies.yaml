@@ -94,7 +94,7 @@ tasks:
     stage: 00-foundation
     title: Supabase local dev via supabase-cli
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: []
     provides: [infra:supabase-local]
@@ -106,7 +106,7 @@ tasks:
     stage: 00-foundation
     title: Drizzle ORM + migration tooling
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-FN-SUPABASE-LOCAL, T-FN-TS-CONFIG]
     parallel_safe_with: []
     provides: [db:migrations]
@@ -130,7 +130,7 @@ tasks:
     stage: 00-foundation
     title: Environment variable conventions and .env.example
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: [T-FN-SUPABASE-LOCAL, T-FN-ORCHESTRATOR-SCRIPTS]
     provides: [config:env]
@@ -428,7 +428,7 @@ tasks:
     stage: 01-data-layer
     title: data_conflict table + resolver write path (admin debug surface)
     agent_role: data
-    status: review
+    status: merged
     depends_on: [T-DL-RLS-POLICIES, T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-ADMIN-DEBUG-SURFACES]
     provides: [table:data_conflict]
@@ -441,7 +441,7 @@ tasks:
     stage: 01-data-layer
     title: Admin debug views (pg_stat_statements + catalog audit views)
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-DATA-CONFLICT-TABLE]
     provides: [debug:admin-surfaces]
