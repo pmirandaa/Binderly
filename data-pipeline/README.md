@@ -387,6 +387,140 @@ psql postgresql://postgres:postgres@localhost:54322/postgres \
         FROM price_aggregate ORDER BY period_start DESC LIMIT 10;"
 ```
 
+### `pricing-current-view` — refresh `mv_current_price` (T-DL-PRICING-CURRENT-VIEW)
+
+Refreshes the `mv_current_price` materialized view defined in
+[`packages/db/src/migrations/0013_mv_current_price.sql`](../packages/db/src/migrations/0013_mv_current_price.sql).
+The view caches the latest `price_aggregate` row per
+`(printing_id, grade_tier, market, currency)` so the future
+card-detail UI (T-SP-PRICING-DISPLAY) reads a single bounded row per
+card / grade / market combo instead of doing `DISTINCT ON` over the
+growing `price_aggregate` table on every page render.
+
+The runner picks the right refresh form automatically:
+
+- First-ever refresh after the migration (the view is created
+  `WITH NO DATA` so the migration is fast):
+  `REFRESH MATERIALIZED VIEW mv_current_price;`. Blocks readers
+  while it runs, but the view has no readers yet.
+- Subsequent refreshes:
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_current_price;`.
+  Requires the unique index that the migration creates; never
+  blocks readers. Production-friendly form per the PG docs.
+
+Cadence: nightly, **after** `pricing-rollup` so the view sees the
+freshest aggregates. Wired by ops via cron / Edge Functions; this
+job ships only the runner.
+
+#### CLI usage
+
+```sh
+# Production daily cron (use the right form automatically)
+pnpm --filter @binderly/data-pipeline pricing-current-view --refresh \
+  --url <postgres://...>
+
+# Preview the SQL without executing (no DB writes)
+pnpm --filter @binderly/data-pipeline pricing-current-view --refresh \
+  --dry-run --url <postgres://...>
+
+# Smoke test with no DB / no network (synthetic in-memory refresher)
+MOCK_PRICING_CURRENT_VIEW=1 \
+  pnpm --filter @binderly/data-pipeline pricing-current-view --refresh
+```
+
+Modes:
+
+- **Live** (`MOCK_PRICING_CURRENT_VIEW` unset, `--url`/`DATABASE_URL`/
+  `SUPABASE_DB_URL` set): postgres-js refresher that detects the
+  populated state via `pg_class.relpages` and issues the right
+  `REFRESH MATERIALIZED VIEW [CONCURRENTLY] …` form.
+- **Dry run** (`--dry-run` + URL): postgres-js refresher reads the
+  populated state but does not issue the `REFRESH`; the report
+  echoes the SQL that would have run.
+- **Mock** (`MOCK_PRICING_CURRENT_VIEW=1`): synthetic in-memory
+  refresher; no credentials, no network, no Postgres needed. Useful
+  for verifying the CLI plumbing.
+
+Flags:
+
+- `--refresh` — required operation flag (the only operation v1
+  supports; the explicit flag leaves room for future verbs).
+- `--dry-run` — skip the refresh; print the SQL.
+- `--url <conn>` (or `DATABASE_URL` / `SUPABASE_DB_URL`).
+
+The CLI prints a single line of JSON (the
+`PricingCurrentViewReport`) to stdout on success and exits 0; on
+any unrecoverable error it prints a diagnostic to stderr and exits
+
+1. Same posture as `fx-rates`, `pricing-ebay-browse`, and
+   `pricing-rollup`.
+
+#### Live smoke (paste-able for Pablo)
+
+```sh
+cd /Users/pmiranda/Stuff/Binderly  # or your worktree
+git checkout main && git pull --ff-only
+export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
+pnpm install --prefer-offline
+
+# 1. Bring up Postgres + apply migrations (creates mv_current_price WITH NO DATA).
+docker compose -f infra/docker-compose.yml up -d postgres
+pnpm --filter @binderly/db db:migrate
+
+# 2. Confirm the view exists (empty for now).
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "\d+ mv_current_price"
+
+# 3. Seed some pricing data so the view has rows to cache:
+MOCK_PRICING_EBAY_BROWSE=1 pnpm --filter @binderly/data-pipeline \
+  pricing-ebay-browse --set en-swsh9 --max-queries 3
+pnpm --filter @binderly/data-pipeline pricing-rollup \
+  --date "$(date -u -v-1d +%F)"
+
+# 4. Preview the refresh SQL (dry-run, no writes).
+pnpm --filter @binderly/data-pipeline pricing-current-view \
+  --refresh --dry-run
+
+# 5. Refresh for real.
+pnpm --filter @binderly/data-pipeline pricing-current-view --refresh
+
+# 6. Inspect: should now have one row per
+#    (printing, grade_tier, market, currency).
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "SELECT printing_id, grade_tier, market, currency,
+             period_start, mean_price, sample_count
+        FROM mv_current_price ORDER BY printing_id LIMIT 5;"
+```
+
+#### Refresh-form selection
+
+The runner asks the refresher whether the view is populated
+(`pg_class.relpages > 0`) and picks the form:
+
+- `relpages = 0` → `REFRESH MATERIALIZED VIEW mv_current_price;`
+  (initial population; blocks readers but there are none).
+- `relpages > 0` →
+  `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_current_price;`
+  (steady state; never blocks readers; relies on the
+  `mv_current_price_pk_idx` unique index).
+
+`REFRESH … CONCURRENTLY` on a never-populated view fails with
+"CONCURRENTLY cannot be used when the materialized view is not
+populated", so the gating is mandatory.
+
+#### RLS posture
+
+Materialized views in PostgreSQL 17 do **not** support row-level
+security. The view's access posture is enforced by SQL grants only
+(see the migration header for the verification trail against the
+PG 17 docs). Posture mirrors `price_aggregate`:
+
+- `REVOKE ALL FROM PUBLIC` (defense-in-depth).
+- `GRANT SELECT TO anon, authenticated, service_role` — read-only
+  for every consumer role; service-role bypasses RLS via Supabase's
+  BYPASSRLS attribute, but PostgREST checks SQL privileges before
+  any policy layer, so the explicit GRANT is required.
+
 ## Testing
 
 ```sh

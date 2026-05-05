@@ -29,7 +29,8 @@
     "seed": "tsx scripts/seed.ts",
     "fx-rates": "tsx scripts/fx-rates.ts",
     "pricing-ebay-browse": "tsx scripts/pricing-ebay-browse.ts",
-    "pricing-rollup": "tsx scripts/pricing-rollup.ts"
+    "pricing-rollup": "tsx scripts/pricing-rollup.ts",
+    "pricing-current-view": "tsx scripts/pricing-current-view.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.685.0",

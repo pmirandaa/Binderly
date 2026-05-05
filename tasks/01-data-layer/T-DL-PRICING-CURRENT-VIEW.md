@@ -3,7 +3,7 @@
 **Stage:** 01-data-layer
 **Agent role:** backend
 **Effort:** S
-**Status:** in_progress
+**Status:** review
 
 ---
 
@@ -506,4 +506,76 @@ Stop and escalate to orchestrator (via `open-questions.md` append) if:
 
 ## Notes from execution
 
-_(empty until the implementation runs)_
+### v1 column set (orchestrator dispatch vs `data-model.md`)
+
+Implemented the orchestrator's iter-9 v1 spec: latest aggregate stats
+per `(printing_id, grade_tier, market, currency)`. Surfaced as Q-006
+in the elaborated task .md above. The richer trends + freshness
+columns from `context/data-model.md` § mv_current_price are deferred
+to a follow-up that pairs with `T-SP-PRICING-DISPLAY` once the
+display layer's read patterns are pinned. v1 is a strict subset of
+the eventual shape (no columns dropped) so the follow-up is purely
+additive.
+
+### RLS on materialized views — orchestrator hint disconfirmed
+
+The dispatch hinted that PG 14+ supports `ALTER MATERIALIZED VIEW …
+ENABLE ROW LEVEL SECURITY`. Verified against the [PG 17 ALTER
+MATERIALIZED VIEW docs](https://www.postgresql.org/docs/17/sql-altermaterializedview.html)
+(no RLS in the action list) and the [Row Security Policies docs](https://www.postgresql.org/docs/17/ddl-rowsecurity.html)
+("supported for tables" only) — RLS on materialized views is not
+supported in PG 17 (which is what local Supabase CLI 2.98.1 ships
+per Q-003). Posture is enforced via REVOKE / GRANT only; documented
+in the migration's section-3 header. `verify-rls.ts` is **not**
+extended (no `pg_policies` rows to assert for an mv).
+
+### Index strategy
+
+Two indices ship:
+
+- UNIQUE `(printing_id, grade_tier, market, currency)` — required
+  for `REFRESH … CONCURRENTLY` and doubles as the natural lookup
+  index for the future display path.
+- `(printing_id)` — for the "give me every grade tier and market
+  for this card" read pattern.
+
+The dispatch hinted at a possible `(printing_id, grade_tier)` index;
+skipped because the `(printing_id)` index already covers that prefix
+and a second composite would only matter when the second column is
+highly selective and queried independently. Easy to add if the
+display layer's profiler later flags it.
+
+### Refresh-form selection
+
+The runner detects the populated state via `pg_class.relpages` and
+issues:
+
+- `REFRESH MATERIALIZED VIEW mv_current_price;` on first run after
+  the migration (the view is created `WITH NO DATA` so the migration
+  is fast).
+- `REFRESH MATERIALIZED VIEW CONCURRENTLY mv_current_price;`
+  thereafter (never blocks readers; relies on the unique index).
+
+Pinned in unit tests via `InMemoryMaterializedViewRefresher`.
+
+### Test count
+
+Baseline: 1072 tests. After this PR: 1087 tests (+15). All five
+data-pipeline gates clean; all three @binderly/db gates clean. CLI
+smoke under sandbox is impossible (`tsx`-IPC-pipe EPERM, same
+limitation that affects every other tsx-based script in this repo
+under sandbox); paste-able smoke for Pablo lives in the PR body and
+in `data-pipeline/README.md` § "Pricing current view". Live
+`db:migrate` + `REFRESH` validation is a Pablo-side post-merge
+smoke; T-DL-DB-TEST-INFRA tracks the sandbox fix.
+
+### Out of scope — verify-rls extension
+
+Materialized views aren't in `pg_policies` and don't support RLS in
+PG 17 (see "RLS on materialized views" above). The `verify-rls`
+suite's structural asserter targets tables; extending it for the
+mv's GRANT posture would require a separate inventory layer that
+queries `information_schema.role_table_grants` for materialized
+views. Out of scope for this S-effort task; the migration's
+REVOKE/GRANT block is the source of truth and PR review can audit
+it line-by-line.
