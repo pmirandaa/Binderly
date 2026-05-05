@@ -33,6 +33,9 @@ import {
   type SeedRunReport,
 } from './seed.js';
 import { InMemoryDedupResolver, type ImageDedupResolver } from '../images/index.js';
+import { InMemoryConflictLogRepo } from '../resolver/conflict-log.js';
+
+import type { RawCard } from '../types.js';
 
 // ============================================================
 // Test wiring
@@ -495,6 +498,165 @@ describe('DrizzleCatalogWriter', () => {
     const fakeDb = {} as CtorArg;
     const writer = new DrizzleCatalogWriter(fakeDb);
     expect(writer).toBeInstanceOf(DrizzleCatalogWriter);
+  });
+});
+
+// ============================================================
+// runSeedIngest — conflict-log integration (T-DL-DATA-CONFLICT-TABLE)
+// ============================================================
+
+describe('runSeedIngest — conflict-log persistence', () => {
+  // Build a ptcgio validation adapter that disagrees with the
+  // primary on `illustrator` so the resolver fires a real conflict.
+  function buildConflictingPtcgio(): MockAdapter {
+    const swsh9SetPtcgio = {
+      source: 'ptcgio',
+      sourceKey: 'swsh9',
+      code: 'swsh9',
+      language: 'en' as const,
+      name: 'Brilliant Stars',
+      series: 'Sword & Shield',
+      releaseDate: '2022-02-25',
+      printedTotal: 172,
+      total: 186,
+    };
+    const charizardCardPtcgio: RawCard = {
+      source: 'ptcgio',
+      sourceKey: 'swsh9-018',
+      setCode: 'swsh9',
+      language: 'en',
+      number: '018',
+      name: 'Charizard VSTAR',
+      typeRaw: 'Fire',
+      hp: 270,
+      // Disagrees with the tcgdex-en primary's '5ban Graphics' →
+      // the resolver records a DataConflict on `illustrator`.
+      illustrator: 'Pokemon Studio',
+      rarityRaw: 'Rare Holo VSTAR',
+    };
+    return new MockAdapter({
+      name: 'ptcgio',
+      language: 'en',
+      tier: 'validation',
+      sets: [swsh9SetPtcgio],
+      cardsBySet: new Map([['swsh9', [charizardCardPtcgio]]]),
+      printingsByCard: new Map(),
+    });
+  }
+
+  it('persists resolver conflicts via conflictLog when supplied', async () => {
+    const { writer, dedup, storage, httpProvider } = await buildWiring();
+    const fixtures = buildSyntheticCatalog();
+    const conflictLog = new InMemoryConflictLogRepo();
+
+    const report = await runSeedIngest({
+      adapters: [fixtures.tcgdexEn, buildConflictingPtcgio()],
+      writer,
+      dedup,
+      storage,
+      imageHttpProvider: httpProvider,
+      imageLadder: TINY_TEST_LADDER,
+      conflictLog,
+      sets: ['en-swsh9'],
+    });
+
+    // Resolver counter still bumps as before.
+    expect(report.resolver.cardConflicts).toBeGreaterThan(0);
+    // …and the persistence layer received the rows.
+    expect(conflictLog.size()).toBeGreaterThan(0);
+    const rows = conflictLog.list();
+    const illustratorRow = rows.find((r) => r.fieldName === 'illustrator');
+    expect(illustratorRow).toBeDefined();
+    expect(illustratorRow?.entityKind).toBe('card');
+    expect(illustratorRow?.entityCanonicalKey).toBe('en-swsh9-018');
+    expect(illustratorRow?.resolution).toBe('kept_tcgdex-en');
+    expect(illustratorRow?.keptValue).toBe('5ban Graphics');
+  });
+
+  it('preserves legacy behavior when conflictLog is undefined', async () => {
+    const { writer, dedup, storage, httpProvider } = await buildWiring();
+    const fixtures = buildSyntheticCatalog();
+
+    const report = await runSeedIngest({
+      adapters: [fixtures.tcgdexEn, buildConflictingPtcgio()],
+      writer,
+      dedup,
+      storage,
+      imageHttpProvider: httpProvider,
+      imageLadder: TINY_TEST_LADDER,
+      sets: ['en-swsh9'],
+    });
+
+    // The report's per-source counter still bumped — backwards-compat.
+    expect(report.resolver.cardConflicts).toBeGreaterThan(0);
+  });
+
+  it('idempotency: re-running the same set bumps disputeCount instead of duplicating rows', async () => {
+    const { writer, dedup, storage, httpProvider } = await buildWiring();
+    const fixtures = buildSyntheticCatalog();
+    const conflictLog = new InMemoryConflictLogRepo();
+
+    await runSeedIngest({
+      adapters: [fixtures.tcgdexEn, buildConflictingPtcgio()],
+      writer,
+      dedup,
+      storage,
+      imageHttpProvider: httpProvider,
+      imageLadder: TINY_TEST_LADDER,
+      conflictLog,
+      sets: ['en-swsh9'],
+    });
+    const sizeAfterFirst = conflictLog.size();
+    const illustratorBefore = conflictLog
+      .list()
+      .find((r) => r.fieldName === 'illustrator')?.disputeCount;
+
+    await runSeedIngest({
+      adapters: [fixtures.tcgdexEn, buildConflictingPtcgio()],
+      writer,
+      dedup,
+      storage,
+      imageHttpProvider: httpProvider,
+      imageLadder: TINY_TEST_LADDER,
+      conflictLog,
+      sets: ['en-swsh9'],
+    });
+
+    // Same number of distinct rows after re-run.
+    expect(conflictLog.size()).toBe(sizeAfterFirst);
+    const illustratorAfter = conflictLog
+      .list()
+      .find((r) => r.fieldName === 'illustrator')?.disputeCount;
+    expect(illustratorAfter).toBe((illustratorBefore ?? 0) + 1);
+  });
+
+  it('flush failure surfaces as a recordError but does not abort the set', async () => {
+    const { writer, dedup, storage, httpProvider } = await buildWiring();
+    const fixtures = buildSyntheticCatalog();
+    const failingRepo: InMemoryConflictLogRepo = new InMemoryConflictLogRepo();
+    failingRepo.upsertMany = async (): Promise<number> => {
+      throw new Error('simulated repo failure');
+    };
+
+    const report = await runSeedIngest({
+      adapters: [fixtures.tcgdexEn, buildConflictingPtcgio()],
+      writer,
+      dedup,
+      storage,
+      imageHttpProvider: httpProvider,
+      imageLadder: TINY_TEST_LADDER,
+      conflictLog: failingRepo,
+      sets: ['en-swsh9'],
+    });
+
+    // Set's catalog writes still happened.
+    expect(report.db.setsUpserted).toBe(1);
+    expect(report.db.cardsUpserted).toBeGreaterThan(0);
+    // The flush failure is captured as a typed db_upsert error.
+    const flushErr = report.errors.find(
+      (e) => e.kind === 'db_upsert' && e.entity === 'data_conflict',
+    );
+    expect(flushErr).toBeDefined();
   });
 });
 

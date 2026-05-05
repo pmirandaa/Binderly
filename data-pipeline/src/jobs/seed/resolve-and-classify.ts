@@ -17,6 +17,10 @@ import { canonicalCardKey, printingVariantKey } from '../../canonical-keys.js';
 import { type AdapterLogger, type SourceAdapter } from '../../interfaces/adapter.js';
 import { decideMasterSetMembership, type MasterSetDecisionInput } from '../../master-set/index.js';
 import {
+  dataConflictFromResolverConflict,
+  type ConflictLogRepo,
+} from '../../resolver/conflict-log.js';
+import {
   resolveCanonicalCards,
   resolveCanonicalPrintings,
   type TieredRecords,
@@ -27,6 +31,7 @@ import type {
   CanonicalCard,
   CanonicalPrinting,
   CanonicalSet,
+  DataConflict,
   RawCard,
   RawPrinting,
   RawSet,
@@ -54,6 +59,15 @@ export interface ProcessSetResult {
  *
  * The fn does NOT touch the DB or the image pipeline. Those are
  * downstream stages composed on top of this one.
+ *
+ * `conflictLog` is optional. When provided, every resolver conflict
+ * observed during this set's processing is buffered and flushed via
+ * `repo.upsertMany` at the end of the set. When undefined, the
+ * report's per-source `resolverConflicts` counter still bumps but
+ * the conflicts are not persisted (preserves every legacy test).
+ *
+ * `clock` is injectable so tests can pin `last_seen_at`
+ * deterministically; defaults to `() => new Date()`.
  */
 export async function processSet(args: {
   readonly canonicalSet: CanonicalSet;
@@ -63,8 +77,24 @@ export async function processSet(args: {
   readonly reporter: Reporter;
   readonly logger: AdapterLogger;
   readonly limitCards?: number | null;
+  readonly conflictLog?: ConflictLogRepo;
+  readonly clock?: () => Date;
 }): Promise<ProcessSetResult> {
-  const { canonicalSet, adapters, rawByAdapter, reporter, logger, limitCards } = args;
+  const { canonicalSet, adapters, rawByAdapter, reporter, logger, limitCards, conflictLog } = args;
+  const clock = args.clock ?? ((): Date => new Date());
+
+  // Per-set buffer of conflicts to persist. The per-set bound matches
+  // the pricing-rollup repo's per-day batching shape and keeps a
+  // failed flush from losing more than one set's worth of data. The
+  // resolver still reports the count to `recordResolverConflicts`
+  // even when persistence is disabled.
+  const conflictBuffer: Array<{ entity: 'card' | 'printing'; conflict: DataConflict }> = [];
+  const recordConflict = (entity: 'card' | 'printing', c: DataConflict): void => {
+    reporter.recordResolverConflicts(entity, c.chosenSource, 1);
+    if (conflictLog) {
+      conflictBuffer.push({ entity, conflict: c });
+    }
+  };
 
   // ----- Collect cards from each adapter that recognises this set -----
   const cardTiers: TieredRecords<RawCard> = { primary: [], validation: [], filler: [] };
@@ -118,7 +148,7 @@ export async function processSet(args: {
 
   const { canonical: canonicalCards } = await reporter.time('resolve_classify', async () => {
     const result = resolveCanonicalCards(cardTiers, setLookupForResolver, {
-      onConflict: (c) => reporter.recordResolverConflicts('card', c.chosenSource, 1),
+      onConflict: (c) => recordConflict('card', c),
     });
     for (const card of result.canonical) {
       reporter.recordResolverAgreements(card.sourceMetadata);
@@ -243,7 +273,7 @@ export async function processSet(args: {
       printingTiers,
       classifiedEntries,
       {
-        onConflict: (c) => reporter.recordResolverConflicts('printing', c.chosenSource, 1),
+        onConflict: (c) => recordConflict('printing', c),
       },
     );
 
@@ -257,6 +287,38 @@ export async function processSet(args: {
     }
 
     processedCards.push({ canonical: canonicalCard, printings: processedPrintings });
+  }
+
+  // ----- Flush buffered conflicts to the persistence layer -----
+  // The flush is per-set so a failed write loses at most one set's
+  // worth of conflicts; the report's `resolverConflicts` counter
+  // remains intact regardless. We never re-throw — the conflict log
+  // is debug data, and failing to persist must not abort catalog
+  // writes for the set.
+  if (conflictLog && conflictBuffer.length > 0) {
+    const now = clock();
+    const fixedNow = (): Date => now;
+    const rows = conflictBuffer.map(({ conflict }) =>
+      dataConflictFromResolverConflict(conflict, fixedNow),
+    );
+    try {
+      await conflictLog.upsertMany(rows);
+    } catch (cause) {
+      reporter.recordError({
+        kind: 'db_upsert',
+        entity: 'data_conflict',
+        key: canonicalSet.canonicalKey,
+        cause,
+      });
+      logger.error(
+        {
+          set: canonicalSet.canonicalKey,
+          buffered_conflicts: conflictBuffer.length,
+          err: describeError(cause),
+        },
+        'seed.conflict_log.flush.failed',
+      );
+    }
   }
 
   return { cards: processedCards };

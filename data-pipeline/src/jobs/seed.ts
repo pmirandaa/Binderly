@@ -41,6 +41,7 @@ import {
   InMemoryDedupResolver,
 } from '../images/index.js';
 import { type AdapterLogger, type SourceAdapter } from '../interfaces/adapter.js';
+import { type ConflictLogRepo } from '../resolver/conflict-log.js';
 
 import type { CanonicalSet } from '../types.js';
 
@@ -62,6 +63,14 @@ export interface SeedOptions {
    * pipeline. Tests pass a stub returning a shimmed client.
    */
   readonly imageHttpProvider: ImageHttpProvider;
+  /**
+   * Optional `ConflictLogRepo`. When provided, every resolver
+   * conflict observed during the run is buffered per-set and
+   * persisted to `data_conflict` via `upsertMany`. When undefined,
+   * conflicts still bump the report's `resolverConflicts` counter
+   * but are not persisted (preserves every legacy test).
+   */
+  readonly conflictLog?: ConflictLogRepo;
   /** Pino-compatible logger; defaults to a noop. */
   readonly logger?: AdapterLogger;
 
@@ -226,6 +235,9 @@ async function processOneSet(args: ProcessOneSetArgs): Promise<void> {
 
   // ----- Process cards + printings (resolver + classifier + master-set engine) -----
   const limitCards = options.limitCards ?? null;
+  // SeedOptions.clock returns ms; processSet's clock returns Date.
+  const seedClock = options.clock;
+  const processSetClock = seedClock ? (): Date => new Date(seedClock()) : undefined;
   const result = await processSet({
     canonicalSet,
     adapters,
@@ -233,6 +245,8 @@ async function processOneSet(args: ProcessOneSetArgs): Promise<void> {
     reporter,
     logger,
     limitCards,
+    ...(options.conflictLog ? { conflictLog: options.conflictLog } : {}),
+    ...(processSetClock ? { clock: processSetClock } : {}),
   });
 
   // ----- DB: per card, upsert; per printing, upsert and patch with image URLs -----

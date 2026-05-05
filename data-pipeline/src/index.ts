@@ -10,6 +10,7 @@ export * from './canonical-keys.js';
 export * from './variant-classify.js';
 export * from './http/rate-limited-client.js';
 export * from './resolver/resolver.js';
+export * from './resolver/conflict-log.js';
 export * from './master-set/index.js';
 export * from './adapters/index.js';
 export * from './images/index.js';

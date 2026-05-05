@@ -1,13 +1,14 @@
 // The expected RLS posture, hand-derived from the merged migrations:
 //
-//   - 0001_users_rls.sql        → profile, subscription
-//   - 0003_catalog_rls.sql      → set, card, printing
-//   - 0005_collections_rls.sql  → collection_item, custom_collection,
-//                                 custom_collection_item, smart_collection_rule,
-//                                 shareable
-//   - 0007_grading_rls.sql      → grading_submission, grading_training_sample
-//   - 0009_pricing_rls.sql      → market, price_observation, price_aggregate,
-//                                 fx_rate
+//   - 0001_users_rls.sql            → profile, subscription
+//   - 0003_catalog_rls.sql          → set, card, printing
+//   - 0005_collections_rls.sql      → collection_item, custom_collection,
+//                                     custom_collection_item, smart_collection_rule,
+//                                     shareable
+//   - 0007_grading_rls.sql          → grading_submission, grading_training_sample
+//   - 0009_pricing_rls.sql          → market, price_observation, price_aggregate,
+//                                     fx_rate
+//   - 0015_data_conflict_rls.sql    → data_conflict (service-role-only)
 //
 // This file is the structural source of truth for the verification script.
 // Every entry has a one-line note that maps it back to its origin migration
@@ -60,6 +61,10 @@ export const EXPECTED_TABLES: readonly ExpectedTable[] = [
   { tablename: 'price_observation', note: 'pricing — service_role only (no permissive policy)' },
   { tablename: 'price_aggregate', note: 'pricing — public read, service_role write' },
   { tablename: 'fx_rate', note: 'pricing — public read, service_role write' },
+  {
+    tablename: 'data_conflict',
+    note: 'admin debug — service_role only (no permissive policy)',
+  },
 ] as const;
 
 /**
@@ -69,6 +74,7 @@ export const EXPECTED_TABLES: readonly ExpectedTable[] = [
 export const NO_PERMISSIVE_POLICY_TABLES: readonly string[] = [
   'grading_training_sample',
   'price_observation',
+  'data_conflict',
 ] as const;
 
 /**

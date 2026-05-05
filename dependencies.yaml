@@ -428,7 +428,7 @@ tasks:
     stage: 01-data-layer
     title: data_conflict table + resolver write path (admin debug surface)
     agent_role: data
-    status: in_progress
+    status: review
     depends_on: [T-DL-RLS-POLICIES, T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-ADMIN-DEBUG-SURFACES]
     provides: [table:data_conflict]
