@@ -67,6 +67,7 @@ import {
   type ImageHttpProvider,
   type SeedRunReport,
 } from '../src/jobs/seed.js';
+import { DrizzleConflictLogRepo, type ConflictLogRepo } from '../src/resolver/conflict-log.js';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 
@@ -179,6 +180,7 @@ interface ProductionWiring {
   dedup: DrizzleImageDedupResolver;
   storage: S3ImageStorage;
   imageHttpProvider: ImageHttpProvider;
+  conflictLog: ConflictLogRepo;
   closeFns: Array<() => Promise<void>>;
 }
 
@@ -189,6 +191,7 @@ function buildProductionWiring(): ProductionWiring {
   const db = createDbClient(databaseUrl);
   const writer = new DrizzleCatalogWriter(db);
   const dedup = new DrizzleImageDedupResolver(db);
+  const conflictLog = new DrizzleConflictLogRepo(db);
 
   const bucket = process.env['IMAGES_BUCKET'] ?? 'images';
   const publicUrlPrefix =
@@ -236,6 +239,7 @@ function buildProductionWiring(): ProductionWiring {
     dedup,
     storage,
     imageHttpProvider,
+    conflictLog,
     closeFns: [
       () => tcgdexClient.stop(),
       () => ptcgioClient.stop(),
@@ -285,6 +289,7 @@ async function main(): Promise<number> {
       dedup: wiring.dedup,
       storage: wiring.storage,
       imageHttpProvider: wiring.imageHttpProvider,
+      conflictLog: wiring.conflictLog,
       sources: args.sources.length > 0 ? args.sources : undefined,
       sets: args.sets.length > 0 ? args.sets : undefined,
       limitSets: args.limitSets,

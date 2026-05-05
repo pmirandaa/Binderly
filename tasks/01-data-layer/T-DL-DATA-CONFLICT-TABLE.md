@@ -3,7 +3,7 @@
 **Stage:** 01-data-layer
 **Agent role:** data
 **Effort:** S
-**Status:** in_progress
+**Status:** review
 
 ---
 
@@ -606,4 +606,85 @@ Stop and escalate (append to `open-questions.md`) if:
 
 ## Notes from execution
 
-(Sub-agent appends here at end. Empty until then.)
+### Drizzle generation worked under sandbox
+
+`pnpm exec drizzle-kit generate` ran cleanly inside the sandbox
+(no tsx-IPC-pipe failure this round) and produced
+`0014_material_proemial_gods.sql` + `meta/0014_snapshot.json`.
+Renamed the SQL to the canonical `0014_data_conflict.sql` and
+updated the journal `tag` to match. Hand-prepended a header
+comment block to the generated DDL describing the why, the
+idempotency contract, the `entity_canonical_key`-is-not-a-FK
+rationale, and the RLS-companion split. Hand-authored
+`0015_data_conflict_rls.sql` against the
+`0009_pricing_rls.sql` § price_observation block (the closest
+service-role-only precedent).
+
+### Schema-export naming — `DataConflictRow` not `DataConflict`
+
+`@binderly/data-pipeline` already exports a `DataConflict` type
+(`data-pipeline/src/types.ts` ~line 344) for the in-memory
+resolver-emitted shape. To avoid a downstream symbol collision
+when both packages re-export through their barrels, the schema
+exports are named `DataConflictRow` / `NewDataConflictRow`. The
+in-memory `DataConflict` remains the public name for the
+resolver-side type; the persistence-side row carries the `Row`
+suffix and the `RawDataConflict` interface in
+`conflict-log.ts` is the pre-persistence shape callers actually
+build (mirrors the `RawDataConflict` precedent for raw vs
+canonical types in this package).
+
+### Seed integration shape
+
+`processSet` accepts an optional `conflictLog` and an optional
+`clock`. When `conflictLog` is undefined every existing test
+passes unchanged (the report's per-source `resolverConflicts`
+counter still bumps). When provided, conflicts are buffered
+per-set and flushed via `repo.upsertMany` at the end of the
+set. A flush failure is captured as a typed
+`{ kind: 'db_upsert', entity: 'data_conflict' }` `SeedRunError`
+and never aborts the set's catalog writes — the conflict log is
+debug data; failing to persist must not block ingestion. Added
+`'data_conflict'` to the `SeedDbEntity` union for typed-error
+clarity.
+
+### `__presence` conflict mapping
+
+The resolver emits two conflict flavors:
+
+1. The standard "primary won" case — a validation source
+   disagreed on a field; the resolver kept the primary's value.
+   Maps to `resolution = 'kept_<chosenSource>'` and
+   `keptValue = c.chosenValue`.
+2. The `__presence` flavor (`resolver.ts` ~line 297 + ~line
+   591) — a non-primary source emitted a record the primary did
+   not. `c.chosenValue` is `null` and `c.chosenSource` is the
+   string `'primary'`. Mapped to `resolution = 'unresolved'` so
+   the audit verb reflects "no value won; the disagreement
+   stands". Future manual-override workflow can update the row
+   to `'manual_override'` + non-null `notes`.
+
+### `verify-rls` extension shape
+
+The `assertions.ts` behavioral matrix lists each
+`NO_PERMISSIVE_POLICY_TABLES` entry explicitly (it doesn't loop
+over the constant). Added `data_conflict` to the explicit
+authenticated/anon-denied + service_role-allowed assertions to
+match the existing pattern for `grading_training_sample` /
+`price_observation`. The structural asserter
+(`assertTablesExist` / `assertRlsEnabled` /
+`assertPolicyInventory`) and the `NO_PERMISSIVE_POLICY_TABLES`
+collision check pick the new table up automatically from
+`inventory.ts`.
+
+### Test count
+
+Baseline (data-pipeline): 1087. After this PR: 1101 (+14 new
+tests — 10 in `conflict-log.test.ts` + 4 in
+`seed.test.ts`'s new "conflict-log persistence" describe
+block). All five data-pipeline gates clean (format:check, lint,
+typecheck, test, build); all three @binderly/db gates clean
+(format:check, lint, typecheck). Live `db:migrate` + smoke
+verification is Pablo-side post-merge per the
+T-DL-DB-TEST-INFRA limitation; paste-able commands ship in the
+PR body and in `data-pipeline/README.md` § "Data conflict log".

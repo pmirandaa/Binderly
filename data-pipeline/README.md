@@ -521,6 +521,70 @@ PG 17 docs). Posture mirrors `price_aggregate`:
   BYPASSRLS attribute, but PostgREST checks SQL privileges before
   any policy layer, so the explicit GRANT is required.
 
+## Data conflict log
+
+The resolver
+(`src/resolver/resolver.ts`) emits an in-memory `DataConflict` every
+time a validation source disagrees with the primary on a field
+beyond the configured tolerance. Historically the seed reporter
+only counted those conflicts; the conflict itself was lost the
+moment the run ended.
+
+T-DL-DATA-CONFLICT-TABLE persists every emitted conflict to the
+service-role-only `data_conflict` table via a `ConflictLogRepo`
+(`src/resolver/conflict-log.ts`). Seed runs that supply
+`conflictLog: DrizzleConflictLogRepo(db)` (the production CLI does
+this automatically) flush a per-set batch at the end of every
+`processSet` call. Re-running seed against the same set is
+idempotent: `(entity_kind, entity_canonical_key, field_name)` is
+UNIQUE, so the upsert bumps `dispute_count` and refreshes
+`last_seen_at` / `sources` / `kept_value` / `resolution` instead of
+inserting duplicate rows.
+
+#### Live smoke (paste-able for Pablo)
+
+```sh
+cd /Users/pmiranda/Stuff/Binderly  # or your worktree
+git checkout main && git pull --ff-only
+export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
+pnpm install --prefer-offline
+
+# 1. Apply migrations (creates `data_conflict` + RLS posture).
+docker compose -f infra/docker-compose.yml up -d postgres
+pnpm --filter @binderly/db db:migrate
+
+# 2. Run a seed against any set; the resolver's conflicts now persist:
+pnpm --filter @binderly/data-pipeline seed \
+  --source tcgdex-en --set en-swsh9
+
+# 3. Inspect the persisted conflicts:
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "SELECT entity_kind, count(*) FROM data_conflict GROUP BY entity_kind;"
+
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -c "SELECT entity_kind, entity_canonical_key, field_name,
+             dispute_count, resolution, last_seen_at
+        FROM data_conflict ORDER BY dispute_count DESC LIMIT 10;"
+```
+
+#### RLS posture
+
+Service-role-only — mirrors `price_observation` and
+`grading_training_sample`:
+
+- RLS enabled with **no permissive policies** for `anon` /
+  `authenticated`. End-user sessions get neither read nor write
+  access.
+- `service_role` has full DML (granted explicitly via
+  `0015_data_conflict_rls.sql`). The data-pipeline runs with the
+  service-role key.
+- `verify-rls` (`packages/db/scripts/verify-rls/`) extends both
+  the structural inventory and the behavioral matrix with the new
+  table, so a future migration can't silently weaken the posture.
+
+The future T-DL-ADMIN-DEBUG-SURFACES task ships the read-only
+`v_*` views over this table for admin-tier auditors.
+
 ## Testing
 
 ```sh

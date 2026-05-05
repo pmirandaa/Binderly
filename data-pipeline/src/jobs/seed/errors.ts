@@ -18,7 +18,7 @@ export type SeedRunErrorKind =
   | 'image_pipeline'
   | 'db_upsert';
 
-export type SeedDbEntity = 'set' | 'card' | 'printing' | 'printing_image';
+export type SeedDbEntity = 'set' | 'card' | 'printing' | 'printing_image' | 'data_conflict';
 
 export type SeedRunError =
   | {

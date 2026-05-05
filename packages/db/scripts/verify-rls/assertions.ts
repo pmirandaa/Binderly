@@ -289,6 +289,7 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
 
   await assertSelectDenied(sql, 'grading_training_sample', 'authenticated', results);
   await assertSelectDenied(sql, 'price_observation', 'authenticated', results);
+  await assertSelectDenied(sql, 'data_conflict', 'authenticated', results);
 
   // ---- anon — public read of catalog + profile, blocked from owner tables ----
   await switchRole(sql, 'anon', null, results);
@@ -315,6 +316,7 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
 
   await assertSelectDenied(sql, 'grading_training_sample', 'anon', results);
   await assertSelectDenied(sql, 'price_observation', 'anon', results);
+  await assertSelectDenied(sql, 'data_conflict', 'anon', results);
 
   // ---- service_role — bypasses every policy ----
   await switchRole(sql, 'service_role', null, results);
@@ -327,7 +329,7 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
     return rows.length === 2 ? null : `expected 2 rows under BYPASSRLS, got ${rows.length}`;
   });
 
-  for (const tname of ['grading_training_sample', 'price_observation']) {
+  for (const tname of ['grading_training_sample', 'price_observation', 'data_conflict']) {
     await assertSelectAllowed(sql, tname, 'service_role', results);
   }
 

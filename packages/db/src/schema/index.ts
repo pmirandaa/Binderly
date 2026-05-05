@@ -48,4 +48,9 @@ export * from './price_snapshots.js';
 // ============================================================
 export * from './printing_image.js';
 
+// ============================================================
+// === T-DL-DATA-CONFLICT-TABLE === (admin debug — resolver disagreement log)
+// ============================================================
+export * from './data_conflict.js';
+
 export {};
