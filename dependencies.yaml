@@ -457,14 +457,14 @@ tasks:
     stage: 02-backend
     title: Supabase Auth — Google, Apple, Discord, magic link
     agent_role: backend
-    status: in_progress
+    status: review
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-BE-API-CONTRACTS]
     provides: [auth:flows]
     owns_paths: [packages/auth/, infra/supabase/auth/]
     task_file: tasks/02-backend/T-BE-AUTH.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-BE-API-CONTRACTS
     stage: 02-backend

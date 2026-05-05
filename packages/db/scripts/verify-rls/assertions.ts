@@ -223,13 +223,24 @@ interface AuthFixture {
 }
 
 /**
- * Insert two synthetic auth.users rows and the matching profile rows so
- * the behavioral assertions have something to look at. Every fixture
- * lives inside the caller's transaction and disappears on ROLLBACK.
+ * Insert two synthetic auth.users rows so the behavioral assertions
+ * have something to look at. Every fixture lives inside the caller's
+ * transaction and disappears on ROLLBACK.
+ *
+ * Note: the matching public.profile + public.subscription rows are
+ * NO LONGER inserted explicitly here. As of T-BE-AUTH /
+ * `0017_profile_provisioning_trigger.sql`, an AFTER INSERT trigger
+ * on auth.users provisions both rows automatically (handle =
+ * `'u_' || first 12 hex chars of the user uuid`, tier = 'free').
+ * The existing assertions about profile visibility still pass — they
+ * key on user_id, not the handle / display_name; two new assertions
+ * (`behavior:trigger created profile row …`, `behavior:trigger
+ * created subscription row …`) confirm the trigger actually fired.
  *
  * Returns null and pushes a "skipped" assertion if auth.users isn't
  * insertable (e.g. column shape on this Supabase version diverges from
- * what we expect). Behavioral assertions become best-effort in that case.
+ * what we expect, or the trigger is missing on a partially-applied
+ * database). Behavioral assertions become best-effort in that case.
  */
 async function setupAuthFixtures(
   sql: Sql,
@@ -246,24 +257,95 @@ async function setupAuthFixtures(
         ('00000000-0000-0000-0000-000000000000'::uuid, ${userB}::uuid,
          'authenticated', 'authenticated', ${`verify-rls-b-${userB}@verify.local`})
     `;
-    await sql`
-      INSERT INTO public.profile (user_id, handle, display_name)
-      VALUES
-        (${userA}::uuid, ${`verify_a_${userA.replaceAll('-', '').slice(0, 12)}`}, 'Verify User A'),
-        (${userB}::uuid, ${`verify_b_${userB.replaceAll('-', '').slice(0, 12)}`}, 'Verify User B')
-    `;
     return { userA, userB };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     results.push(
       fail(
         'behavior:setup',
-        `could not insert auth.users + profile fixtures (${message}). ` +
-          'Behavioral checks skipped; structural checks above are still authoritative.',
+        `could not insert auth.users fixtures (${message}). ` +
+          'Behavioral checks skipped; structural checks above are still authoritative. ' +
+          'If the message mentions `public.profile` / `public.subscription`, the ' +
+          '`0017_profile_provisioning_trigger.sql` migration is likely missing — re-run ' +
+          '`pnpm --filter @binderly/db db:migrate` against this DB.',
       ),
     );
     return null;
   }
+}
+
+/**
+ * Probe `public.profile` + `public.subscription` from the service-role
+ * connection (verifier connects as `postgres`/superuser, which behaves
+ * like service_role for grant purposes) to confirm the
+ * `0017_profile_provisioning_trigger.sql` trigger fired during
+ * `setupAuthFixtures` and provisioned both rows for both synthetic
+ * auth.users. Two assertions, one per table.
+ *
+ * The handle predicate (`u_<first 12 hex of uuid>`) is the format the
+ * trigger generates and the application-level `defaultHandleFor`
+ * helper in `@binderly/auth/profile.ts` mirrors. A future PR that
+ * changes the format must update both call sites in lockstep.
+ */
+async function assertTriggerProvisionedRows(
+  sql: Sql,
+  fixtures: AuthFixture,
+  results: AssertionResult[],
+): Promise<void> {
+  const expectedHandleA = `u_${fixtures.userA.replaceAll('-', '').slice(0, 12)}`;
+  const expectedHandleB = `u_${fixtures.userB.replaceAll('-', '').slice(0, 12)}`;
+
+  await withTry(
+    sql,
+    results,
+    'behavior:trigger created profile row for new auth.users (with default handle)',
+    async () => {
+      const rows = await sql<{ user_id: string; handle: string }[]>`
+        SELECT user_id, handle::text AS handle
+        FROM   public.profile
+        WHERE  user_id IN (${fixtures.userA}::uuid, ${fixtures.userB}::uuid)
+      `;
+      if (rows.length !== 2) {
+        return (
+          `expected 2 trigger-provisioned profile rows, got ${rows.length}. ` +
+          'Either `0017_profile_provisioning_trigger.sql` is missing or the ' +
+          'AFTER INSERT trigger on auth.users is not firing.'
+        );
+      }
+      const handlesByUser = new Map(rows.map((r) => [r.user_id, r.handle]));
+      if (handlesByUser.get(fixtures.userA) !== expectedHandleA) {
+        return `userA handle: expected ${expectedHandleA}, got ${handlesByUser.get(fixtures.userA) ?? '(missing)'}`;
+      }
+      if (handlesByUser.get(fixtures.userB) !== expectedHandleB) {
+        return `userB handle: expected ${expectedHandleB}, got ${handlesByUser.get(fixtures.userB) ?? '(missing)'}`;
+      }
+      return null;
+    },
+  );
+
+  await withTry(
+    sql,
+    results,
+    'behavior:trigger created subscription row with tier=free for new auth.users',
+    async () => {
+      const rows = await sql<{ user_id: string; tier: string }[]>`
+        SELECT user_id, tier
+        FROM   public.subscription
+        WHERE  user_id IN (${fixtures.userA}::uuid, ${fixtures.userB}::uuid)
+      `;
+      if (rows.length !== 2) {
+        return (
+          `expected 2 trigger-provisioned subscription rows, got ${rows.length}. ` +
+          'Either `0017_profile_provisioning_trigger.sql` is missing or the ' +
+          'second INSERT inside `public.handle_new_user()` is failing.'
+        );
+      }
+      const wrongTier = rows.find((r) => r.tier !== 'free');
+      return wrongTier === undefined
+        ? null
+        : `subscription.tier should default to 'free', got '${wrongTier.tier}' for user ${wrongTier.user_id}`;
+    },
+  );
 }
 
 /**
@@ -275,6 +357,12 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
   const fixtures = await setupAuthFixtures(sql, results);
   if (!fixtures) return;
   const { userA, userB } = fixtures;
+
+  // ---- trigger-provisioning posture (verified before any role switch
+  // ----                              while we still have superuser  )
+  // Confirms `0017_profile_provisioning_trigger.sql` fired during
+  // setupAuthFixtures and the two application-level rows now exist.
+  await assertTriggerProvisionedRows(sql, fixtures, results);
 
   // ---- authenticated (userA) — sees own profile, not userB's owner row ----
   await switchRole(sql, 'authenticated', userA, results);
