@@ -428,4 +428,84 @@ here for the record per the orchestrator's hotfix-coordination protocol)_
 
 ---
 
+## Q-007 — Provision a dedicated `admin` Postgres role for read-only debug access?
+
+**Raised:** 2026-05-04 (T-DL-ADMIN-DEBUG-SURFACES, Phase 1 closing PR)
+**Blocking:** none — `T-DL-ADMIN-DEBUG-SURFACES` ships gated to
+`service_role` only and is *not* blocked on this question. Future
+admin-web-UI and break-glass debug surfaces (Phase 4+) would benefit
+from a narrower role.
+
+**Context:** `T-DL-ADMIN-DEBUG-SURFACES` ships five hand-authored
+debug views (`v_data_conflict_top`, `v_data_conflict_by_source`,
+`v_image_pipeline_coverage_gaps`, `v_fx_rate_freshness`,
+`v_pg_stat_statements_top_queries`) for resolver-disagreement
+auditing, image-pipeline coverage gaps, FX-freshness, and top SQL
+queries. Each view is gated to `service_role` only — same posture as
+`data_conflict`, `price_observation`, `grading_training_sample`.
+
+The local Supabase ships only the canonical four roles (`anon`,
+`authenticated`, `postgres`, `service_role`); no `admin` role exists.
+`service_role` carries `BYPASSRLS` and full DML on every catalog
+table — meaning any code holding the service-role key can not only
+read the debug views but also write `card` / `printing` / `price_*` /
+`profile` etc. That is more surface area than a "debug operator"
+strictly needs. As we approach the admin-web-UI work (Phase 4+), the
+question is whether to introduce a read-only `admin` Postgres role.
+
+**Verification at task elaboration time:**
+
+```sh
+$ psql postgresql://postgres:postgres@localhost:54322/postgres \
+    -c "SELECT rolname FROM pg_roles
+        WHERE rolname IN ('admin','service_role','anon','authenticated','postgres')
+        ORDER BY rolname;"
+    rolname
+---------------
+ anon
+ authenticated
+ postgres
+ service_role
+```
+
+**Options:**
+
+1. **Stay on `service_role` only** (v1 default; what this task
+   ships). The eventual admin web UI runs server-side with the
+   service-role key in a trusted edge function. Pros: zero new
+   surface area, matches the existing `price_observation` /
+   `grading_training_sample` precedent, no new role-management story.
+   Cons: any future "give a contractor read access" or break-glass
+   psql session inherits full write privilege; rotation pain if a key
+   leaks.
+2. **Provision an `admin` Postgres role with read-only SELECT on the
+   debug views** (and only those). Lives in a new migration
+   (`00NN_admin_role.sql`) that `CREATE ROLE admin NOLOGIN
+   NOINHERIT;` (login optional), `GRANT SELECT ON v_*` to it, and
+   adds `admin` to the `EXPECTED_DEBUG_VIEWS` posture in
+   `verify-rls/inventory.ts`. Mapping `admin` to a JWT-bearing
+   identity (for the future admin web UI) is a separate piece of
+   work — likely a Supabase auth claim or a dedicated PAT. Pros:
+   narrower blast radius for human debug access; clear posture
+   ladder (`anon` → `authenticated` → `admin` → `service_role`).
+   Cons: new role-management story, new auth claim plumbing, more
+   surface for verify-rls to track.
+3. **Provision an `admin` role AND grant it broader read access**
+   (every catalog table, not just the debug views). Pros: a single
+   "read everything for debug" role mirrors the role most teams
+   actually want for break-glass. Cons: equivalent to "service_role
+   minus DML" — large surface, easy to drift; verify-rls would have
+   to track per-table grants for the new role across every existing
+   migration.
+
+**Recommendation:** **Option 1** today; revisit at the start of
+Phase 4 (admin web UI) when the consumer story is concrete. If the
+admin web UI lands first behind service_role and we later decide to
+narrow access, the migration to add `admin` is purely additive —
+nothing in this PR or the existing v1 posture has to be undone.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
 _(no other open questions yet)_
