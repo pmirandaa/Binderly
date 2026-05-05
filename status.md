@@ -1,12 +1,45 @@
-# Build status — Phase 1 CLOSED. Iter 12 (first Phase 2 dispatch) opens tomorrow.
+# Build status — Phase 2 iter 12 dispatching: T-BE-AUTH + T-BE-API-CONTRACTS (parallel siblings, the backend foundation pair)
 
 **Phase 0:** Complete (10/10 merged).
-**Phase 1:** Complete (23/23 merged) — closed at iter 11, 2026-05-04 ~21:00 UTC-4.
-**Phases 2-11:** 0 / 56 merged. Phase 2 dispatch opens tomorrow per Pablo's request.
+**Phase 1:** Complete (23/23 merged) — closed 2026-05-04.
+**Phase 2 (stages 02-11):** 0 / 56 merged. **Iter 12 dispatching: 2 parallel siblings.**
 
-**In progress:** 0 (orchestrator paused for the night).
+**In progress:** 2 (T-BE-AUTH, T-BE-API-CONTRACTS).
 **Blocked:** 0.
 **Blocked on humans:** 0.
+
+## Phase 2 prep summary (this iter)
+
+A first prep worker was dispatched + aborted before completing.
+Survey done in foreground instead — turns out **all 56 Phase 2 stubs
+already exist** in `tasks/02-backend/` ... `tasks/11-deployment/`,
+and **all 10 stage rules files exist** in `rules/02-*.md` ...
+`rules/11-*.md`. So no stub authoring needed; Phase 2 dispatch
+opens cleanly.
+
+## Phase 2 dependency survey (9 ready / 56 total)
+
+| Task | Stage | Role | Status | Blockers |
+|---|---|---|---|---|
+| **T-BE-API-CONTRACTS** | 02-backend | backend | **dispatching** | (none) — linchpin for 5 downstream tasks |
+| **T-BE-AUTH** | 02-backend | backend | **dispatching** | (none) — independent of API-CONTRACTS |
+| T-SP-UI-TOKENS | 03-shared-packages | frontend-web | ready (held to iter 13) | (none) |
+| T-SC-EMBED-MODEL | 06-scanner | ml | ready (held — scanner stack races behind app shell) | (none) |
+| T-GR-DATA-PSA | 07-grading | data | ready (held — grading is a Phase 2 sub-track) | (none) |
+| T-GR-DATA-EBAY | 07-grading | data | ready (held) | (none) |
+| T-GR-DATA-AUCTIONS | 07-grading | data | ready (held) | (none) |
+| T-DP-SUPABASE-PROD | 11-deployment | devops | ready (held — deploy comes after app shell) | (none) |
+| T-DP-R2-PROD | 11-deployment | devops | ready (held) | (none) |
+
+The other 47 Phase 2 tasks are all blocked on at least one of the
+above. Critical path runs:
+
+  T-BE-API-CONTRACTS → T-BE-API-CLIENT + T-BE-EDGE-FUNCTIONS +
+  3 shared packages (PRICING-DISPLAY, SET-COMPLETION, SMART-DSL)
+  → T-W-SHELL / T-M-SHELL → web + mobile UI tasks.
+
+Plus the parallel scanner + grading sub-tracks that fork off
+T-M-SHELL (scanner) and T-GR-DATA-* (grading data ingest).
 
 ## Phase 1 close summary
 
@@ -57,9 +90,10 @@ iter 7.5 (Q-005 hotfix) →
 iter 8 (PRICING-ROLLUP) →
 iter 9 (PRICING-CURRENT-VIEW) →
 iter 10 (DATA-CONFLICT-TABLE) →
-iter 11 (ADMIN-DEBUG-SURFACES — Phase 1 cap).
+iter 11 (ADMIN-DEBUG-SURFACES — Phase 1 cap) →
+**iter 12 (Phase 2 backend foundation pair: BE-AUTH + BE-API-CONTRACTS)**.
 
-Final migration sequence on main: monotonic 0000-0016.
+Phase 1 final migration sequence on main: monotonic 0000-0016.
 
   0000_user_tables          (T-DL-SCHEMA-USERS)
   0001_users_rls            (T-DL-SCHEMA-USERS, hand-authored)
@@ -108,29 +142,30 @@ Final migration sequence on main: monotonic 0000-0016.
 | T-DL-DATA-CONFLICT-TABLE | merged | #39 (`3fb5227`) |
 | T-DL-ADMIN-DEBUG-SURFACES | merged | #40 (`b13d3ed`; surfaced Q-007) |
 
-## Tomorrow's first move (iter 12 — Phase 2 prep)
+## Iter 12 dispatch (2 in flight, under MAX_PARALLEL=3)
 
-When the orchestrator resumes:
+Backend foundation pair. Picked together because both are in the
+critical path AND clearly independent ownership areas (auth vs API
+contracts; different files in `apps/api/` and
+`packages/api-contracts/` — which the worker(s) will create from
+scratch).
 
-1. Read PROJECT.md's sponsor-spec ordering for stages 02-11. The
-   stages are:
-   - 02-backend (4 tasks)
-   - 03-shared-packages (4 tasks)
-   - 04-web (8 tasks)
-   - 05-mobile (5 tasks)
-   - 06-scanner (6 tasks)
-   - 07-grading (10 tasks)
-   - 08-shareables (3 tasks)
-   - 09-offline-sync (3 tasks)
-   - 10-paywall-billing (4 tasks)
-   - 11-deployment (6 tasks)
-2. Identify which stages have stub .md files vs. which need stub
-   authoring (likely most need stubs).
-3. Identify the critical-path next dispatch — almost certainly
-   in stage 02-backend or 03-shared-packages, since the web /
-   mobile / scanner stages will depend on shared packages and
-   backend APIs.
-4. Author stubs for the first iter's candidates and dispatch.
+| Task | Effort | Owns_paths | Why this iter |
+|---|---|---|---|
+| **T-BE-API-CONTRACTS** | M | `packages/api-contracts/` | Linchpin: zod schemas + TS types shared between backend + web + mobile + scanner. Without it the other 5 backend / shared-packages tasks can't dispatch. |
+| **T-BE-AUTH** | M | `apps/api/auth/` (Supabase Auth wiring: Google / Apple / Discord / magic link) | Parallel-safe with API-CONTRACTS; unblocks T-BE-API-CLIENT (which depends on both). |
+
+Phase 2 strategy notes:
+- **Iter 13 candidates** (assuming this iter lands): T-SP-UI-TOKENS
+  (the L-effort Tamagui design tokens task) + T-BE-API-CLIENT (which
+  becomes ready once both this iter's tasks merge).
+- **Mid-Phase-2 critical path**: BE-API-CONTRACTS → 3 shared
+  packages (PRICING-DISPLAY, SET-COMPLETION, SMART-DSL) → web /
+  mobile collection + smart-rules UIs.
+- **Independent sub-tracks** parallel to the app shell: scanner ML
+  (06-scanner; T-SC-EMBED-MODEL onwards) and grading data ingest
+  (07-grading; T-GR-DATA-PSA / -EBAY / -AUCTIONS). Both can start
+  any time without blocking the app shell critical path.
 
 ## Open questions (1 open; non-blocking)
 

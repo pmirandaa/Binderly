@@ -457,7 +457,7 @@ tasks:
     stage: 02-backend
     title: Supabase Auth — Google, Apple, Discord, magic link
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-BE-API-CONTRACTS]
     provides: [auth:flows]
@@ -470,7 +470,7 @@ tasks:
     stage: 02-backend
     title: Shared API contracts package (zod + types)
     agent_role: backend
-    status: pending
+    status: in_progress
     depends_on: [T-DL-SCHEMA-COLLECTIONS]
     parallel_safe_with: [T-BE-AUTH]
     provides: [api:contracts]
