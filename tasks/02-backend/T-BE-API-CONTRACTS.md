@@ -3,7 +3,7 @@
 **Stage:** 02-backend
 **Agent role:** backend
 **Effort:** M
-**Status:** in_progress
+**Status:** review
 
 ---
 
@@ -443,4 +443,68 @@ if:
 
 ## Notes from execution
 
-_(Sub-agent appends here at end of work. Empty until then.)_
+### Test count
+
+187 tests in `@binderly/api-contracts` (brand-new package; baseline
+0). Distribution per module: `common.test.ts` 43,
+`cards.test.ts` 25, `collection.test.ts` 35, `pricing.test.ts` 19,
+`grading.test.ts` 21, `shareables.test.ts` 16, `auth.test.ts` 28.
+Each schema has at least one positive case (valid input parses)
+and one negative case (invalid input is rejected); `.strict()`
+schemas additionally have a "rejects unknown extra key" case.
+
+### Re-declared enum tuples (no `@binderly/data-pipeline` dependency)
+
+Per D3, the contracts package re-declares the variant taxonomy
+enums (`VARIANT_CLASSES`, `VARIANT_FLAGS`, `RARITIES`,
+`POKEMON_TYPES`, `CARD_SUBTYPES`) and the price-tier /
+observation-kind tuples, rather than importing them from
+`@binderly/data-pipeline`. Reason: the data-pipeline package
+pulls in Sharp / AWS-SDK / postgres-js which mobile / web /
+scanner consumers must NOT inherit transitively. The two tuples
+are short and a manual-diff check at PR review is the safety
+net; an alignment test in `T-BE-API-CLIENT` (which already
+depends on both) is a future option.
+
+### Smart-collection `expression` requires presence (not just type)
+
+`expression: z.unknown()` accepts a missing key by default. We
+needed "must be present, may be any JSON value" (the smart-DSL
+package will parse it later). `.refine()` on a discriminated-union
+branch wraps it in `ZodEffects` which `z.discriminatedUnion`
+rejects. Solution: a field-level `z.custom<unknown>((v) => v !==
+undefined)` validator (`smartExpressionSchema` in
+`collection.ts`). Documented in-line.
+
+### Repo-wide `format:check` is per-package, not root
+
+The repo's root `package.json` has `pnpm format` (turbo
+fan-out) but no `pnpm format:check`. The convention is per-package
+`format:check` scripts that can be invoked via
+`pnpm --filter @binderly/<pkg> format:check`. We added one to
+`@binderly/api-contracts` and a co-located `.prettierignore`
+mirroring `data-pipeline`'s posture (so prettier doesn't try to
+re-format the `dist/` build outputs after `pnpm build`).
+
+### Five package gates clean; four CI gates clean repo-wide
+
+```
+pnpm --filter @binderly/api-contracts format:check  ✓
+pnpm --filter @binderly/api-contracts lint          ✓
+pnpm --filter @binderly/api-contracts typecheck     ✓
+pnpm --filter @binderly/api-contracts test          ✓ 187 / 187
+pnpm --filter @binderly/api-contracts build         ✓ dist/ emits
+
+pnpm lint                                           ✓
+pnpm typecheck                                      ✓
+pnpm test                                           ✓ all packages
+pnpm build                                          ✓ all packages
+```
+
+### `dependencies.yaml` `owns_paths` updated
+
+The original stub listed `packages/shared-types/`; the
+orchestrator's iter-12 dispatch renamed the workspace to
+`packages/api-contracts/`. Updated the entry in the same
+implementation commit (the rename is part of the implementation,
+not a separate task-graph edit).
