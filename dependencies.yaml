@@ -441,7 +441,7 @@ tasks:
     stage: 01-data-layer
     title: Admin debug views (pg_stat_statements + catalog audit views)
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-DATA-CONFLICT-TABLE]
     provides: [debug:admin-surfaces]
