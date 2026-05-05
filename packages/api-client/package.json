@@ -1,0 +1,47 @@
+{
+  "name": "@binderly/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed HTTP client over @binderly/api-contracts + @binderly/auth — the single SDK web/mobile/scanner consumers use to talk to the Binderly backend.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@binderly/api-contracts": "workspace:*",
+    "@binderly/auth": "workspace:*",
+    "@supabase/supabase-js": "2.105.3",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@types/node": "22.19.17",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
