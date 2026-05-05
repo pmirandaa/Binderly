@@ -3,7 +3,7 @@
 **Stage:** 02-backend
 **Agent role:** backend
 **Effort:** M (~half day)
-**Status:** in_progress
+**Status:** in_review
 
 ---
 
@@ -345,4 +345,39 @@ Stop and surface to orchestrator if:
 
 ## Notes from execution
 
-_(Sub-agent appends here at end. Empty until then.)_
+- **Out-of-`owns_paths` edits (authorized in dispatch prompt):** the
+  task touches three files outside `packages/auth/` and
+  `infra/supabase/auth/`:
+  1. `packages/db/src/migrations/0017_profile_provisioning_trigger.sql`
+     — the new auto-provisioning migration (Phase 1 elaboration
+     decision § 3).
+  2. `packages/db/src/migrations/meta/_journal.json` — the
+     drizzle-kit metadata appendix for the new migration.
+  3. `packages/db/scripts/verify-rls/assertions.ts` — extends the
+     behavioral suite with the two trigger-coverage assertions
+     and removes the now-redundant manual `INSERT INTO public.profile`
+     fixture (the trigger does it for us).
+  4. `.env.example` — adds three forward-compat `*_CLIENT_ID` env
+     vars and expands the auth section's documentation block.
+  5. `dependencies.yaml` — flips this task's status from
+     `in_progress` to `review` and clears the `stub: true` flag.
+     No conflict with the parallel sibling `T-BE-API-CONTRACTS`
+     (which owns `packages/shared-types/`).
+- **Final test counts:** `@binderly/auth` ships **43 tests** across
+  five `*.test.ts` files (env / errors / jwt / clients / session /
+  profile). Verify-rls grows by **2 assertions**; not exercised in
+  CI without a live Supabase, gated as "skipped" with exit 2 per
+  the existing convention.
+- **`drizzle-kit generate` was NOT used** for migration 0017 — the
+  hand-authored SQL is safer than letting drizzle-kit emit a
+  trigger-and-function pair (drizzle has no model for these).
+  Pattern matches the other hand-authored RLS migrations
+  (`0001_users_rls.sql`, `0007_grading_rls.sql`, etc.).
+- **`tsx` IPC pipe EPERM under sandbox** still blocks
+  `pnpm --filter @binderly/db db:migrate` in this environment;
+  the migration was validated by hand-reading + by structurally
+  matching the existing migration shape. Pablo runs the verify-rls
+  suite post-merge to confirm end-to-end.
+- **`@supabase/supabase-js` pinned at `2.105.3`** (the latest stable
+  at PR open). Engines field `>= node 20` is satisfied by the
+  repo's pinned Node 22.
