@@ -470,11 +470,15 @@ tasks:
     stage: 02-backend
     title: Shared API contracts package (zod + types)
     agent_role: backend
-    status: in_progress
+    status: review
     depends_on: [T-DL-SCHEMA-COLLECTIONS]
     parallel_safe_with: [T-BE-AUTH]
     provides: [api:contracts]
-    owns_paths: [packages/shared-types/]
+    # `owns_paths` updated from `packages/shared-types/` (the original
+    # stub) to `packages/api-contracts/` per the orchestrator's iter-12
+    # dispatch, which renamed the package. The package itself ships at
+    # the new path.
+    owns_paths: [packages/api-contracts/]
     task_file: tasks/02-backend/T-BE-API-CONTRACTS.md
     est_effort: M
     stub: true
