@@ -149,3 +149,65 @@ When `T-DL-SCHEMA-CARDS` / `T-DL-SCHEMA-USERS` / etc. land:
 - They add RLS policies as **separate** migrations (one logical change
   per migration — see `context/conventions.md`). Hand-write the SQL,
   bump the journal, and the policy ships in `<NNNN+1>_<name>.sql`.
+
+## Admin debug views
+
+Migration `0016_admin_debug_views.sql` ships five hand-authored
+read-only `v_*` views that surface pipeline-internal debug signals to
+the `service_role` only. They live in `public` for ergonomics
+(callers don't need to qualify the schema) but are gated via
+`REVOKE ALL FROM PUBLIC` + `GRANT SELECT TO service_role` — same
+posture as the `data_conflict` table from `0015_data_conflict_rls.sql`.
+PostgreSQL does not support RLS on regular views (RLS is "supported
+for tables" only), so the gate is enforced by SQL grants alone — same
+shape as `mv_current_price` from `0013_mv_current_price.sql`.
+
+| View                               | Reads from                                  | Surfaces                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ---------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `v_data_conflict_top`              | `public.data_conflict`                      | Top 100 conflicts ordered by `dispute_count DESC, last_seen_at DESC`. The headline view for "what conflicts are recurring most often?".                                                                                                                                                                                                                                                                                                                                                                         |
+| `v_data_conflict_by_source`        | `public.data_conflict`                      | Per-source-per-field rollup. Built with `jsonb_object_keys(sources)`. Columns: `source`, `field_name`, `conflict_count`, `total_dispute_count`.                                                                                                                                                                                                                                                                                                                                                                 |
+| `v_image_pipeline_coverage_gaps`   | `public.printing` ⨝ `public.printing_image` | Printings missing canonical image URL or with zero provenance rows. The DB-only "image pipeline failed" signal — the merged `printing_image` schema persists only successful transcodes, so the failure surface is "no row was written".                                                                                                                                                                                                                                                                        |
+| `v_fx_rate_freshness`              | `public.fx_rate`                            | Per `(base_currency, quote_currency)` pair: max + min rate date, `gap_days` vs `CURRENT_DATE`, `row_count_30d`, `last_fetched_at`. Sorted by `gap_days DESC` so stale pairs surface first.                                                                                                                                                                                                                                                                                                                      |
+| `v_pg_stat_statements_top_queries` | `extensions.pg_stat_statements`             | Top 50 normalized queries by `total_exec_time DESC`. The migration runs `CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA extensions;` so the migration is self-contained when the extension is missing in production. Note: pg_stat_statements applies its own runtime privilege check on `current_user` — service_role sees full `query` text only for queries it executed itself; queries run by other roles show `<insufficient privilege>` for the text but stats columns are always visible. |
+
+### Querying the views
+
+The views are gated to `service_role`. Two consumption paths:
+
+1. **Direct psql via the `postgres` superuser** (local dev / break-glass):
+
+   ```sh
+   psql "$SUPABASE_DB_URL" -c "SELECT * FROM v_data_conflict_top LIMIT 5;"
+   psql "$SUPABASE_DB_URL" -c "SELECT * FROM v_data_conflict_by_source LIMIT 10;"
+   psql "$SUPABASE_DB_URL" -c "SELECT * FROM v_image_pipeline_coverage_gaps LIMIT 10;"
+   psql "$SUPABASE_DB_URL" -c "SELECT * FROM v_fx_rate_freshness;"
+   psql "$SUPABASE_DB_URL" -c "SELECT * FROM v_pg_stat_statements_top_queries LIMIT 5;"
+   ```
+
+2. **Service-role-keyed Postgres client** (data-pipeline jobs, the
+   eventual admin web UI). Use the same `createDbClient(...).$client`
+   raw-SQL pattern that `data-pipeline/src/jobs/pricing-current-view.ts`
+   established for `mv_current_price`.
+
+Anon and authenticated sessions are denied — verified by
+`pnpm --filter @binderly/db verify-rls`, which drives every view
+through `assertSelectDenied` for anon + authenticated and
+`assertSelectAllowed` for service_role.
+
+### Why no Drizzle TS layer
+
+Drizzle's `pgView` support is light around `DISTINCT ON`, `LATERAL`,
+and aggregate views (the patterns `v_data_conflict_by_source` and
+`v_image_pipeline_coverage_gaps` use). The closest precedent in this
+repo — `mv_current_price` from `0013_mv_current_price.sql` — is
+hand-authored SQL with no Drizzle TS layer. The views are read via
+raw SQL when the app needs them.
+
+### Admin role posture
+
+`v1` ships gated to `service_role` only. Whether to provision a
+narrower read-only `admin` Postgres role for human-driven debug
+access (e.g. via a future admin web UI) is captured as **Q-007** in
+`open-questions.md`. Non-blocking — service_role is the v1 admin
+posture, matching the `data_conflict` / `price_observation` /
+`grading_training_sample` precedent.
