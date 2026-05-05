@@ -1,11 +1,14 @@
-# Build status — Iter 12 closed. Phase 2 backend foundation (auth + api-contracts) is on main.
+# Build status — Iter 13 closed. App shells (web + mobile) unblocked.
 
 **Phase 0:** Complete (10/10 merged).
-**Phase 1:** Complete (23/23 merged) — closed at iter 11, 2026-05-04 ~21:00 UTC-4.
-**Phase 2 backend (Stage 02):** 2/4 merged at iter 12 (T-BE-API-CONTRACTS #41 + T-BE-AUTH #42). 2 ready (T-BE-API-CLIENT, T-BE-EDGE-FUNCTIONS).
-**Phases 3-11:** 0 / 52 merged. Iter 13 dispatch in progress.
+**Phase 1:** Complete (23/23 merged) — closed at iter 11.
+**Phase 2 backend (Stage 02):** 3/4 merged. T-BE-EDGE-FUNCTIONS remaining.
+**Phase 3 shared packages (Stage 03):** 1/4 merged (T-SP-UI-TOKENS #45). 3 ready (T-SP-PRICING-DISPLAY, T-SP-SET-COMPLETION, T-SP-SMART-DSL).
+**Phase 4 web (Stage 04):** 0/8 — T-W-SHELL now unblocked.
+**Phase 5 mobile (Stage 05):** 0/5 — T-M-SHELL now unblocked.
+**Stages 06-11:** 0 / 32 merged.
 
-**In progress:** 0 (iter 12 just closed; iter 13 dispatch incoming).
+**In progress:** 0 (iter 13 just closed; iter 14 dispatch incoming).
 **Blocked:** 0.
 **Blocked on humans:** 0.
 
@@ -44,11 +47,14 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 12 closed 2026-05-05 ~18:35 UTC-4 with both Phase 2 backend
-foundation siblings on main. Phase 2 progression so far:
+Iter 13 closed 2026-05-05 ~19:14 UTC-4 with both downstream
+foundation siblings on main. Phase 2+ progression so far:
 
-iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — parallel siblings; opens
-Phase 2 backend foundation).
+iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
+foundation) →
+iter 13 (T-BE-API-CLIENT + T-SP-UI-TOKENS — backend client +
+cross-platform UI primitives; together unblock T-W-SHELL +
+T-M-SHELL for iter 14).
 
 Phase 1 progression (closed at iter 11):
 
@@ -124,31 +130,45 @@ after taking main's lockfile. `dependencies.yaml` auto-merged.
 | Task | Status | PR / commit | Tests | Highlight |
 |---|---|---|---|---|
 | T-BE-API-CONTRACTS | merged | #41 (`ebe59a1`) | 187 | Variant-taxonomy enums re-declared locally to avoid pulling sharp/aws-sdk into web/mobile/scanner consumers; smart-collection `expression` enforced via field-level `z.custom` |
-| T-BE-AUTH | merged | #42 (`2347268`) | 43 + 2 verify-rls behavioral assertions | Profile + subscription auto-provisioned via idempotent `AFTER INSERT ON auth.users` Postgres trigger (mig 0017, `SECURITY DEFINER`, pinned `search_path`, `EXECUTE` revoked from PUBLIC) — signup is atomic and provider-agnostic |
+| T-BE-AUTH | merged | #42 (`2347268`) | 43 + 2 verify-rls behavioral | Profile + subscription auto-provisioned via idempotent `AFTER INSERT ON auth.users` trigger (mig 0017) — signup is atomic and provider-agnostic |
 
-New migrations on main: 0017_profile_provisioning_trigger.sql (the
-trigger).
+## Iter 13 close summary (downstream foundation)
 
-Final migration sequence on main: monotonic 0000-0017.
+Both siblings landed clean with **zero merge conflicts** —
+api-client and ui-tokens dep graphs were orthogonal at the
+lockfile level (api-client only added new top-level workspaces +
+a few small deps; ui-tokens added a fresh Tamagui dep tree; no
+shared transitive collisions).
 
-## Iter 13 readiness — what's available
-
-After iter 12, the dependency graph unblocks **6 ready candidates**:
-
-| Task | Stage | Effort | Depends on (now satisfied) | Stub? |
+| Task | Status | PR / commit | Tests | Highlight |
 |---|---|---|---|---|
-| T-BE-API-CLIENT | 02-backend | M | api-contracts + auth | yes |
-| T-BE-EDGE-FUNCTIONS | 02-backend | L | api-contracts + rls-policies | yes |
-| T-SP-PRICING-DISPLAY | 03-shared-packages | M | fx-rates + api-contracts | yes |
-| T-SP-SET-COMPLETION | 03-shared-packages | M | api-contracts + master-set-rules | yes |
-| T-SP-SMART-DSL | 03-shared-packages | L | api-contracts | yes |
-| T-SP-UI-TOKENS | 03-shared-packages | ? | (none) | yes |
+| T-BE-API-CLIENT | merged | #44 (`303e5f5`) | 227 | The `auth` resource delegates interactive sign-in (OAuth/PKCE/magic-link) to a SupabaseClient (caller-supplied or lazily built); every other resource is a pure typed HTTP wrapper that validates outbound payloads via api-contracts write schemas (fail fast — never round-trip to fail) and inbound bodies via read schemas (catch backend drift as `ApiResponseDecodeError`) |
+| T-SP-UI-TOKENS | merged | #45 (`f228d1a`) | 257 | Bound prod deps to `@tamagui/core` + `@tamagui/input` only (skipping the heavy `tamagui` umbrella); `<Icon>` is a registry-pattern wrapper that takes any lucide flavour via an `as` prop, so the shared package never drags `react-native-svg` / `react-native` peers into the web RSC graph |
 
-Iter 13 first wave (parallel-safe siblings): TBD by orchestrator
-based on stub elaboration + risk profile. Likely shape: 2-3
-parallel workers covering the highest-leverage backend-foundation
-+ shared-package combo (api-client unblocks all of web/mobile;
-edge-functions unblocks scanner).
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 13).
+
+## Iter 14 readiness — what's available
+
+After iter 13, the dependency graph unblocks **5 ready candidates**:
+
+| Task | Stage | Effort | Depends on (now satisfied) | Notes |
+|---|---|---|---|---|
+| T-W-SHELL | 04-web | M | ui-tokens + api-client | newly unblocked; opens web stage |
+| T-M-SHELL | 05-mobile | M | ui-tokens + api-client | newly unblocked; opens mobile stage |
+| T-BE-EDGE-FUNCTIONS | 02-backend | L | api-contracts + rls-policies | last backend task; closes Stage 02 |
+| T-SP-PRICING-DISPLAY | 03-shared-packages | M | fx-rates + api-contracts | parallel-safe with set-completion + smart-dsl |
+| T-SP-SET-COMPLETION | 03-shared-packages | M | api-contracts + master-set-rules | parallel-safe with smart-dsl |
+| T-SP-SMART-DSL | 03-shared-packages | L | api-contracts | parallel-safe with set-completion |
+
+**Iter 14 dispatch decision: T-W-SHELL + T-M-SHELL as parallel
+siblings.** Orthogonal app directories (`apps/web/` vs
+`apps/mobile/`), different agent roles, and they're the
+highest-leverage remaining work since each one unblocks an entire
+8-task / 5-task downstream stage. Both shells will share-validate
+the cross-platform contract of @binderly/ui (Tamagui) and
+@binderly/api-client (typed HTTP), which is the most useful
+integration test the iter 13 work could get.
 
 ## Open questions (1 open; non-blocking)
 
@@ -165,11 +185,11 @@ All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
 
 ## Last 5 merges
 
-- T-BE-AUTH — `2347268` (Supabase Auth wiring; mig 0017 trigger auto-provisions profile+subscription; @binderly/auth package; 43 unit tests + 2 verify-rls behavioral) — **iter 12 cap**
+- T-SP-UI-TOKENS — `f228d1a` (@binderly/ui Tamagui tokens + base components; light+dark; cross-platform via core+input only; 257 tests) — **iter 13 cap**
+- T-BE-API-CLIENT — `303e5f5` (@binderly/api-client typed HTTP wrapper; auth resource delegates to Supabase JS for interactive flows; 227 tests; zero live network)
+- T-BE-AUTH — `2347268` (Supabase Auth wiring; mig 0017 trigger auto-provisions profile+subscription; 43 unit tests + 2 verify-rls behavioral) — **iter 12 cap**
 - T-BE-API-CONTRACTS — `ebe59a1` (@binderly/api-contracts; 187 zod-backed DTOs across 7 modules; opens Phase 2)
 - T-DL-ADMIN-DEBUG-SURFACES — `b13d3ed` (mig 0016 hand-authored views; Q-007 surfaced) — **Phase 1 cap**
-- T-DL-DATA-CONFLICT-TABLE — `3fb5227` (mig 0014/0015; per-set buffer-and-flush; service_role-only RLS; +14 tests)
-- T-DL-PRICING-CURRENT-VIEW — `f9bcc96` (mig 0013; mv DDL; UNIQUE for REFRESH CONCURRENTLY; +15 tests)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 

@@ -486,7 +486,7 @@ tasks:
     stage: 02-backend
     title: Typed API client used by web and mobile
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-BE-API-CONTRACTS, T-BE-AUTH]
     parallel_safe_with: []
     provides: [api:client]
@@ -541,7 +541,7 @@ tasks:
     stage: 03-shared-packages
     title: Tamagui design tokens + base components
     agent_role: frontend-web
-    status: review
+    status: merged
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-SMART-DSL]
     provides: [pkg:ui]
