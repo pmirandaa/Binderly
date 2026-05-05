@@ -1,0 +1,62 @@
+{
+  "name": "@binderly/ui",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-platform Tamagui design tokens + base components for Binderly. Shared by apps/web (Next.js) and apps/mobile (Expo).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./tamagui.config": {
+      "types": "./dist/tamagui.config.d.ts",
+      "default": "./dist/tamagui.config.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "@tamagui/core": "1.123.3",
+    "@tamagui/input": "1.123.3"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "22.19.17",
+    "@types/react": "18.3.28",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "4.7.0",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "jsdom": "25.0.1",
+    "prettier": "3.8.3",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}

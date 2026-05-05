@@ -425,4 +425,68 @@ Stop and surface to orchestrator if:
 
 ## Notes from execution
 
-_(sub-agent appends here once execution is complete)_
+- **Tamagui version:** pinned `@tamagui/core@1.123.3` and
+  `@tamagui/input@1.123.3`. The npm `latest` tag on `tamagui` (the
+  umbrella) is `2.0.0-rc.22`, a release candidate; we picked the
+  last 1.x stable (`1.123.3`, currently npm-tagged `prepub`)
+  intentionally so we ship against a stable API. Future bumps go
+  through whichever co-orchestrator owns Tamagui upgrades.
+- **Bound to `@tamagui/core` only, plus `@tamagui/input`.** The
+  full `tamagui` umbrella pulls 30+ sub-packages (sheet, dialog,
+  popover, accordion, etc.). At this phase we don't need any of
+  them, and pulling them inflates the bundler graph + RSC + jsdom
+  test setup. `@tamagui/core` has `View`, `Stack`, `Text`,
+  `styled`, `createTokens`, `createTheme`, `createTamagui`, and
+  `<TamaguiProvider>`; `@tamagui/input` ships the cross-platform
+  text input (web `<input>` ↔ native `TextInput`) the umbrella
+  doesn't surface from `@tamagui/core` directly.
+- **Brand colours.** v1 ships a teal-leaning primary (`#0FA3A3`)
+  and violet-leaning secondary (`#7B5DFF`). Both meet WCAG-AA
+  contrast on light + dark surfaces. No `Q-008` raised yet — the
+  defaults are flagged in the README + task file so Pablo can
+  request a swap whenever the brand decision lands. The swap is
+  one-file (`src/tokens/colors.ts`) when it does.
+- **Iconography via registry, not a hard dep.** Built-in `<Icon>`
+  takes the icon component via `as`. Both `lucide-react` (web) and
+  `lucide-react-native` (mobile) export the same icon names with
+  the same prop shape, so apps install whichever flavour fits the
+  platform. We did NOT add `lucide-react-native` to dependencies —
+  it has hard peers on `react-native` and `react-native-svg` that
+  would bloat the shared package + RSC graph.
+- **`<UIProvider>` is `"use client"`.** `TamaguiProvider` mounts a
+  React context, which RSC forbids at the server boundary. The
+  primitives (`<Box>`, `<Text>`, `<Card>`, …) do NOT take the
+  directive — server components can import them freely; the
+  client boundary travels with the provider.
+- **Tests.** 257 tests across 20 test files: 76 token-shape
+  contracts (incl. `it.each` over every semantic slot for both
+  themes), 5 config tests, 6 provider tests, 152 component tests
+  with rendering + a11y + variant/size/disabled/loading
+  assertions. Coverage runs through the documented Tamagui +
+  vitest setup (`@vitejs/plugin-react`, `jsdom`,
+  `@testing-library/react@16`).
+- **Spinner / Icon a11y.** Tamagui maps `accessibilityRole` →
+  `role` on web with the RN value winning, which produced
+  surprising `role="progressbar"` outputs from a web RTL query.
+  We dropped `accessibilityRole` on Spinner + Icon, leaving only
+  the explicit web `role="status"` / `role="img"` /
+  `role="presentation"` and the RN `accessibilityLabel`. Tamagui
+  derives the native role from the web role at compile time on
+  native; the cross-platform contract holds.
+- **Lockfile / workspace.** `pnpm-workspace.yaml` already
+  globs `packages/*` — no edit needed. `pnpm-lock.yaml`
+  regenerated with the new Tamagui + testing-library + vitest
+  + react/react-dom deps. The peer-dep warning surfaced by pnpm
+  about `react-native@0.85.3` wanting `react@^19` is a transient
+  install-time warning from a transitive peer that resolves
+  against the React 18 we explicitly pin; it is non-blocking and
+  matches the warning shape every other pre-Expo-SDK-52
+  workspace sees today.
+- **Out-of-`owns_paths` edits.** `pnpm-lock.yaml` (regenerated),
+  `dependencies.yaml` (status flip + `stub: false`),
+  `tasks/03-shared-packages/T-SP-UI-TOKENS.md` (this elaboration +
+  these notes). All three pre-authorized by the orchestrator
+  dispatch.
+- **`pnpm-workspace.yaml`:** verified unchanged; no edit
+  required.
+

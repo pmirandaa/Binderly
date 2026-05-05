@@ -541,14 +541,14 @@ tasks:
     stage: 03-shared-packages
     title: Tamagui design tokens + base components
     agent_role: frontend-web
-    status: pending
+    status: review
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-SMART-DSL]
     provides: [pkg:ui]
     owns_paths: [packages/ui/]
     task_file: tasks/03-shared-packages/T-SP-UI-TOKENS.md
     est_effort: L
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 4 — WEB APP
