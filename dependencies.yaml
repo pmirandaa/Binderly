@@ -361,7 +361,7 @@ tasks:
     stage: 01-data-layer
     title: mv_current_price materialized view + nightly refresh
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-DL-PRICING-ROLLUP]
     parallel_safe_with: []
     provides: [view:current-price]
@@ -428,7 +428,7 @@ tasks:
     stage: 01-data-layer
     title: data_conflict table + resolver write path (admin debug surface)
     agent_role: data
-    status: pending
+    status: in_progress
     depends_on: [T-DL-RLS-POLICIES, T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-ADMIN-DEBUG-SURFACES]
     provides: [table:data_conflict]
