@@ -33,13 +33,13 @@
     "pricing-current-view": "tsx scripts/pricing-current-view.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.685.0",
+    "@aws-sdk/client-s3": "3.1042.0",
     "@binderly/db": "workspace:*",
     "bottleneck": "2.19.5",
     "drizzle-orm": "0.45.2",
     "pino": "9.5.0",
     "postgres": "3.4.9",
-    "sharp": "0.33.5",
+    "sharp": "0.34.5",
     "zod": "3.25.76"
   },
   "devDependencies": {

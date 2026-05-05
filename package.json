@@ -26,6 +26,6 @@
   },
   "devDependencies": {
     "supabase": "2.98.1",
-    "turbo": "2.9.6"
+    "turbo": "2.9.9"
   }
 }
