@@ -1,45 +1,13 @@
-# Build status — Phase 2 iter 12 dispatching: T-BE-AUTH + T-BE-API-CONTRACTS (parallel siblings, the backend foundation pair)
+# Build status — Iter 12 closed. Phase 2 backend foundation (auth + api-contracts) is on main.
 
 **Phase 0:** Complete (10/10 merged).
-**Phase 1:** Complete (23/23 merged) — closed 2026-05-04.
-**Phase 2 (stages 02-11):** 0 / 56 merged. **Iter 12 dispatching: 2 parallel siblings.**
+**Phase 1:** Complete (23/23 merged) — closed at iter 11, 2026-05-04 ~21:00 UTC-4.
+**Phase 2 backend (Stage 02):** 2/4 merged at iter 12 (T-BE-API-CONTRACTS #41 + T-BE-AUTH #42). 2 ready (T-BE-API-CLIENT, T-BE-EDGE-FUNCTIONS).
+**Phases 3-11:** 0 / 52 merged. Iter 13 dispatch in progress.
 
-**In progress:** 2 (T-BE-AUTH, T-BE-API-CONTRACTS).
+**In progress:** 0 (iter 12 just closed; iter 13 dispatch incoming).
 **Blocked:** 0.
 **Blocked on humans:** 0.
-
-## Phase 2 prep summary (this iter)
-
-A first prep worker was dispatched + aborted before completing.
-Survey done in foreground instead — turns out **all 56 Phase 2 stubs
-already exist** in `tasks/02-backend/` ... `tasks/11-deployment/`,
-and **all 10 stage rules files exist** in `rules/02-*.md` ...
-`rules/11-*.md`. So no stub authoring needed; Phase 2 dispatch
-opens cleanly.
-
-## Phase 2 dependency survey (9 ready / 56 total)
-
-| Task | Stage | Role | Status | Blockers |
-|---|---|---|---|---|
-| **T-BE-API-CONTRACTS** | 02-backend | backend | **dispatching** | (none) — linchpin for 5 downstream tasks |
-| **T-BE-AUTH** | 02-backend | backend | **dispatching** | (none) — independent of API-CONTRACTS |
-| T-SP-UI-TOKENS | 03-shared-packages | frontend-web | ready (held to iter 13) | (none) |
-| T-SC-EMBED-MODEL | 06-scanner | ml | ready (held — scanner stack races behind app shell) | (none) |
-| T-GR-DATA-PSA | 07-grading | data | ready (held — grading is a Phase 2 sub-track) | (none) |
-| T-GR-DATA-EBAY | 07-grading | data | ready (held) | (none) |
-| T-GR-DATA-AUCTIONS | 07-grading | data | ready (held) | (none) |
-| T-DP-SUPABASE-PROD | 11-deployment | devops | ready (held — deploy comes after app shell) | (none) |
-| T-DP-R2-PROD | 11-deployment | devops | ready (held) | (none) |
-
-The other 47 Phase 2 tasks are all blocked on at least one of the
-above. Critical path runs:
-
-  T-BE-API-CONTRACTS → T-BE-API-CLIENT + T-BE-EDGE-FUNCTIONS +
-  3 shared packages (PRICING-DISPLAY, SET-COMPLETION, SMART-DSL)
-  → T-W-SHELL / T-M-SHELL → web + mobile UI tasks.
-
-Plus the parallel scanner + grading sub-tracks that fork off
-T-M-SHELL (scanner) and T-GR-DATA-* (grading data ingest).
 
 ## Phase 1 close summary
 
@@ -76,8 +44,13 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 11 closed; iter 12 paused per Pablo's "leave it for tonight"
-instruction. Phase 1 progression in full:
+Iter 12 closed 2026-05-05 ~18:35 UTC-4 with both Phase 2 backend
+foundation siblings on main. Phase 2 progression so far:
+
+iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — parallel siblings; opens
+Phase 2 backend foundation).
+
+Phase 1 progression (closed at iter 11):
 
 iter 1 (USERS+CARDS) →
 iter 2 (COLLECTIONS+GRADING+SOURCE-INTERFACES) →
@@ -90,10 +63,9 @@ iter 7.5 (Q-005 hotfix) →
 iter 8 (PRICING-ROLLUP) →
 iter 9 (PRICING-CURRENT-VIEW) →
 iter 10 (DATA-CONFLICT-TABLE) →
-iter 11 (ADMIN-DEBUG-SURFACES — Phase 1 cap) →
-**iter 12 (Phase 2 backend foundation pair: BE-AUTH + BE-API-CONTRACTS)**.
+iter 11 (ADMIN-DEBUG-SURFACES — Phase 1 cap).
 
-Phase 1 final migration sequence on main: monotonic 0000-0016.
+Final migration sequence on main: monotonic 0000-0016.
 
   0000_user_tables          (T-DL-SCHEMA-USERS)
   0001_users_rls            (T-DL-SCHEMA-USERS, hand-authored)
@@ -112,6 +84,7 @@ Phase 1 final migration sequence on main: monotonic 0000-0016.
   0014_data_conflict        (T-DL-DATA-CONFLICT-TABLE, drizzle-generated)
   0015_data_conflict_rls    (T-DL-DATA-CONFLICT-TABLE, hand-authored)
   0016_admin_debug_views    (T-DL-ADMIN-DEBUG-SURFACES, hand-authored)
+  0017_profile_provisioning_trigger (T-BE-AUTH, hand-authored)
 
 ## Phase 1 ledger (23/23 — 100%)
 
@@ -142,30 +115,40 @@ Phase 1 final migration sequence on main: monotonic 0000-0016.
 | T-DL-DATA-CONFLICT-TABLE | merged | #39 (`3fb5227`) |
 | T-DL-ADMIN-DEBUG-SURFACES | merged | #40 (`b13d3ed`; surfaced Q-007) |
 
-## Iter 12 dispatch (2 in flight, under MAX_PARALLEL=3)
+## Iter 12 close summary (Phase 2 backend foundation)
 
-Backend foundation pair. Picked together because both are in the
-critical path AND clearly independent ownership areas (auth vs API
-contracts; different files in `apps/api/` and
-`packages/api-contracts/` — which the worker(s) will create from
-scratch).
+Both siblings landed clean with one merge-time conflict (`pnpm-lock.yaml`)
+resolved by regenerating with `pnpm install --no-frozen-lockfile`
+after taking main's lockfile. `dependencies.yaml` auto-merged.
 
-| Task | Effort | Owns_paths | Why this iter |
-|---|---|---|---|
-| **T-BE-API-CONTRACTS** | M | `packages/api-contracts/` | Linchpin: zod schemas + TS types shared between backend + web + mobile + scanner. Without it the other 5 backend / shared-packages tasks can't dispatch. |
-| **T-BE-AUTH** | M | `apps/api/auth/` (Supabase Auth wiring: Google / Apple / Discord / magic link) | Parallel-safe with API-CONTRACTS; unblocks T-BE-API-CLIENT (which depends on both). |
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-BE-API-CONTRACTS | merged | #41 (`ebe59a1`) | 187 | Variant-taxonomy enums re-declared locally to avoid pulling sharp/aws-sdk into web/mobile/scanner consumers; smart-collection `expression` enforced via field-level `z.custom` |
+| T-BE-AUTH | merged | #42 (`2347268`) | 43 + 2 verify-rls behavioral assertions | Profile + subscription auto-provisioned via idempotent `AFTER INSERT ON auth.users` Postgres trigger (mig 0017, `SECURITY DEFINER`, pinned `search_path`, `EXECUTE` revoked from PUBLIC) — signup is atomic and provider-agnostic |
 
-Phase 2 strategy notes:
-- **Iter 13 candidates** (assuming this iter lands): T-SP-UI-TOKENS
-  (the L-effort Tamagui design tokens task) + T-BE-API-CLIENT (which
-  becomes ready once both this iter's tasks merge).
-- **Mid-Phase-2 critical path**: BE-API-CONTRACTS → 3 shared
-  packages (PRICING-DISPLAY, SET-COMPLETION, SMART-DSL) → web /
-  mobile collection + smart-rules UIs.
-- **Independent sub-tracks** parallel to the app shell: scanner ML
-  (06-scanner; T-SC-EMBED-MODEL onwards) and grading data ingest
-  (07-grading; T-GR-DATA-PSA / -EBAY / -AUCTIONS). Both can start
-  any time without blocking the app shell critical path.
+New migrations on main: 0017_profile_provisioning_trigger.sql (the
+trigger).
+
+Final migration sequence on main: monotonic 0000-0017.
+
+## Iter 13 readiness — what's available
+
+After iter 12, the dependency graph unblocks **6 ready candidates**:
+
+| Task | Stage | Effort | Depends on (now satisfied) | Stub? |
+|---|---|---|---|---|
+| T-BE-API-CLIENT | 02-backend | M | api-contracts + auth | yes |
+| T-BE-EDGE-FUNCTIONS | 02-backend | L | api-contracts + rls-policies | yes |
+| T-SP-PRICING-DISPLAY | 03-shared-packages | M | fx-rates + api-contracts | yes |
+| T-SP-SET-COMPLETION | 03-shared-packages | M | api-contracts + master-set-rules | yes |
+| T-SP-SMART-DSL | 03-shared-packages | L | api-contracts | yes |
+| T-SP-UI-TOKENS | 03-shared-packages | ? | (none) | yes |
+
+Iter 13 first wave (parallel-safe siblings): TBD by orchestrator
+based on stub elaboration + risk profile. Likely shape: 2-3
+parallel workers covering the highest-leverage backend-foundation
++ shared-package combo (api-client unblocks all of web/mobile;
+edge-functions unblocks scanner).
 
 ## Open questions (1 open; non-blocking)
 
@@ -182,11 +165,11 @@ All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
 
 ## Last 5 merges
 
-- T-DL-ADMIN-DEBUG-SURFACES — `b13d3ed` (mig 0016 hand-authored views: v_data_conflict_top, v_data_conflict_by_source, v_image_pipeline_coverage_gaps, v_fx_rate_freshness, v_pg_stat_statements_top_queries; service_role-only RLS posture; Q-007 surfaced; tests flat at 1101 — no new TS) — **Phase 1 cap**
-- T-DL-DATA-CONFLICT-TABLE — `3fb5227` (mig 0014/0015; per-set buffer-and-flush integration; service_role-only RLS posture; +14 tests; package total 1101)
-- T-DL-PRICING-CURRENT-VIEW — `f9bcc96` (mig 0013; mv DDL with DISTINCT ON projection; UNIQUE for REFRESH CONCURRENTLY; +15 tests; package total 1087)
-- T-DL-PRICING-ROLLUP — `1cc7a40` (daily aggregation; idempotent on schema PK; outlier-trimmed; +29 tests; package total 1072)
-- T-DL-PRICING-EBAY-BROWSE — `8b855f4` (Layer 2 active-listings ingest; mock-by-default; reconciliation rename; +35 tests; package total 1043)
+- T-BE-AUTH — `2347268` (Supabase Auth wiring; mig 0017 trigger auto-provisions profile+subscription; @binderly/auth package; 43 unit tests + 2 verify-rls behavioral) — **iter 12 cap**
+- T-BE-API-CONTRACTS — `ebe59a1` (@binderly/api-contracts; 187 zod-backed DTOs across 7 modules; opens Phase 2)
+- T-DL-ADMIN-DEBUG-SURFACES — `b13d3ed` (mig 0016 hand-authored views; Q-007 surfaced) — **Phase 1 cap**
+- T-DL-DATA-CONFLICT-TABLE — `3fb5227` (mig 0014/0015; per-set buffer-and-flush; service_role-only RLS; +14 tests)
+- T-DL-PRICING-CURRENT-VIEW — `f9bcc96` (mig 0013; mv DDL; UNIQUE for REFRESH CONCURRENTLY; +15 tests)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
