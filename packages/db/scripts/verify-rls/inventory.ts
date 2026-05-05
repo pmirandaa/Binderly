@@ -9,6 +9,14 @@
 //   - 0009_pricing_rls.sql          → market, price_observation, price_aggregate,
 //                                     fx_rate
 //   - 0015_data_conflict_rls.sql    → data_conflict (service-role-only)
+//   - 0016_admin_debug_views.sql    → v_data_conflict_top, v_data_conflict_by_source,
+//                                     v_image_pipeline_coverage_gaps,
+//                                     v_fx_rate_freshness,
+//                                     v_pg_stat_statements_top_queries
+//                                     (regular views, service-role-only;
+//                                      Postgres does not support RLS on views,
+//                                      so the posture is enforced by SQL grants
+//                                      alone — same shape as `mv_current_price`)
 //
 // This file is the structural source of truth for the verification script.
 // Every entry has a one-line note that maps it back to its origin migration
@@ -166,4 +174,49 @@ export const EXPECTED_POLICIES: readonly ExpectedPolicy[] = [
   },
   // price_observation: intentionally no policies; covered by
   // NO_PERMISSIVE_POLICY_TABLES above.
+] as const;
+
+/**
+ * An admin debug view whose access posture is asserted structurally
+ * (`pg_views` row exists) and behaviorally (anon + authenticated denied,
+ * service_role allowed). Postgres does not support RLS on regular views,
+ * so the posture is enforced by SQL grants alone — same shape as
+ * `mv_current_price` from `0013_mv_current_price.sql`.
+ */
+export interface ExpectedDebugView {
+  readonly viewname: string;
+  /** Plain-English summary; surfaced in failure messages. */
+  readonly note: string;
+}
+
+/**
+ * The five views shipped by `0016_admin_debug_views.sql`. Each is gated
+ * to `service_role` only — `REVOKE ALL ON … FROM PUBLIC; GRANT SELECT
+ * ON … TO service_role;` per view. Behavioral assertions in
+ * `assertions.ts` drive each view through the anon / authenticated /
+ * service_role role-switch matrix; the structural assertion in
+ * `assertViewsExist` confirms the view object exists in the public
+ * schema.
+ */
+export const EXPECTED_DEBUG_VIEWS: readonly ExpectedDebugView[] = [
+  {
+    viewname: 'v_data_conflict_top',
+    note: 'admin debug — top 100 conflicts by dispute_count',
+  },
+  {
+    viewname: 'v_data_conflict_by_source',
+    note: 'admin debug — per-source conflict rollup',
+  },
+  {
+    viewname: 'v_image_pipeline_coverage_gaps',
+    note: 'admin debug — printings missing image provenance / canonical url',
+  },
+  {
+    viewname: 'v_fx_rate_freshness',
+    note: 'admin debug — per-pair fx_rate freshness + 30d row count',
+  },
+  {
+    viewname: 'v_pg_stat_statements_top_queries',
+    note: 'admin debug — top 50 queries by total_exec_time (extensions.pg_stat_statements)',
+  },
 ] as const;

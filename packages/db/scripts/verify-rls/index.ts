@@ -13,6 +13,7 @@ import {
   assertPolicyInventory,
   assertRlsEnabled,
   assertTablesExist,
+  assertViewsExist,
   type AssertionResult,
 } from './assertions.js';
 
@@ -56,6 +57,11 @@ export async function runVerification(config: VerifyConfig): Promise<VerifyOutco
       // missing — the user almost certainly forgot to apply migrations.
       return { results, failed: true };
     }
+
+    // Admin debug views ship in `0016_admin_debug_views.sql`. The
+    // structural inventory check is informational here; behavioral
+    // checks below drive each view through the role matrix.
+    await assertViewsExist(sql, results);
 
     await assertRlsEnabled(sql, results);
     await assertPolicyInventory(sql, results);

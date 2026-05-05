@@ -12,6 +12,7 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  EXPECTED_DEBUG_VIEWS,
   EXPECTED_POLICIES,
   EXPECTED_TABLES,
   NO_PERMISSIVE_POLICY_TABLES,
@@ -63,6 +64,32 @@ export async function assertTablesExist(sql: Sql, results: AssertionResult[]): P
           `table:${t.tablename} exists`,
           `missing in public schema (note: ${t.note}). Have you run ` +
             '`pnpm --filter @binderly/db db:migrate` against this DB?',
+        ),
+      );
+    }
+  }
+}
+
+export async function assertViewsExist(sql: Sql, results: AssertionResult[]): Promise<void> {
+  const expectedNames = EXPECTED_DEBUG_VIEWS.map((v) => v.viewname);
+  if (expectedNames.length === 0) return;
+  const rows = await sql<{ viewname: string }[]>`
+    SELECT viewname
+    FROM   pg_catalog.pg_views
+    WHERE  schemaname = 'public'
+      AND  viewname = ANY(${expectedNames})
+  `;
+  const found = new Set(rows.map((r) => r.viewname));
+  for (const v of EXPECTED_DEBUG_VIEWS) {
+    if (found.has(v.viewname)) {
+      results.push(ok(`view:${v.viewname} exists`));
+    } else {
+      results.push(
+        fail(
+          `view:${v.viewname} exists`,
+          `missing in public schema (note: ${v.note}). Have you run ` +
+            '`pnpm --filter @binderly/db db:migrate` against this DB? ' +
+            '0016_admin_debug_views.sql ships this view.',
         ),
       );
     }
@@ -291,6 +318,12 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
   await assertSelectDenied(sql, 'price_observation', 'authenticated', results);
   await assertSelectDenied(sql, 'data_conflict', 'authenticated', results);
 
+  // Admin debug views: service-role-only. authenticated must be denied
+  // on every view shipped by `0016_admin_debug_views.sql`.
+  for (const view of EXPECTED_DEBUG_VIEWS) {
+    await assertSelectDenied(sql, view.viewname, 'authenticated', results);
+  }
+
   // ---- anon — public read of catalog + profile, blocked from owner tables ----
   await switchRole(sql, 'anon', null, results);
 
@@ -318,6 +351,12 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
   await assertSelectDenied(sql, 'price_observation', 'anon', results);
   await assertSelectDenied(sql, 'data_conflict', 'anon', results);
 
+  // Admin debug views: anon must also be denied (same posture as
+  // service-role-only base tables).
+  for (const view of EXPECTED_DEBUG_VIEWS) {
+    await assertSelectDenied(sql, view.viewname, 'anon', results);
+  }
+
   // ---- service_role — bypasses every policy ----
   await switchRole(sql, 'service_role', null, results);
 
@@ -331,6 +370,14 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
 
   for (const tname of ['grading_training_sample', 'price_observation', 'data_conflict']) {
     await assertSelectAllowed(sql, tname, 'service_role', results);
+  }
+
+  // Admin debug views: service_role must SELECT successfully on each.
+  // (The wrappers in `public` are owned by `postgres`, so the underlying-
+  // table reads — `extensions.pg_stat_statements` etc. — use the view
+  // owner's privileges per PG 17's `security_invoker = false` default.)
+  for (const view of EXPECTED_DEBUG_VIEWS) {
+    await assertSelectAllowed(sql, view.viewname, 'service_role', results);
   }
 
   await withTry(sql, results, 'behavior:reset role', async () => {

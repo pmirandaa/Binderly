@@ -3,7 +3,7 @@
 **Stage:** 01-data-layer
 **Agent role:** backend
 **Effort:** S
-**Status:** in_progress
+**Status:** review
 
 ---
 
@@ -642,4 +642,60 @@ Stop and escalate to orchestrator (via `open-questions.md` append) if:
 
 ## Notes from execution
 
-(Sub-agent appends here at end. Empty until then.)
+### View rename — `v_image_pipeline_failures` → `v_image_pipeline_coverage_gaps`
+
+The stub suggested `v_image_pipeline_failures` joining onto a
+`printing_image` row "with a non-null error column". The merged
+`printing_image` schema (read at start of work, per
+`packages/db/src/schema/printing_image.ts` head comment) has **no**
+error column — the table is a strict provenance sidecar that only
+persists successful transcodes (Q-005 in `open-questions.md`
+documents image-pipeline failures landing in run-report JSON, not in
+the DB). Renamed the view to surface the actually-observable
+DB-only signal: printings missing canonical URL or with zero
+provenance rows. Decision recorded in the migration header comment
+and the elaborated task .md under "Approach > v3.
+
+### `pg_stat_statements` query-text masking
+
+`pg_stat_statements` applies a runtime privilege check on
+`current_user`: only superusers and members of `pg_read_all_stats`
+see the full `query` text for queries executed by *other* roles. For
+service_role (the gate role for these views) that means: queries
+run by the data-pipeline / edge functions show full text, but
+queries run by `postgres` / `supabase_admin` / `authenticator`
+show `<insufficient privilege>` for the text — though stats columns
+(calls / *_exec_time / rows / shared_blks_*) are always visible.
+Granting `pg_read_all_stats` to service_role would lift the
+restriction but requires `WITH ADMIN OPTION` on the predefined
+role, which Supabase does not delegate by default
+(`GRANT pg_read_all_stats TO service_role` returns "permission
+denied to grant role"). Documented in the migration header comment
+and the README as a known limitation rather than worked around.
+
+### `verify-rls` extension
+
+`assertViewsExist` mirrors `assertTablesExist` (parallel structural
+asserter). The behavioral matrix (anon/authenticated denied,
+service_role allowed) reuses the existing `assertSelectDenied` /
+`assertSelectAllowed` helpers — no new harness primitives needed.
+The full suite cannot be run from a sandboxed agent shell (tsx
+spawn-IPC fails with EPERM, same as `db:migrate`). Validation done
+by hand-applying `0014_data_conflict.sql`, `0015_data_conflict_rls.sql`,
+and the new `0016_admin_debug_views.sql` against local Supabase via
+`psql -f`, then running per-role `SET LOCAL ROLE` smoke checks
+(service_role: 5/5 SELECT succeeds; anon + authenticated: 5/5 fail
+with "permission denied for view"). Pablo can re-run the full suite
+post-merge per the smoke commands in the PR body.
+
+### Migrating production
+
+`CREATE EXTENSION IF NOT EXISTS pg_stat_statements WITH SCHEMA
+extensions;` is the first non-comment statement of the migration.
+Local Supabase ships the extension already enabled (verified via
+`pg_extension`); newer hosted Supabase projects do too. If a future
+Supabase project disables it, the migration fails loudly at the
+CREATE EXTENSION step — easy to recover (re-enable out of band, re-
+run the migration). The data_conflict / printing_image / fx_rate /
+printing tables are all merged on `main`, so the migration's other
+references resolve cleanly.

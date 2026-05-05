@@ -113,6 +113,13 @@
       "when": 1777920000005,
       "tag": "0015_data_conflict_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1777920000006,
+      "tag": "0016_admin_debug_views",
+      "breakpoints": true
     }
   ]
 }
