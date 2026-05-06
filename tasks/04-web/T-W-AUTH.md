@@ -88,4 +88,41 @@ Stop and write to `open-questions.md` if:
 
 ## Notes from execution
 
-_(populated by the sub-agent at the end of execution)_
+- **Run-once-effect ergonomics around `<AuthProvider>`.** The provider's
+  context value (`signOut` reference, `loading`, `session`) flips a few
+  times during hydration as the lazy `getBrowserSupabase()` resolves
+  and `getSession()` returns. Naive `useEffect(() => signOut(), [signOut])`
+  patterns therefore double-call the SDK. Both `<ProtectedRoute>` and
+  the sign-out page pin `signOut` (and `router`, which is a fresh object
+  per call under the test mock) into refs and gate side effects with
+  a `startedRef` boolean. Worth keeping in mind for downstream tasks
+  that wire similar one-shot effects against `useAuth()`.
+- **Middleware is best-effort, not authoritative.** `@supabase/ssr`'s
+  `sb-*-auth-token` cookie convention is what the middleware sniffs;
+  the default Supabase JS browser singleton persists to localStorage,
+  which the edge runtime can't see. Definitive client-side gating is
+  `<ProtectedRoute>`. If a future task adopts cookie-based SSR auth,
+  the middleware can be tightened to JWT-verify rather than just
+  presence-check.
+- **No new env keys.** OAuth providers are configured on the Supabase
+  project itself; the only auth-relevant env the client reads is
+  `NEXT_PUBLIC_APP_URL` (already declared by W-SHELL) for OG / future
+  email-template consumption. The sign-in page uses
+  `window.location.origin` at call time to build `redirectTo`, since
+  it's only invoked from event handlers.
+- **`bash scripts/spawn_worktree.sh T-W-AUTH` rejects the task ID.**
+  The helper's regex requires a 2-letter task scope, but `T-W-AUTH`
+  has only one letter (`W`). Worked around manually with
+  `git worktree add -b agent/T-W-AUTH ../binderly-wt-T-W-AUTH main`.
+  Same workaround will be needed for every Phase-04 web task
+  (`T-W-BROWSE`, `T-W-COLLECTION`, …) and Phase-05 mobile task
+  (`T-M-AUTH`, …). Worth fixing the regex to
+  `^T-[A-Z]{1,2}-[A-Z0-9-]+$` in a future devops task.
+- **`pnpm --filter @binderly/web format:write` reformats
+  `AuthProvider.tsx`.** The W-SHELL commit landed it with a
+  6-import multi-line block prettier wants on a single line at the
+  configured 100-char width. Touching that file is forbidden by the
+  task's authorized-paths list, so I reverted prettier's edit and
+  formatted only the new files. CI doesn't gate `format:check`, so
+  the pre-existing violation is fine; flagging here for the
+  orchestrator in case a follow-up cleanup is wanted.
