@@ -557,7 +557,7 @@ tasks:
     stage: 04-web
     title: Next.js app shell, routing, layout, theme
     agent_role: frontend-web
-    status: review
+    status: merged
     depends_on: [T-SP-UI-TOKENS, T-BE-API-CLIENT]
     parallel_safe_with: []
     provides: [web:shell]
@@ -664,7 +664,7 @@ tasks:
     stage: 05-mobile
     title: Expo app shell — navigation, tabs, theme
     agent_role: frontend-mobile
-    status: review
+    status: merged
     depends_on: [T-SP-UI-TOKENS, T-BE-API-CLIENT]
     parallel_safe_with: []
     provides: [mobile:shell]

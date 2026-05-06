@@ -1,14 +1,14 @@
-# Build status — Iter 13 closed. App shells (web + mobile) unblocked.
+# Build status — Iter 14 closed. Web + mobile app shells live on main.
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11.
 **Phase 2 backend (Stage 02):** 3/4 merged. T-BE-EDGE-FUNCTIONS remaining.
-**Phase 3 shared packages (Stage 03):** 1/4 merged (T-SP-UI-TOKENS #45). 3 ready (T-SP-PRICING-DISPLAY, T-SP-SET-COMPLETION, T-SP-SMART-DSL).
-**Phase 4 web (Stage 04):** 0/8 — T-W-SHELL now unblocked.
-**Phase 5 mobile (Stage 05):** 0/5 — T-M-SHELL now unblocked.
+**Phase 3 shared packages (Stage 03):** 1/4 merged (T-SP-UI-TOKENS). 3 ready (T-SP-PRICING-DISPLAY, T-SP-SET-COMPLETION, T-SP-SMART-DSL).
+**Phase 4 web (Stage 04):** 1/8 merged (T-W-SHELL #48). T-W-AUTH + T-W-BROWSE now ready.
+**Phase 5 mobile (Stage 05):** 1/5 merged (T-M-SHELL #47). T-M-AUTH + T-M-BROWSE now ready.
 **Stages 06-11:** 0 / 32 merged.
 
-**In progress:** 0 (iter 13 just closed; iter 14 dispatch incoming).
+**In progress:** 0 (iter 14 just closed; iter 15 dispatch incoming).
 **Blocked:** 0.
 **Blocked on humans:** 0.
 
@@ -47,14 +47,15 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 13 closed 2026-05-05 ~19:14 UTC-4 with both downstream
-foundation siblings on main. Phase 2+ progression so far:
+Iter 14 closed 2026-05-05 ~20:30 UTC-4 with both app shells on
+main. Phase 2+ progression so far:
 
 iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
 foundation) →
 iter 13 (T-BE-API-CLIENT + T-SP-UI-TOKENS — backend client +
-cross-platform UI primitives; together unblock T-W-SHELL +
-T-M-SHELL for iter 14).
+cross-platform UI primitives) →
+iter 14 (T-W-SHELL + T-M-SHELL — Next.js + Expo app shells;
+opens Phase 4 web stage and Phase 5 mobile stage).
 
 Phase 1 progression (closed at iter 11):
 
@@ -132,43 +133,55 @@ after taking main's lockfile. `dependencies.yaml` auto-merged.
 | T-BE-API-CONTRACTS | merged | #41 (`ebe59a1`) | 187 | Variant-taxonomy enums re-declared locally to avoid pulling sharp/aws-sdk into web/mobile/scanner consumers; smart-collection `expression` enforced via field-level `z.custom` |
 | T-BE-AUTH | merged | #42 (`2347268`) | 43 + 2 verify-rls behavioral | Profile + subscription auto-provisioned via idempotent `AFTER INSERT ON auth.users` trigger (mig 0017) — signup is atomic and provider-agnostic |
 
-## Iter 13 close summary (downstream foundation)
+## Iter 14 close summary (app shells)
 
-Both siblings landed clean with **zero merge conflicts** —
-api-client and ui-tokens dep graphs were orthogonal at the
-lockfile level (api-client only added new top-level workspaces +
-a few small deps; ui-tokens added a fresh Tamagui dep tree; no
-shared transitive collisions).
+Both siblings landed; T-W-SHELL hit a CI build snag at merge
+time that needed an orchestrator hotfix, otherwise clean.
 
 | Task | Status | PR / commit | Tests | Highlight |
 |---|---|---|---|---|
-| T-BE-API-CLIENT | merged | #44 (`303e5f5`) | 227 | The `auth` resource delegates interactive sign-in (OAuth/PKCE/magic-link) to a SupabaseClient (caller-supplied or lazily built); every other resource is a pure typed HTTP wrapper that validates outbound payloads via api-contracts write schemas (fail fast — never round-trip to fail) and inbound bodies via read schemas (catch backend drift as `ApiResponseDecodeError`) |
-| T-SP-UI-TOKENS | merged | #45 (`f228d1a`) | 257 | Bound prod deps to `@tamagui/core` + `@tamagui/input` only (skipping the heavy `tamagui` umbrella); `<Icon>` is a registry-pattern wrapper that takes any lucide flavour via an `as` prop, so the shared package never drags `react-native-svg` / `react-native` peers into the web RSC graph |
+| T-M-SHELL | merged | #47 (`f73c54b`) | 110 | Pinned the workspace to RN 0.76.9 / React 18 (Expo SDK 52) via a workspace-root `pnpm.overrides` block — Tamagui's `react-native: *` peer otherwise drags RN 0.85.x + React 19 typings into `@binderly/ui` and breaks its build. expo-secure-store is the JWT storage adapter (NOT AsyncStorage) |
+| T-W-SHELL | merged | #48 (`355b63c`) | 58 | Pinned Next.js 14.2.18 + React 18.3.1 to align with the React 18 graph; AuthProvider lazily constructs Supabase JS in useEffect (not useMemo at render) so `next build` static prerender doesn't fail on missing env vars in CI (orchestrator hotfix `fb4a6d0` after merge — see ledger note below) |
+
+**Hotfix at merge time:** T-W-SHELL's worker reported all CI
+green locally, but the post-merge CI run failed at the `build`
+step because `next build` prerendered the public placeholder
+routes, evaluated AuthProvider, and called `getBrowserSupabase()`
+→ `loadWebEnv()` → throw on missing
+`NEXT_PUBLIC_SUPABASE_URL`. Orchestrator pushed `fb4a6d0`
+deferring Supabase JS init to a useEffect (client-only); 11/11
+prerendered routes now build cleanly without env vars set. Same
+file also needed `eslint --fix` for import order — both included
+in the hotfix commit.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
-migrations in iter 13).
+migrations in iter 14).
 
-## Iter 14 readiness — what's available
+## Iter 15 readiness — what's available
 
-After iter 13, the dependency graph unblocks **5 ready candidates**:
+After iter 14, the dependency graph unblocks **8 ready
+candidates** (and several more if shared packages land):
 
 | Task | Stage | Effort | Depends on (now satisfied) | Notes |
 |---|---|---|---|---|
-| T-W-SHELL | 04-web | M | ui-tokens + api-client | newly unblocked; opens web stage |
-| T-M-SHELL | 05-mobile | M | ui-tokens + api-client | newly unblocked; opens mobile stage |
+| T-W-AUTH | 04-web | M | shell + be-auth | actual sign-in flow on web; parallel with T-W-BROWSE |
+| T-W-BROWSE | 04-web | ? | shell | catalog browse; parallel with T-W-AUTH |
+| T-M-AUTH | 05-mobile | M | shell + be-auth | actual sign-in flow on mobile; parallel with T-M-BROWSE |
+| T-M-BROWSE | 05-mobile | ? | shell | catalog browse; parallel with T-M-AUTH |
 | T-BE-EDGE-FUNCTIONS | 02-backend | L | api-contracts + rls-policies | last backend task; closes Stage 02 |
 | T-SP-PRICING-DISPLAY | 03-shared-packages | M | fx-rates + api-contracts | parallel-safe with set-completion + smart-dsl |
 | T-SP-SET-COMPLETION | 03-shared-packages | M | api-contracts + master-set-rules | parallel-safe with smart-dsl |
 | T-SP-SMART-DSL | 03-shared-packages | L | api-contracts | parallel-safe with set-completion |
 
-**Iter 14 dispatch decision: T-W-SHELL + T-M-SHELL as parallel
-siblings.** Orthogonal app directories (`apps/web/` vs
-`apps/mobile/`), different agent roles, and they're the
-highest-leverage remaining work since each one unblocks an entire
-8-task / 5-task downstream stage. Both shells will share-validate
-the cross-platform contract of @binderly/ui (Tamagui) and
-@binderly/api-client (typed HTTP), which is the most useful
-integration test the iter 13 work could get.
+**Iter 15 dispatch decision: T-W-AUTH + T-M-AUTH as parallel
+siblings.** Orthogonal owns_paths (`apps/web/app/auth/` +
+`apps/web/lib/auth/` vs `apps/mobile/src/screens/auth/` +
+`apps/mobile/src/lib/auth/`), different agent roles. Both
+exercise the same backend auth contract (`@binderly/auth` +
+Supabase JS + provisioning trigger from mig 0017) and the same
+api-client `auth` resource — best cross-platform validation we
+can do at this layer. Iter 16 candidate: T-BE-EDGE-FUNCTIONS to
+close Stage 02.
 
 ## Open questions (1 open; non-blocking)
 
@@ -185,11 +198,11 @@ All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
 
 ## Last 5 merges
 
-- T-SP-UI-TOKENS — `f228d1a` (@binderly/ui Tamagui tokens + base components; light+dark; cross-platform via core+input only; 257 tests) — **iter 13 cap**
-- T-BE-API-CLIENT — `303e5f5` (@binderly/api-client typed HTTP wrapper; auth resource delegates to Supabase JS for interactive flows; 227 tests; zero live network)
+- T-W-SHELL — `355b63c` (Next.js 14.2.18 + React 18 app shell; 11 prerendered routes + middleware; AuthProvider lazy-init via useEffect; 58 tests) — **iter 14 cap (with hotfix `fb4a6d0`)**
+- T-M-SHELL — `f73c54b` (Expo SDK 52 + RN 0.76.9 app shell; expo-secure-store JWT storage; root pnpm.overrides for React 18 pin; 110 tests)
+- T-SP-UI-TOKENS — `f228d1a` (@binderly/ui Tamagui tokens + base components; cross-platform via core+input only; 257 tests) — **iter 13 cap**
+- T-BE-API-CLIENT — `303e5f5` (@binderly/api-client typed HTTP wrapper; auth resource delegates to Supabase JS for interactive flows; 227 tests)
 - T-BE-AUTH — `2347268` (Supabase Auth wiring; mig 0017 trigger auto-provisions profile+subscription; 43 unit tests + 2 verify-rls behavioral) — **iter 12 cap**
-- T-BE-API-CONTRACTS — `ebe59a1` (@binderly/api-contracts; 187 zod-backed DTOs across 7 modules; opens Phase 2)
-- T-DL-ADMIN-DEBUG-SURFACES — `b13d3ed` (mig 0016 hand-authored views; Q-007 surfaced) — **Phase 1 cap**
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -222,6 +235,9 @@ All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
    gracefully.
 8. **Dependabot backlog** — ~9 open PRs from when CI landed.
 9. **`.nvmrc` 22.22.2 not locally installable** — fall back to 22.13.0.
+10. **`scripts/cleanup_worktree.sh` regex rejects single-letter task scopes** — script enforces `^T-[A-Z]{2}-[A-Z0-9-]+$` but iter 14's `T-M-SHELL` and `T-W-SHELL` only have one letter in the scope segment. Orchestrator did manual `git worktree remove --force` + `git branch -D` for both. Either relax the regex to `^T-[A-Z]+-[A-Z0-9-]+$` or rename the affected tasks. Same regex appears in the repo's `pr-title` lint workflow (which is why both shell PRs needed `feat(<area>): T-X-SHELL — …` reformatting at merge time).
+11. **`@binderly/web` worker reported all-green-locally but CI build failed.** Root cause: AuthProvider eagerly called Supabase client constructor (which throws on missing env) inside useMemo at render time; `next build` static prerender evaluates this for every page. Orchestrator hotfix `fb4a6d0` deferred init to useEffect. **Action item:** add a CI-style "build with no env" smoke test the worker can run locally before pushing, so future Next.js shells catch this in the dispatch loop instead of post-merge.
+12. **Iter 14 worker `T-W-SHELL` hit `resource_exhausted` twice** before the third resume succeeded with strict guardrails (no web searches, minimal up-front reading, smallest viable shell, 30-50 test target). For future Next.js / Expo / large-framework dispatches, default to the lean prompt shape upfront.
 
 ## Phase 0 ledger (closed; 10/10 merged)
 
