@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@binderly/tsconfig/react-native.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "jsx": "react-jsx",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "app/**/*",
+    "src/**/*",
+    "index.js",
+    "metro.config.js",
+    "babel.config.js",
+    "vitest.config.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": ["node_modules", ".expo", "dist", "build"]
+}

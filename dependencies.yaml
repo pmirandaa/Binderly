@@ -664,14 +664,14 @@ tasks:
     stage: 05-mobile
     title: Expo app shell — navigation, tabs, theme
     agent_role: frontend-mobile
-    status: pending
+    status: review
     depends_on: [T-SP-UI-TOKENS, T-BE-API-CLIENT]
     parallel_safe_with: []
     provides: [mobile:shell]
     owns_paths: [apps/mobile/]
     task_file: tasks/05-mobile/T-M-SHELL.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-M-AUTH
     stage: 05-mobile
