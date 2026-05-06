@@ -1,0 +1,8 @@
+.next
+.next/
+next-env.d.ts
+coverage
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local

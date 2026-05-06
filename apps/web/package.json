@@ -1,0 +1,50 @@
+{
+  "name": "@binderly/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Binderly web app — Next.js 15 App Router shell hosting browse, collection, auth, and shareable surfaces.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@binderly/api-client": "workspace:*",
+    "@binderly/api-contracts": "workspace:*",
+    "@binderly/ui": "workspace:*",
+    "@supabase/supabase-js": "2.105.3",
+    "@tamagui/core": "1.123.3",
+    "@tanstack/react-query": "5.59.20",
+    "next": "14.2.18",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "22.19.17",
+    "@types/react": "18.3.28",
+    "@types/react-dom": "18.3.7",
+    "@vitejs/plugin-react": "4.7.0",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "jsdom": "25.0.1",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
