@@ -570,14 +570,14 @@ tasks:
     stage: 04-web
     title: Web auth pages and session handling
     agent_role: frontend-web
-    status: review
+    status: merged
     depends_on: [T-W-SHELL, T-BE-AUTH]
     parallel_safe_with: [T-W-BROWSE]
     provides: [web:auth]
     owns_paths: [apps/web/app/auth/, apps/web/lib/auth/]
     task_file: tasks/04-web/T-W-AUTH.md
     est_effort: M
-    stub: false
+    stub: true
 
   - id: T-W-BROWSE
     stage: 04-web
@@ -677,14 +677,14 @@ tasks:
     stage: 05-mobile
     title: Mobile auth flows (Google, Apple, Discord, magic link)
     agent_role: frontend-mobile
-    status: review
+    status: merged
     depends_on: [T-M-SHELL, T-BE-AUTH]
     parallel_safe_with: [T-M-BROWSE]
     provides: [mobile:auth]
     owns_paths: [apps/mobile/src/screens/auth/, apps/mobile/src/lib/auth/]
     task_file: tasks/05-mobile/T-M-AUTH.md
     est_effort: M
-    stub: false
+    stub: true
 
   - id: T-M-BROWSE
     stage: 05-mobile

@@ -1,14 +1,14 @@
-# Build status — Iter 14 closed. Web + mobile app shells live on main.
+# Build status — Iter 15 closed. Auth flows live cross-platform. Paused for the night.
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11.
 **Phase 2 backend (Stage 02):** 3/4 merged. T-BE-EDGE-FUNCTIONS remaining.
 **Phase 3 shared packages (Stage 03):** 1/4 merged (T-SP-UI-TOKENS). 3 ready (T-SP-PRICING-DISPLAY, T-SP-SET-COMPLETION, T-SP-SMART-DSL).
-**Phase 4 web (Stage 04):** 1/8 merged (T-W-SHELL #48). T-W-AUTH + T-W-BROWSE now ready.
-**Phase 5 mobile (Stage 05):** 1/5 merged (T-M-SHELL #47). T-M-AUTH + T-M-BROWSE now ready.
+**Phase 4 web (Stage 04):** 2/8 merged (T-W-SHELL #48, T-W-AUTH #51). T-W-BROWSE now ready.
+**Phase 5 mobile (Stage 05):** 2/5 merged (T-M-SHELL #47, T-M-AUTH #52). T-M-BROWSE now ready.
 **Stages 06-11:** 0 / 32 merged.
 
-**In progress:** 0 (iter 14 just closed; iter 15 dispatch incoming).
+**In progress:** 0 (orchestrator paused for the night per Pablo's request).
 **Blocked:** 0.
 **Blocked on humans:** 0.
 
@@ -47,15 +47,18 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 14 closed 2026-05-05 ~20:30 UTC-4 with both app shells on
-main. Phase 2+ progression so far:
+Iter 15 closed 2026-05-05 ~21:15 UTC-4 with cross-platform auth
+flows on main. Pablo paused for the night. Phase 2+ progression
+so far:
 
 iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
 foundation) →
 iter 13 (T-BE-API-CLIENT + T-SP-UI-TOKENS — backend client +
 cross-platform UI primitives) →
 iter 14 (T-W-SHELL + T-M-SHELL — Next.js + Expo app shells;
-opens Phase 4 web stage and Phase 5 mobile stage).
+opens Phase 4 web stage and Phase 5 mobile stage) →
+iter 15 (T-W-AUTH + T-M-AUTH — cross-platform sign-in /
+callback / sign-out on top of iter-12 backend auth).
 
 Phase 1 progression (closed at iter 11):
 
@@ -133,6 +136,43 @@ after taking main's lockfile. `dependencies.yaml` auto-merged.
 | T-BE-API-CONTRACTS | merged | #41 (`ebe59a1`) | 187 | Variant-taxonomy enums re-declared locally to avoid pulling sharp/aws-sdk into web/mobile/scanner consumers; smart-collection `expression` enforced via field-level `z.custom` |
 | T-BE-AUTH | merged | #42 (`2347268`) | 43 + 2 verify-rls behavioral | Profile + subscription auto-provisioned via idempotent `AFTER INSERT ON auth.users` trigger (mig 0017) — signup is atomic and provider-agnostic |
 
+## Iter 15 close summary (cross-platform auth)
+
+Both siblings landed clean — **zero merge conflicts** this iter
+(orthogonal owns_paths under each app's auth/ subtree;
+orthogonal Expo vs. Next dep graphs at the lockfile level).
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-M-AUTH | merged | #52 (`c970b4b`) | +58 (168 total in @binderly/mobile) | Tests re-mock `expo-router` locally via `vi.hoisted({ routerMocks })` because M-SHELL's global mock returns a fresh `useRouter()` per call, breaking `mockReturnValueOnce` and observable `.mock.calls` assertions on `router.replace`. Apple Sign-In via `expo-apple-authentication` for iOS App Store compliance |
+| T-W-AUTH | merged | #51 (`e7b3ebf`) | +55 (113 total in @binderly/web) | Auth pages pin `useAuth().signOut` and `useRouter()` into refs and gate effects with a `startedRef` because AuthProvider's value reference flips during lazy Supabase hydration (per W-SHELL hotfix `fb4a6d0`); naive `useEffect` deps would double-fire. Build still succeeds with NO `NEXT_PUBLIC_SUPABASE_*` env set |
+
+**Cross-platform validation:** both flows exercise the same
+backend auth contract (`@binderly/auth` + Supabase JS +
+provisioning trigger from mig 0017) and the same api-client
+`auth` resource. The trigger ensures profile + subscription rows
+exist atomically regardless of which platform signs the user up.
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 15).
+
+## Iter 16 readiness — what's available when Pablo resumes
+
+| Task | Stage | Effort | Depends on (now satisfied) | Notes |
+|---|---|---|---|---|
+| T-W-BROWSE | 04-web | ? | shell + auth | catalog browse on web |
+| T-M-BROWSE | 05-mobile | ? | shell + auth | catalog browse on mobile |
+| T-BE-EDGE-FUNCTIONS | 02-backend | L | api-contracts + rls-policies | last backend task; closes Stage 02 |
+| T-SP-PRICING-DISPLAY | 03-shared-packages | M | fx-rates + api-contracts | parallel-safe with set-completion + smart-dsl |
+| T-SP-SET-COMPLETION | 03-shared-packages | M | api-contracts + master-set-rules | parallel-safe with smart-dsl |
+| T-SP-SMART-DSL | 03-shared-packages | L | api-contracts | parallel-safe with set-completion |
+
+Suggested iter 16 dispatch (when resuming): T-BE-EDGE-FUNCTIONS
+(closes Stage 02; large but fully independent) **or** the
+browse pair (T-W-BROWSE + T-M-BROWSE) for another cross-platform
+feature lap. Edge functions probably earns its slot first since
+collection mutations need it before browse can be useful.
+
 ## Iter 14 close summary (app shells)
 
 Both siblings landed; T-W-SHELL hit a CI build snag at merge
@@ -198,11 +238,11 @@ All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
 
 ## Last 5 merges
 
-- T-W-SHELL — `355b63c` (Next.js 14.2.18 + React 18 app shell; 11 prerendered routes + middleware; AuthProvider lazy-init via useEffect; 58 tests) — **iter 14 cap (with hotfix `fb4a6d0`)**
+- T-W-AUTH — `e7b3ebf` (web sign-in/callback/sign-out; +55 tests; refs+startedRef pattern for hydration-flip-safe effects) — **iter 15 cap**
+- T-M-AUTH — `c970b4b` (mobile sign-in/callback; magic-link + Google/Apple/Discord OAuth via expo-auth-session; +58 tests; expo-router test-mock pattern logged for follow-ups)
+- T-W-SHELL — `355b63c` (Next.js 14.2.18 + React 18 app shell; AuthProvider lazy-init via useEffect; 58 tests) — **iter 14 cap (with hotfix `fb4a6d0`)**
 - T-M-SHELL — `f73c54b` (Expo SDK 52 + RN 0.76.9 app shell; expo-secure-store JWT storage; root pnpm.overrides for React 18 pin; 110 tests)
 - T-SP-UI-TOKENS — `f228d1a` (@binderly/ui Tamagui tokens + base components; cross-platform via core+input only; 257 tests) — **iter 13 cap**
-- T-BE-API-CLIENT — `303e5f5` (@binderly/api-client typed HTTP wrapper; auth resource delegates to Supabase JS for interactive flows; 227 tests)
-- T-BE-AUTH — `2347268` (Supabase Auth wiring; mig 0017 trigger auto-provisions profile+subscription; 43 unit tests + 2 verify-rls behavioral) — **iter 12 cap**
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -238,6 +278,9 @@ All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
 10. **`scripts/cleanup_worktree.sh` regex rejects single-letter task scopes** — script enforces `^T-[A-Z]{2}-[A-Z0-9-]+$` but iter 14's `T-M-SHELL` and `T-W-SHELL` only have one letter in the scope segment. Orchestrator did manual `git worktree remove --force` + `git branch -D` for both. Either relax the regex to `^T-[A-Z]+-[A-Z0-9-]+$` or rename the affected tasks. Same regex appears in the repo's `pr-title` lint workflow (which is why both shell PRs needed `feat(<area>): T-X-SHELL — …` reformatting at merge time).
 11. **`@binderly/web` worker reported all-green-locally but CI build failed.** Root cause: AuthProvider eagerly called Supabase client constructor (which throws on missing env) inside useMemo at render time; `next build` static prerender evaluates this for every page. Orchestrator hotfix `fb4a6d0` deferred init to useEffect. **Action item:** add a CI-style "build with no env" smoke test the worker can run locally before pushing, so future Next.js shells catch this in the dispatch loop instead of post-merge.
 12. **Iter 14 worker `T-W-SHELL` hit `resource_exhausted` twice** before the third resume succeeded with strict guardrails (no web searches, minimal up-front reading, smallest viable shell, 30-50 test target). For future Next.js / Expo / large-framework dispatches, default to the lean prompt shape upfront.
+13. **Mobile router-asserting tests need a local `vi.hoisted({ routerMocks })` mock** because M-SHELL's global `setup.ts` returns a fresh `useRouter()` per call (breaks `mockReturnValueOnce` and observable `.mock.calls`). T-M-AUTH worked around it locally; M-SHELL cleanup pass could lift the stable mock into the global setup. Worth a short follow-up task for whoever next touches `apps/mobile/src/test-utils/`.
+14. **Dead M-SHELL placeholder screens** at `apps/mobile/src/screens/SignInScreen.tsx` and `AuthCallbackScreen.tsx` (legacy duplicates from before T-M-AUTH repointed the route shells). Outside any current task's owns_paths; flag for an M-SHELL cleanup follow-up.
+15. **`apps/web/components/providers/AuthProvider.tsx` not prettier-compliant** — `pnpm --filter @binderly/web format:write` reformats it. T-W-SHELL committed it in this state and `format:check` isn't a CI gate, so workers can't safely re-run format on the file. Worth a one-shot cleanup commit.
 
 ## Phase 0 ledger (closed; 10/10 merged)
 
