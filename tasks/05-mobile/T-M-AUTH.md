@@ -3,84 +3,184 @@
 **Stage:** 05-mobile
 **Agent role:** frontend-mobile
 **Effort:** M
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** in_progress
 
----
+## Hard dependencies
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 10 (Core App Features), § 11 (Scanner), § 15 (Offline)) and any
->    referenced sections.
-> 2. Read `rules/05-mobile.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-M-AUTH`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+- T-M-SHELL (the Expo Router shell, `<AuthProvider>`, the
+  `expo-secure-store`-backed Supabase JS client, env loader)
+- T-BE-AUTH (the `@binderly/auth` server helpers and Supabase
+  Auth project configuration)
 
----
+## Soft dependencies
 
-## Provisional metadata (from `dependencies.yaml`)
+- Parallel-safe with T-M-BROWSE (orthogonal directories).
+- Sibling task **T-W-AUTH** owns the equivalent surface on web
+  (`apps/web/app/auth/`, `apps/web/lib/auth/`).
 
-**Hard dependencies:**
+## Required reading
 
-- T-M-SHELL
-- T-BE-AUTH
+- `tasks/05-mobile/T-M-AUTH.md` (this file)
+- `apps/mobile/app/auth/sign-in.tsx`, `apps/mobile/app/auth/callback.tsx`,
+  `apps/mobile/app/auth/_layout.tsx` (Expo Router placeholders from M-SHELL)
+- `apps/mobile/src/components/providers/AuthProvider.tsx` (existing
+  context — the lazy-init pattern is the model for any new client-side init)
+- `apps/mobile/src/lib/supabase-mobile.ts` and
+  `apps/mobile/src/lib/secure-storage.ts` (singleton + storage adapter)
+- `apps/mobile/app.json` (`binderly://` deep-link scheme)
+- `packages/auth/src/index.ts` + `packages/auth/README.md` (server-side
+  contract; JWT shape)
+- `packages/api-client/src/resources/auth.ts` (interactive sign-in
+  delegates to Supabase JS via `supabaseAuth`)
 
-**Parallel-safe with:** T-M-BROWSE
+## Goal
 
-**Owns paths:**
+Replace the placeholder `app/auth/sign-in.tsx` and
+`app/auth/callback.tsx` routes with real, ship-quality mobile auth
+flows. Users can sign in via magic link (email-OTP) or one of three
+OAuth providers (Apple, Google, Discord). The `<AuthProvider>` from
+M-SHELL already owns the live session subscription and the
+secure-store-backed Supabase JS client — this task wires the user-facing
+side: input, the OAuth round-trip via `expo-auth-session` +
+`expo-web-browser`, the deep-link callback handler, and a small
+`<ProtectedScreen>` helper feature tasks downstream use to gate routes.
 
-- `apps/mobile/src/screens/auth/`
-- `apps/mobile/src/lib/auth/`
+## Deliverables
 
-## Provisional goal
+- `apps/mobile/src/lib/auth/oauth.ts` — thin wrapper around
+  `expo-auth-session` / `expo-web-browser` for OAuth provider sign-in.
+  Exports `getOAuthRedirectUrl()`, `signInWithOAuthProvider(supabase, provider)`,
+  and the `OAuthProvider` literal-union type.
+- `apps/mobile/src/lib/auth/apple.ts` — Apple Sign-In wrapper around
+  `expo-apple-authentication`. Exports `isAppleAuthAvailable()` and
+  `signInWithApple(supabase)`. Falls back to the OAuth round-trip on
+  Android / web.
+- `apps/mobile/src/lib/auth/protected-screen.tsx` — `<ProtectedScreen>`
+  component + `useRequireAuth()` hook. Redirects to `/auth/sign-in`
+  when no session and rendering is otherwise unblocked.
+- `apps/mobile/src/lib/auth/index.ts` — barrel export.
+- `apps/mobile/src/screens/auth/SignInScreen.tsx` — real sign-in UI
+  built from `@binderly/ui` primitives. Email + magic-link path,
+  Apple / Google / Discord buttons, in-flight + error states.
+- `apps/mobile/src/screens/auth/CallbackScreen.tsx` — deep-link
+  callback handler. Reads the `code` query param off the URL,
+  calls `supabase.auth.exchangeCodeForSession(code)`, navigates to
+  `/(tabs)` on success, surfaces an error on failure.
+- `apps/mobile/src/screens/auth/index.ts` — barrel export.
+- `apps/mobile/app/auth/sign-in.tsx`, `apps/mobile/app/auth/callback.tsx`
+  — re-pointed to import from `src/screens/auth/`.
+- `apps/mobile/app.json` — registers `expo-apple-authentication` plugin
+  + `usesAppleSignIn: true` for the iOS bundle.
+- `apps/mobile/.env.example` — documents the optional
+  `EXPO_PUBLIC_OAUTH_REDIRECT_URL` override.
+- New deps: `expo-auth-session`, `expo-web-browser`,
+  `expo-apple-authentication` (SDK 52 compatible). Lockfile bumps.
+- Tests at `apps/mobile/src/screens/auth/*.test.tsx` and
+  `apps/mobile/src/lib/auth/*.test.{ts,tsx}` covering render, form
+  validation, OAuth click-through, callback exchange, and protected-screen
+  redirect.
 
-Mobile auth flows (Google, Apple, Discord, magic link).
+## Acceptance criteria
 
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
+- [ ] `<SignInScreen>` renders the email field, the magic-link button,
+      and three OAuth buttons (Apple, Google, Discord).
+- [ ] Email input rejects empty / malformed addresses; the magic-link
+      button is disabled until a syntactically valid email is entered.
+- [ ] Tapping a provider button calls `supabase.auth.signInWithOAuth`
+      with that provider and the `binderly://auth/callback` redirect.
+- [ ] `<CallbackScreen>` reads the `code` param from the URL and
+      calls `supabase.auth.exchangeCodeForSession(code)` on mount;
+      success navigates to `/(tabs)`, failure surfaces a user-readable
+      error message.
+- [ ] `<ProtectedScreen>` redirects to `/auth/sign-in` when
+      `useAuth().session === null` and `loading === false`.
+- [ ] No Supabase / SecureStore call happens at module-evaluation or
+      first-render time (lazy-init mirrors `<AuthProvider>`).
+- [ ] All tests live alongside their source files and pass under
+      `pnpm --filter @binderly/mobile test`.
+- [ ] No edits outside the authorized list (see Out of scope).
 
-## Provisional reading list
+## Out of scope
 
-- PROJECT.md § 10 (Core App Features), § 11 (Scanner), § 15 (Offline)
-- rules/05-mobile.md
-- (context files added at elaboration time based on the stage rules)
+- Server-side OAuth provider configuration (client IDs, redirect URIs,
+  Apple Developer entitlements). Documented in `open-questions.md` if
+  Pablo's input is required.
+- Profile screen / sign-out UI (lives in `apps/mobile/src/screens/ProfileScreen.tsx`,
+  owned by a follow-up task).
+- Tab gating beyond `<ProtectedScreen>` exposure (a follow-up task may
+  wrap individual tabs / stacks).
+- Web auth (T-W-AUTH owns it).
+- Any change to `<AuthProvider>` (M-SHELL owns it; extend via
+  composition or escalate).
+
+## Authorized out-of-`owns_paths` edits
+
+These are explicitly green-lit by the dispatch brief:
+
+- `apps/mobile/app/auth/sign-in.tsx` and `apps/mobile/app/auth/callback.tsx`
+  (Expo Router route shells from M-SHELL — repointed to the new
+  screen components).
+- `apps/mobile/app.json` (Apple Sign-In iOS plugin entry +
+  `usesAppleSignIn` flag).
+- `apps/mobile/.env.example` (new optional env keys).
+- `apps/mobile/package.json` and `pnpm-lock.yaml` (new deps).
+- `dependencies.yaml` (status flip on completion).
+- `tasks/05-mobile/T-M-AUTH.md` (this elaboration).
 
 ## Branch & PR
 
 - Branch: `agent/T-M-AUTH`
-- PR title: `T-M-AUTH: Mobile auth flows (Google, Apple, Discord, magic link)`
+- PR title: `feat(mobile): T-M-AUTH — Mobile auth flows (Google, Apple, Discord, magic link)`
+  (the regex on the pr-title check requires a 2-letter task scope;
+  T-M-AUTH only has one, so the literal `T-M-AUTH: ...` prefix fails.
+  Conventional Commits prefix in the title satisfies the gate.)
+- Commit format: Conventional Commits.
+
+## Escalation triggers
+
+Stop and append to `open-questions.md` if:
+
+- OAuth provider configuration (client IDs / redirect URIs) is not
+  present in the Supabase project — propose defaults but flag.
+- Apple Sign-In requires native config Pablo hasn't decided on yet
+  (Apple Developer team, entitlements). The JS surface ships with a
+  reasonable default; flag the native side.
+- The `packages/api-client/src/resources/auth.ts` contract is missing
+  a flow this task needs — flag, do not extend the contract here.
+- A required Expo SDK API is unstable in SDK 52.
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+- Tests in this task locally re-mock `expo-router` instead of leaning
+  on `apps/mobile/src/test-utils/setup.ts`. The shell mock returns a
+  *fresh* `useRouter()` object on every call, which makes
+  `mockReturnValueOnce` and `vi.mocked(...)` assertions impossible.
+  The auth tests use `vi.hoisted({ routerMocks })` so the
+  `vi.mock('expo-router', …)` factory closes over a stable mock pair
+  whose `.mock.calls` is observable across renders. Future tests that
+  need to assert on `router.replace` / `router.push` should follow the
+  same pattern (or M-SHELL can lift this into the global setup).
+- `WebBrowserResultType` is not re-exported by the global mock; tests
+  pass plain `{ type: 'cancel' }` / `{ type: 'dismiss' }` objects with
+  a narrow `as Awaited<ReturnType<…>>` cast at the call site rather
+  than importing the enum (which would require the mock to declare it).
+- Magic-link sending uses the api-client's `auth.signInWithMagicLink`
+  resource (no `redirectTo` — the email lands the user back at
+  `binderly://auth/callback` via Supabase's project-level email
+  template). `redirectTo` is left `undefined` so the api-client passes
+  the SDK its default; revisit if Pablo wants a custom
+  `emailRedirectTo`.
+- Apple Sign-In on iOS uses the native `expo-apple-authentication`
+  flow + `supabase.auth.signInWithIdToken({ provider: 'apple' })`.
+  On Android / web (and on iOS devices where `isAvailableAsync()`
+  returns false — older OS) it falls back to the OAuth web sheet.
+  This satisfies Apple's "if you ship social auth, you must ship
+  Apple Sign-In on iOS" rule for the JS surface; the iOS bundle
+  needs the "Sign in with Apple" capability enabled in EAS, which
+  Pablo handles natively.
+- The placeholder screens at `apps/mobile/src/screens/SignInScreen.tsx`
+  and `apps/mobile/src/screens/AuthCallbackScreen.tsx` are now
+  unused (route shells point at `src/screens/auth/`). They live
+  outside this task's `owns_paths` so they remain in place; M-SHELL
+  or a follow-up cleanup PR can delete them along with the
+  matching `screens.test.tsx` rows.

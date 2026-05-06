@@ -10,6 +10,7 @@
     "ios": {
       "bundleIdentifier": "app.binderly.binderly",
       "supportsTablet": true,
+      "usesAppleSignIn": true,
       "associatedDomains": ["applinks:binderly.app"]
     },
     "android": {
@@ -30,7 +31,9 @@
           "resizeMode": "contain"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "experiments": {
       "typedRoutes": true
