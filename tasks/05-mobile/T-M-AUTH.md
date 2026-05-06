@@ -151,4 +151,36 @@ Stop and append to `open-questions.md` if:
 
 ## Notes from execution
 
-_(Sub-agent appends after running.)_
+- Tests in this task locally re-mock `expo-router` instead of leaning
+  on `apps/mobile/src/test-utils/setup.ts`. The shell mock returns a
+  *fresh* `useRouter()` object on every call, which makes
+  `mockReturnValueOnce` and `vi.mocked(...)` assertions impossible.
+  The auth tests use `vi.hoisted({ routerMocks })` so the
+  `vi.mock('expo-router', …)` factory closes over a stable mock pair
+  whose `.mock.calls` is observable across renders. Future tests that
+  need to assert on `router.replace` / `router.push` should follow the
+  same pattern (or M-SHELL can lift this into the global setup).
+- `WebBrowserResultType` is not re-exported by the global mock; tests
+  pass plain `{ type: 'cancel' }` / `{ type: 'dismiss' }` objects with
+  a narrow `as Awaited<ReturnType<…>>` cast at the call site rather
+  than importing the enum (which would require the mock to declare it).
+- Magic-link sending uses the api-client's `auth.signInWithMagicLink`
+  resource (no `redirectTo` — the email lands the user back at
+  `binderly://auth/callback` via Supabase's project-level email
+  template). `redirectTo` is left `undefined` so the api-client passes
+  the SDK its default; revisit if Pablo wants a custom
+  `emailRedirectTo`.
+- Apple Sign-In on iOS uses the native `expo-apple-authentication`
+  flow + `supabase.auth.signInWithIdToken({ provider: 'apple' })`.
+  On Android / web (and on iOS devices where `isAvailableAsync()`
+  returns false — older OS) it falls back to the OAuth web sheet.
+  This satisfies Apple's "if you ship social auth, you must ship
+  Apple Sign-In on iOS" rule for the JS surface; the iOS bundle
+  needs the "Sign in with Apple" capability enabled in EAS, which
+  Pablo handles natively.
+- The placeholder screens at `apps/mobile/src/screens/SignInScreen.tsx`
+  and `apps/mobile/src/screens/AuthCallbackScreen.tsx` are now
+  unused (route shells point at `src/screens/auth/`). They live
+  outside this task's `owns_paths` so they remain in place; M-SHELL
+  or a follow-up cleanup PR can delete them along with the
+  matching `screens.test.tsx` rows.

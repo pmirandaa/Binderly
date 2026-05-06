@@ -677,14 +677,14 @@ tasks:
     stage: 05-mobile
     title: Mobile auth flows (Google, Apple, Discord, magic link)
     agent_role: frontend-mobile
-    status: pending
+    status: review
     depends_on: [T-M-SHELL, T-BE-AUTH]
     parallel_safe_with: [T-M-BROWSE]
     provides: [mobile:auth]
     owns_paths: [apps/mobile/src/screens/auth/, apps/mobile/src/lib/auth/]
     task_file: tasks/05-mobile/T-M-AUTH.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-M-BROWSE
     stage: 05-mobile

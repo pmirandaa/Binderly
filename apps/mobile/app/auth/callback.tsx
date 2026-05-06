@@ -1,3 +1,3 @@
-import { AuthCallbackScreen } from '../../src/screens/AuthCallbackScreen';
+import { CallbackScreen } from '../../src/screens/auth';
 
-export default AuthCallbackScreen;
+export default CallbackScreen;
