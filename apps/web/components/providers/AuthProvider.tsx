@@ -8,7 +8,14 @@
 // magic-link, callback handling) live in T-W-AUTH; this provider
 // is the read-side surface every authenticated route reads from.
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 
 import { getBrowserSupabase } from '../../lib/supabase-browser';
 
@@ -30,11 +37,25 @@ export interface AuthProviderProps {
 }
 
 export function AuthProvider({ children, supabase }: AuthProviderProps): ReactNode {
-  const client = useMemo(() => supabase ?? getBrowserSupabase(), [supabase]);
+  // Construct the Supabase client lazily on the client side only.
+  // During SSR / static prerender, env vars like
+  // NEXT_PUBLIC_SUPABASE_URL aren't available (CI builds don't set
+  // them, and shouldn't), so calling getBrowserSupabase() at render
+  // time would throw and break next build's static generation.
+  // We start with `null` and hydrate inside useEffect, which only
+  // runs in the browser. The injected `supabase` test seam still
+  // works because we seed state from it on first render.
+  const [client, setClient] = useState<SupabaseClient | null>(supabase ?? null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (client !== null) return;
+    setClient(getBrowserSupabase());
+  }, [client]);
+
+  useEffect(() => {
+    if (client === null) return;
     let cancelled = false;
     void client.auth.getSession().then(({ data }) => {
       if (cancelled) return;
@@ -57,7 +78,7 @@ export function AuthProvider({ children, supabase }: AuthProviderProps): ReactNo
       user: session?.user ?? null,
       loading,
       signOut: async () => {
-        await client.auth.signOut();
+        await client?.auth.signOut();
       },
     }),
     [session, loading, client],
