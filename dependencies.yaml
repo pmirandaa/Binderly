@@ -570,14 +570,14 @@ tasks:
     stage: 04-web
     title: Web auth pages and session handling
     agent_role: frontend-web
-    status: pending
+    status: review
     depends_on: [T-W-SHELL, T-BE-AUTH]
     parallel_safe_with: [T-W-BROWSE]
     provides: [web:auth]
     owns_paths: [apps/web/app/auth/, apps/web/lib/auth/]
     task_file: tasks/04-web/T-W-AUTH.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-W-BROWSE
     stage: 04-web

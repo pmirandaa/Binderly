@@ -3,84 +3,126 @@
 **Stage:** 04-web
 **Agent role:** frontend-web
 **Effort:** M
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** pending
 
----
+## Hard dependencies
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 10 (Core App Features), § 14 (Shareables), § 16 (Freemium)) and any
->    referenced sections.
-> 2. Read `rules/04-web.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-W-AUTH`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+- T-W-SHELL (merged) — Next.js shell, `<AuthProvider>`, `getBrowserSupabase`, `getApiClient`, middleware skeleton.
+- T-BE-AUTH (merged) — server-side `@binderly/auth` helpers + Supabase project config (Google / Apple / Discord / magic-link providers enabled in `infra/supabase/auth/`).
 
----
+## Soft dependencies
 
-## Provisional metadata (from `dependencies.yaml`)
+- T-M-AUTH (parallel sibling) — owns the mobile equivalent. Orthogonal directories.
 
-**Hard dependencies:**
+## Required reading
 
-- T-W-SHELL
-- T-BE-AUTH
+- `apps/web/app/auth/{sign-in,callback,sign-out}/page.tsx` (placeholders being replaced)
+- `apps/web/components/providers/AuthProvider.tsx` (lazy useEffect-based Supabase init — preserve the pattern)
+- `apps/web/lib/supabase-browser.ts` (browser singleton; only safe to touch from `'use client'` code, never at module evaluation)
+- `apps/web/middleware.ts` (skeleton — extend for protected-route gating)
+- `packages/api-client/src/resources/auth.ts` (interactive auth contract — `signInWithOAuth`, `signInWithMagicLink`, `exchangeCodeForSession`, `signOut`)
+- `packages/auth/README.md` (server-side surface; confirms the JWT shape but no server work needed here)
+- `infra/supabase/auth/{google,discord,magic-link,redirect-urls}.md` (provider config — already wired by T-BE-AUTH)
 
-**Parallel-safe with:** T-W-BROWSE
+## Goal
 
-**Owns paths:**
+Replace the three placeholder auth pages from T-W-SHELL with a real, end-to-end interactive sign-in surface for the web app and wire protected-route enforcement into the existing middleware. Users should be able to sign in via magic-link or any of the three OAuth providers, complete the PKCE callback, and sign out cleanly. Unauthenticated requests for routes the product treats as private (`/collection/*`, `/profile/*`) are redirected to `/auth/sign-in?next=…` and the original destination is preserved across the round-trip.
 
-- `apps/web/app/auth/`
-- `apps/web/lib/auth/`
+## Deliverables
 
-## Provisional goal
+- `apps/web/app/auth/sign-in/page.tsx` — interactive sign-in: magic-link form + Google/Apple/Discord OAuth buttons; reads `?next=` and forwards it to `redirectTo` so the callback resumes the original destination. Uses `@binderly/ui` only.
+- `apps/web/app/auth/callback/page.tsx` — exchanges the `?code=` query param via `supabase.auth.exchangeCodeForSession`, then redirects to the `?next=` target (default `/`). Surfaces `?error_description=` if the provider returned one.
+- `apps/web/app/auth/sign-out/page.tsx` — calls `AuthProvider.signOut()` once on mount, shows a brief confirmation, and redirects home after a short delay. Idempotent on repeat visits.
+- `apps/web/lib/auth/redirect.ts` — pure helpers: `buildSignInUrl(next)`, `extractNext(searchParams)`, `safeNext(value)` (rejects external URLs to avoid open-redirect).
+- `apps/web/lib/auth/protected-route.tsx` — declarative `<ProtectedRoute>` client wrapper. Reads `useAuth()`; renders fallback while loading; renders children when authenticated; calls `router.replace(buildSignInUrl(currentPath))` when signed-out.
+- `apps/web/middleware.ts` — extended: a small `PROTECTED_PREFIXES` array (`/collection`, `/profile`); when a request to one of those has no Supabase auth cookie (`sb-*-auth-token`), respond with a redirect to `/auth/sign-in?next=<path>`. Preserves the existing `x-request-id` header behaviour. Best-effort cookie check — definitive gating still happens client-side via `<ProtectedRoute>`.
+- `apps/web/.env.example` — comment block documenting that OAuth client IDs / secrets are configured **on the Supabase dashboard** (not in this app's env), so no new env keys are added here. Magic-link redirect URLs come from `NEXT_PUBLIC_APP_URL`.
+- Tests for every file above (≈30–50 total) under the same paths with `.test.ts(x)` suffix.
 
-Web auth pages and session handling.
+## Acceptance criteria
 
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
+- [ ] `/auth/sign-in` renders the magic-link form (email field + submit) and three OAuth buttons.
+- [ ] Submitting the magic-link form with an invalid email shows an inline error and does NOT call `signInWithOtp`.
+- [ ] Submitting with a valid email calls `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo } })` once with `emailRedirectTo` derived from `?next=`.
+- [ ] Each OAuth button click calls `supabase.auth.signInWithOAuth({ provider, options: { redirectTo } })` with the correct `provider` (`google` / `apple` / `discord`).
+- [ ] `/auth/callback?code=…` calls `supabase.auth.exchangeCodeForSession(code)` and redirects to the `?next=` target on success (defaulting to `/`).
+- [ ] `/auth/callback` with `?error_description=…` and no code renders the error message and a "Try again" link to `/auth/sign-in`.
+- [ ] `/auth/sign-out` calls `supabase.auth.signOut()` exactly once and redirects to `/`.
+- [ ] Middleware: a request to `/collection/foo` without a `sb-*-auth-token` cookie returns a 307 to `/auth/sign-in?next=%2Fcollection%2Ffoo`.
+- [ ] Middleware: a request to `/collection/foo` WITH a `sb-*-auth-token` cookie passes through (no redirect).
+- [ ] Middleware: a request to `/` (non-protected) passes through.
+- [ ] `safeNext` rejects external URLs (`http://evil.com`, `//evil.com`) and falls back to `/`.
+- [ ] `<ProtectedRoute>` renders its `fallback` while `loading === true`, redirects via `router.replace` when `loading === false && session === null`, and renders children when authenticated.
+- [ ] `pnpm --filter @binderly/web build` succeeds with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` UNSET — no module-evaluation Supabase calls anywhere new.
+- [ ] All tests live under `apps/web/{app,lib}/**/*.test.ts(x)` and pass under `pnpm --filter @binderly/web test`.
+- [ ] No edits outside the authorized list (see § Branch & PR).
 
-## Provisional reading list
+## Out of scope
 
-- PROJECT.md § 10 (Core App Features), § 14 (Shareables), § 16 (Freemium)
-- rules/04-web.md
-- (context files added at elaboration time based on the stage rules)
+- Email/password sign-in form (Supabase project ships with magic-link as the email primary; password is intentionally absent until a clear product reason emerges).
+- Session refresh / cookie-based SSR auth via `@supabase/ssr` (the middleware does cookie sniffing, not JWT verification — definitive gating is client-side; SSR auth is a future task if needed).
+- Server-side auth API routes; everything here is client-side via the Supabase JS singleton.
+- Any change to `<AuthProvider>` (W-SHELL owns the existing pattern).
+- Any change to `apps/mobile/` (T-M-AUTH sibling).
 
 ## Branch & PR
 
 - Branch: `agent/T-W-AUTH`
-- PR title: `T-W-AUTH: Web auth pages and session handling`
+- PR title: `feat(web): T-W-AUTH — Web auth pages and session handling`
+  - (Note: the literal `T-W-AUTH: …` form fails the pr-title check; the regex requires a 2-letter scope, but `T-W-AUTH` has only one. The orchestrator's pr-title check accepts the conventional `feat(web):` prefix.)
+- Commit format: Conventional Commits.
+- Authorized out-of-`owns_paths` edits (mention each in the PR body):
+  - `apps/web/middleware.ts`
+  - `apps/web/.env.example`
+  - `pnpm-lock.yaml` (if any new deps; none expected)
+  - `dependencies.yaml` (status flip)
+  - `tasks/04-web/T-W-AUTH.md` (this elaboration)
+
+## Escalation triggers
+
+Stop and write to `open-questions.md` if:
+
+- OAuth provider client-ID configuration would need to live in this app's env (Supabase manages providers — confirm before adding env keys).
+- The `auth` resource on `@binderly/api-client` is missing a flow needed here.
+- `next build` fails without env vars even after the lazy-init pattern is applied (escalate; do not paper over with CI env vars).
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+- **Run-once-effect ergonomics around `<AuthProvider>`.** The provider's
+  context value (`signOut` reference, `loading`, `session`) flips a few
+  times during hydration as the lazy `getBrowserSupabase()` resolves
+  and `getSession()` returns. Naive `useEffect(() => signOut(), [signOut])`
+  patterns therefore double-call the SDK. Both `<ProtectedRoute>` and
+  the sign-out page pin `signOut` (and `router`, which is a fresh object
+  per call under the test mock) into refs and gate side effects with
+  a `startedRef` boolean. Worth keeping in mind for downstream tasks
+  that wire similar one-shot effects against `useAuth()`.
+- **Middleware is best-effort, not authoritative.** `@supabase/ssr`'s
+  `sb-*-auth-token` cookie convention is what the middleware sniffs;
+  the default Supabase JS browser singleton persists to localStorage,
+  which the edge runtime can't see. Definitive client-side gating is
+  `<ProtectedRoute>`. If a future task adopts cookie-based SSR auth,
+  the middleware can be tightened to JWT-verify rather than just
+  presence-check.
+- **No new env keys.** OAuth providers are configured on the Supabase
+  project itself; the only auth-relevant env the client reads is
+  `NEXT_PUBLIC_APP_URL` (already declared by W-SHELL) for OG / future
+  email-template consumption. The sign-in page uses
+  `window.location.origin` at call time to build `redirectTo`, since
+  it's only invoked from event handlers.
+- **`bash scripts/spawn_worktree.sh T-W-AUTH` rejects the task ID.**
+  The helper's regex requires a 2-letter task scope, but `T-W-AUTH`
+  has only one letter (`W`). Worked around manually with
+  `git worktree add -b agent/T-W-AUTH ../binderly-wt-T-W-AUTH main`.
+  Same workaround will be needed for every Phase-04 web task
+  (`T-W-BROWSE`, `T-W-COLLECTION`, …) and Phase-05 mobile task
+  (`T-M-AUTH`, …). Worth fixing the regex to
+  `^T-[A-Z]{1,2}-[A-Z0-9-]+$` in a future devops task.
+- **`pnpm --filter @binderly/web format:write` reformats
+  `AuthProvider.tsx`.** The W-SHELL commit landed it with a
+  6-import multi-line block prettier wants on a single line at the
+  configured 100-char width. Touching that file is forbidden by the
+  task's authorized-paths list, so I reverted prettier's edit and
+  formatted only the new files. CI doesn't gate `format:check`, so
+  the pre-existing violation is fine; flagging here for the
+  orchestrator in case a follow-up cleanup is wanted.
