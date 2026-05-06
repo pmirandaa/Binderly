@@ -33,7 +33,7 @@
     "eslint-plugin-import": "2.32.0",
     "eslint-plugin-n": "17.24.0",
     "eslint-plugin-react": "7.37.5",
-    "eslint-plugin-react-hooks": "5.2.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-native": "5.0.0",
     "eslint-plugin-unused-imports": "4.4.1",
     "globals": "17.5.0",
