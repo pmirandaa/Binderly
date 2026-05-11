@@ -28,7 +28,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@supabase/supabase-js": "2.105.3"
+    "@supabase/supabase-js": "2.105.4"
   },
   "devDependencies": {
     "@binderly/eslint-config": "workspace:*",
