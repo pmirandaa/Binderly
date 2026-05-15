@@ -3,82 +3,130 @@
 **Stage:** 03-shared-packages
 **Agent role:** backend
 **Effort:** L
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** in_progress
 
----
+## Hard dependencies
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 8 (Master Set), § 9 (Custom & Smart), § 10 (Core App Features)) and any
->    referenced sections.
-> 2. Read `rules/03-shared-packages.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-SP-SMART-DSL`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+- T-BE-API-CONTRACTS (merged) — `smartExpressionSchema` lives in
+  `packages/api-contracts/src/collection.ts` as a `z.custom<unknown>`
+  placeholder. This task owns the actual schema.
 
----
+## Soft dependencies
 
-## Provisional metadata (from `dependencies.yaml`)
+- T-DL-SCHEMA-CARDS / T-DL-SCHEMA-COLLECTIONS / T-DL-SCHEMA-CUSTOM (merged) —
+  the underlying `card` / `printing` / `set` / `collection_item` columns
+  define the field allowlist.
 
-**Hard dependencies:**
+## Required reading
 
-- T-BE-API-CONTRACTS
+- `PROJECT.md` § 9 (Custom & Smart Collections)
+- `rules/03-shared-packages.md` (zero side-effects, ≥90% coverage)
+- `packages/api-contracts/src/collection.ts` (`smartExpressionSchema`)
+- `packages/api-contracts/src/cards.ts` (DTO + variant enums)
+- `packages/db/src/schema/{cards,printings,sets,collections,smart_rules}.ts`
 
-**Parallel-safe with:** T-SP-SET-COMPLETION, T-SP-UI-TOKENS
+## Goal
 
-**Owns paths:**
+Build a pure-logic shared package — `@binderly/smart-collection-dsl` —
+that owns the small typed expression language users write to describe
+smart-collection slices ("all base-holo Charizards from Vintage", "every
+PSA 9+ alt-art trainer in SWSH"). The DSL is the schema, parser,
+evaluator, and SQL compiler all in one place; the API contract package
+delegates `smartExpressionSchema` validation here at the next pass; the
+backend evaluator + UI explainer share this single source of truth.
 
-- `packages/smart-collection-dsl/`
+The expression language is strictly bounded — boolean combinations
+(AND / OR / NOT) of leaf predicates (EQ, IN, RANGE, EXISTS) over a
+fixed allowlist of fields drawn from the printing / card / set /
+collection-item DTOs. No loops, no functions, no user-defined
+operators, no arbitrary string interpolation. The compiler always
+emits parameterized SQL.
 
-## Provisional goal
+## Deliverables
 
-Smart Collection DSL — schema, parser, evaluator.
+- `packages/smart-collection-dsl/package.json` — workspace package
+  metadata (name `@binderly/smart-collection-dsl`, mirror auth /
+  api-contracts shape).
+- `packages/smart-collection-dsl/tsconfig.json` — extends
+  `@binderly/tsconfig/library.json`.
+- `packages/smart-collection-dsl/eslint.config.js` — node preset.
+- `packages/smart-collection-dsl/vitest.config.ts` — vitest with v8
+  coverage.
+- `packages/smart-collection-dsl/.prettierignore` — `dist/`,
+  `node_modules/`, `coverage/`.
+- `packages/smart-collection-dsl/README.md` — package overview, DSL
+  shape, examples, testing posture.
+- `packages/smart-collection-dsl/src/types.ts` — AST node types
+  (`AndNode`, `OrNode`, `NotNode`, `EqNode`, `InNode`, `RangeNode`,
+  `ExistsNode`), the `Expression` discriminated union, the `Field`
+  allowlist with per-field metadata (kind, sql column, nullable).
+- `packages/smart-collection-dsl/src/schema.ts` — canonical zod schema
+  validating shape, field allowlist, type-matched operands, and
+  max-depth (8).
+- `packages/smart-collection-dsl/src/parse.ts` — `parseExpression(json:
+  unknown): Expression` plus typed `SmartDslParseError`. Normalizes
+  nested AND/OR and collapses double NOT.
+- `packages/smart-collection-dsl/src/evaluate.ts` —
+  `evaluateExpression(expr, item: CandidateItem): boolean`. Pure.
+- `packages/smart-collection-dsl/src/sql.ts` —
+  `expressionToSql(expr, opts): { sql: string; params: unknown[] }`.
+  Always parameterized; never inlines values.
+- `packages/smart-collection-dsl/src/explain.ts` —
+  `explainExpression(expr): string`. Literal English (i18n deferred).
+- `packages/smart-collection-dsl/src/index.ts` — public barrel.
+- Test files for every module + a property-based round-trip test
+  comparing evaluator vs SQL output via an in-memory interpreter that
+  parses the exact grammar emitted by `expressionToSql`.
 
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
+## Acceptance criteria
 
-## Provisional reading list
+- [ ] `pnpm --filter @binderly/smart-collection-dsl build` succeeds.
+- [ ] `pnpm --filter @binderly/smart-collection-dsl typecheck` passes.
+- [ ] `pnpm --filter @binderly/smart-collection-dsl lint` passes with
+      `--max-warnings=0`.
+- [ ] `pnpm --filter @binderly/smart-collection-dsl test` passes with
+      120–200 tests.
+- [ ] Schema rejects unknown field names, mistyped operands (e.g. `range`
+      on a string field), and expressions deeper than 8.
+- [ ] Parser flattens nested AND/OR and collapses double NOT
+      idempotently.
+- [ ] Evaluator and SQL compiler agree on a generated corpus of random
+      valid expressions and items (round-trip property test).
+- [ ] SQL compiler verified injection-safe: a value containing
+      `'; DROP TABLE x;--` ends up as a parameter, never inlined.
+- [ ] Explainer emits a non-empty human-readable string for every node
+      type.
+- [ ] No changes outside `owns_paths` except the three pre-authorized
+      files (`pnpm-lock.yaml`, `dependencies.yaml`, this task file).
 
-- PROJECT.md § 8 (Master Set), § 9 (Custom & Smart), § 10 (Core App Features)
-- rules/03-shared-packages.md
-- (context files added at elaboration time based on the stage rules)
+## Out of scope
+
+- Wiring `smartExpressionSchema` in `@binderly/api-contracts` to
+  delegate here — that lands as a follow-up bump after this PR
+  merges. The contract is documented in this README for the wiring
+  task to consume.
+- Any `infra/supabase/functions/` work (T-BE-EDGE-FUNCTIONS owns).
+- Any `packages/set-completion/` work (T-SP-SET-COMPLETION owns).
+- Persisting / caching evaluation results (caller's concern).
+- i18n of explainer output (literal English for v1; flagged in PR
+  body).
 
 ## Branch & PR
 
 - Branch: `agent/T-SP-SMART-DSL`
 - PR title: `T-SP-SMART-DSL: Smart Collection DSL — schema, parser, evaluator`
+- Commit format: Conventional Commits.
+
+## Escalation triggers
+
+Stop and append to `open-questions.md` if:
+
+- The DSL needs a feature beyond AND/OR/NOT/EQ/IN/RANGE/EXISTS for v1.
+- A column we'd want to expose isn't on the DTO (would need an
+  api-contracts change).
+- The SQL compiler can't produce a clean parameterized form for some
+  operator without a stored function or migration change.
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+_(empty until the sub-agent finishes)_
