@@ -7,137 +7,208 @@
 
 ## Hard dependencies
 
-- T-BE-API-CONTRACTS (merged) — DTO shapes for cards / printings / collection
-- T-DL-MASTER-SET-RULES (merged) — `printing.include_in_master_set` is the
-  materialized boolean we read; the per-set rules engine is the upstream
-  source of truth (see `data-pipeline/src/master-set/`)
+- T-BE-API-CONTRACTS (merged) — provides `printingDto` / `cardDto` /
+  `setDto` / `collectionItemDto` and the variant-class enum.
+- T-DL-MASTER-SET-RULES (merged) — materializes
+  `printing.include_in_master_set`, the boolean this package sums.
 
 ## Soft dependencies
 
-- T-SP-SMART-DSL, T-SP-UI-TOKENS — parallel-safe; no shared paths
+- T-BE-EDGE-FUNCTIONS (in flight, sibling) — the
+  `recompute-set-completion` worker imports this package in a later
+  iter; keep the public surface clean.
 
 ## Required reading
 
-- `PROJECT.md` § 8 (Master Set Definition) — the canonical metric definitions
-- `context/tcg-domain.md` § 2 (Master Set rules), § 5 (canonical keys)
-- `context/data-model.md` § "completion" (the materialized-view shapes the
-  edge-functions worker recomputes; our output mirrors them)
-- `context/glossary.md` § "Collection completion terms"
-- `rules/03-shared-packages.md`
-- `data-pipeline/src/master-set/README.md`
+- `PROJECT.md` § 8 (Master Set Definition) — the canonical formulas:
+  - **Set %** = "owns ≥1 printing of each numbered card. Variant-agnostic; a reverse holo Charizard alone counts as having Charizard." (per-card)
+  - **Master Set %** = "owns every printing where `include_in_master_set = true`" (per-printing within a set)
+  - **All Pokémon %** = "counts unique numbered cards across all sets the user has ≥1 printing of, divided by total numbered cards in the database" (per-card, global)
+  - **Master %** (global) = "sum of all master-set-included printings owned divided by total master-set-included printings"
+- `context/data-model.md` § Materialized views — pins the wire
+  field names and ranges (`set_pct numeric(5,2)` 0..100,
+  `master_pct numeric(5,2)`, `owned_numbered`, `total_numbered`,
+  `owned_master`, `total_master`, `all_pokemon_pct`,
+  `unique_cards_owned`, `unique_cards_total`, `master_owned`,
+  `master_total`).
+- `context/tcg-domain.md` § 2 (Master Set Edge Cases) — for
+  rationale on which printings the master-set rules engine
+  includes / excludes.
+- `rules/03-shared-packages.md` — pure-logic constraints (no IO,
+  no platform-specific imports, tree-shakable, ≥90% covered).
+- `data-pipeline/src/master-set/` — for context on how
+  `include_in_master_set` is derived. This package READS the
+  materialized boolean; it does not re-run the engine.
+- `packages/api-contracts/src/{cards.ts,collection.ts,common.ts}` —
+  DTO shapes.
+- `packages/db/src/schema/{cards.ts,printings.ts,sets.ts,collections.ts}` —
+  table shapes feeding the math.
 
 ## Goal
 
-Pure-logic shared package that computes Binderly's four completion
-percentages from a printing roster + a user's collection. The package is
-runtime-agnostic (Node, browser, React Native, edge) and has no I/O — the
-edge-functions recompute worker (T-BE-EDGE-FUNCTIONS) feeds it data from
-the catalog tables and writes the result to materialized views, while the
-clients call the same functions for optimistic local recompute after a
-mutation.
+A pure-logic shared package — `@binderly/set-completion` — that
+turns a printing roster + a card roster + a user's owned-printing
+list into the four canonical completion percentages used across
+the product (per-set Set % / Master Set %, global All Pokémon % /
+Master %). No IO, no DB, no HTTP — same input, same output, every
+time. Safe to call from the edge-function recompute worker
+(server-side) and from the web/mobile clients (optimistic local
+recompute after a mutation) alike.
 
 ## Deliverables
 
-- `packages/set-completion/package.json` — workspace package mirroring the
-  `@binderly/api-contracts` layout (main / types / exports / scripts).
-- `packages/set-completion/tsconfig.json` — extends `@binderly/tsconfig/library.json`.
-- `packages/set-completion/eslint.config.js` — node preset, dist/coverage ignored.
-- `packages/set-completion/vitest.config.ts` — node env, src/\*\*/\*.test.ts.
-- `packages/set-completion/README.md` — package overview + usage.
-- `packages/set-completion/src/types.ts` — input DTOs (printing roster +
-  collection) and output DTOs (`SetCompletionStats`, `GlobalCompletionStats`,
-  `CompletionResult`), reusing `@binderly/api-contracts` primitives.
-- `packages/set-completion/src/set-pct.ts` — per-set `computeSetCompletion`:
-  variant-agnostic count of distinct cards owned in the set divided by
-  total cards in the set (per PROJECT.md § 8).
-- `packages/set-completion/src/master-pct.ts` — per-set
-  `computeMasterCompletion`: count of distinct master-included printings
-  owned divided by total master-included printings.
+- `packages/set-completion/package.json` — `@binderly/set-completion`
+  workspace package, mirrors the layout of `@binderly/api-contracts` /
+  `@binderly/auth` (`main` / `types` / `exports` pointing at
+  `dist/src/index.{js,d.ts}`; vitest + eslint + tsconfig as devDeps;
+  zero runtime deps).
+- `packages/set-completion/tsconfig.json` — extends
+  `@binderly/tsconfig/library.json`.
+- `packages/set-completion/eslint.config.mjs` — extends
+  `@binderly/eslint-config/node`.
+- `packages/set-completion/vitest.config.ts` — node env, coverage
+  via v8.
+- `packages/set-completion/.prettierignore`.
+- `packages/set-completion/README.md` — public usage doc + module
+  map + decision log.
+- `packages/set-completion/src/types.ts` — input DTOs
+  (`RosterPrinting`, `RosterCard`, `OwnedPrintingId`) and result
+  DTOs (`SetCompletionResult`, `AllPokemonCompletionResult`,
+  `GlobalMasterCompletionResult`, `ComputeCompletionResult`). Field
+  names mirror `mv_user_set_completion` / `mv_user_global_completion`
+  per `context/data-model.md`.
+- `packages/set-completion/src/set-pct.ts` — `computeSetPct(input)`.
+  Per-set, per-card. Ratio of distinct cards in the set the user
+  owns ≥1 printing of, over total cards in the set. Returns
+  `{ pct, ownedNumbered, totalNumbered }`.
+- `packages/set-completion/src/master-pct.ts` —
+  `computeMasterSetPct(input)`. Per-set, per-printing, gated to
+  `includeInMasterSet === true`. Returns `{ pct, ownedMaster,
+  totalMaster }`.
 - `packages/set-completion/src/all-pokemon-pct.ts` —
-  `computeAllPokemonCompletion`: distinct cards owned (catalog or scoped)
-  divided by total cards in scope, plus the global Master %.
-- `packages/set-completion/src/aggregate.ts` — top-level `computeCompletion`
-  that orchestrates per-set + global metrics in a single pass and returns
-  the unified result.
-- `packages/set-completion/src/index.ts` — public barrel.
-- Tests live next to each module as `*.test.ts`.
-- `pnpm-lock.yaml` — refreshed by `pnpm install`.
-- `dependencies.yaml` — status flip pending → review, stub: false.
+  `computeAllPokemonPct(input)`. Global, per-card. Distinct cards
+  in the (caller-supplied, optionally pre-filtered) catalog the user
+  owns ≥1 printing of, over total cards in the catalog. Generation
+  / set / subtype scoping is the caller's concern — pre-filter the
+  `cards` and `printings` arrays before passing them in. Returns
+  `{ pct, uniqueCardsOwned, uniqueCardsTotal }`.
+- `packages/set-completion/src/global-master-pct.ts` —
+  `computeGlobalMasterPct(input)`. Global, per-printing, gated to
+  `includeInMasterSet === true`. Returns `{ pct, masterOwned,
+  masterTotal }`.
+- `packages/set-completion/src/aggregate.ts` —
+  `computeCompletion(input)`. Top-level orchestrator: indexes the
+  roster once, computes Set % + Master Set % per set requested
+  (`input.sets` may pin a subset, otherwise every set in the
+  printing roster), and `computeAllPokemonPct` +
+  `computeGlobalMasterPct` over the whole catalog. Returns a
+  single result object the edge-function recompute worker can
+  consume directly.
+- `packages/set-completion/src/index.ts` — barrel.
+- `packages/set-completion/src/*.test.ts` — vitest suites
+  covering the acceptance criteria below.
 
 ## Acceptance criteria
 
-- [ ] Package builds, lints, typechecks, tests under
-      `pnpm --filter @binderly/set-completion <task>` and the workspace
-      `pnpm -w <task>` aggregations.
-- [ ] `computeSetCompletion` is variant-agnostic per PROJECT.md § 8
-      ("a reverse holo Charizard alone counts as having Charizard").
-- [ ] `computeMasterCompletion` only counts printings whose
-      `includeInMasterSet === true`, matching the materialized boolean
-      written by the master-set rules engine.
-- [ ] `computeAllPokemonCompletion` counts unique cards (per
-      `card.canonical_key`) globally; Charizard from Base + Charizard from
-      Hidden Fates count as 2 (per glossary § "All Pokémon %").
-- [ ] `computeAllPokemonCompletion` accepts an optional scope filter
-      (set ids / languages / series) that restricts BOTH numerator and
-      denominator.
-- [ ] All functions are pure: no `Date.now()`, no randomness, no async, no
-      I/O. Same input → identical output (idempotency test asserts
-      structural equality across two runs).
-- [ ] Empty collection → every percentage is `0`. Empty roster →
-      percentage is `0` (denominator-zero guard). 100% ownership → every
+- [ ] Package builds clean (`pnpm --filter @binderly/set-completion build`).
+- [ ] Public API: `computeSetPct`, `computeMasterSetPct`,
+      `computeAllPokemonPct`, `computeGlobalMasterPct`,
+      `computeCompletion`, plus the input/output type exports.
+- [ ] Empty collection ⇒ every percentage is `0` (NOT `NaN`); empty
+      catalog ⇒ percentage is `0`, `total*` fields are `0`.
+- [ ] Full collection (owns every printing in the roster) ⇒ every
       percentage is `100`.
-- [ ] Master Set % ≥ Set % is NOT a universal invariant (master counts
-      printings, set counts cards) — but a property test asserts that
-      when the user owns only base printings, master % ≤ set % numerically
-      because master adds variants that aren't owned. Asserted as the
-      narrower property: `setOwned ≥ ceil(masterOwned / printingsPerCard)`
-      doesn't hold either; the spec really only constrains both into
-      `[0, 100]` independently.
-- [ ] Performance: `computeCompletion` for a 5,000-item collection over a
-      30,000-printing / 15,000-card / 200-set roster completes in
-      < 100ms wall-clock on the CI runner (asserted in a vitest test).
-- [ ] Output shape integrates cleanly with the
-      `recompute-set-completion` edge-function worker stub
-      (T-BE-EDGE-FUNCTIONS); the package surface is documented in the
-      README and the result type is exported from `index.ts`.
-- [ ] No edits outside `owns_paths` except the pre-authorized list
-      (`pnpm-lock.yaml`, `dependencies.yaml`, this task file).
+- [ ] Set % is variant-agnostic per `PROJECT.md § 8`: owning ANY
+      printing of a card credits that card. Reverse-holo-only
+      ownership of a card credits the card toward Set %.
+- [ ] Master Set % strictly counts only printings with
+      `includeInMasterSet === true`. Owning a printing that is
+      `false` does not contribute to Master Set % numerator OR
+      denominator.
+- [ ] When the user owns only base-set (`HOLO`/`NON_HOLO`)
+      printings of every card and the set has additional
+      master-set-included variants, `setPct === 100` while
+      `masterPct < 100`. (Master ≥ Set never universally — the
+      relationship depends on the variant mix; the test asserts
+      the specific case from `PROJECT.md § 8`.)
+- [ ] All Pokémon % is independent of variant ownership — owning
+      any single printing of a card credits the card. Owning N
+      printings of the same card does not double-count.
+- [ ] All Pokémon % respects caller-supplied catalog filtering:
+      passing only Pokémon-subtype cards (or only Sword & Shield
+      sets) correctly scopes the denominator AND numerator.
+- [ ] Global Master % aggregates across every set in the input
+      printing roster — not per-set; ratio of distinct
+      master-set-included printings owned over total
+      master-set-included printings.
+- [ ] Owned printings that don't appear in the roster are silently
+      ignored (a stale `collection_item` row pointing at a deleted
+      printing must not crash the math).
+- [ ] Owned `printingId` duplicates collapse: the function takes
+      a list of printing ids; duplicates are deduped before the
+      math runs.
+- [ ] Idempotency / determinism: calling any compute function
+      twice on the same input returns deeply-equal results
+      (verified via `expect(a).toEqual(b)`); no `Date.now()`,
+      `Math.random()`, or globals used internally.
+- [ ] Performance: a 5,000-item collection vs a 30,000-printing
+      catalog completes `computeCompletion` in < 100ms wall-clock
+      on the test runner. Measured with `performance.now()` and
+      asserted; fail loud if regressed.
+- [ ] Algorithmic complexity: O(P + C + I) where P = printings,
+      C = cards, I = collection items. No O(n²) scans.
+- [ ] Tests live at `packages/set-completion/src/**/*.test.ts`
+      and pass under `pnpm --filter @binderly/set-completion test`.
+      Total test count between 80 and 150 inclusive.
+- [ ] Lint clean (`pnpm --filter @binderly/set-completion lint`).
+- [ ] Typecheck clean (`pnpm --filter @binderly/set-completion typecheck`).
+- [ ] Format:check clean (`pnpm --filter @binderly/set-completion format:check`).
+- [ ] No edits outside the authorized list (see "Branch & PR"
+      below).
 
 ## Out of scope
 
-- DB reads, HTTP, edge-function wiring (owned by T-BE-EDGE-FUNCTIONS).
-- The `mv_user_set_completion` / `mv_user_global_completion` materialized
-  views themselves (DDL is owned by an earlier data-layer task; this
-  package returns shapes the worker can write into them).
-- Per-user master-set overrides ("I want errors in my master") — deferred
-  per `tcg-domain.md` § 3.
-- Pricing / portfolio value math — separate package family.
-- Adding a new completion-result schema to `@binderly/api-contracts` — if
-  needed, escalate via `open-questions.md`. The package re-exports its
-  own types for now.
+- Materialized-view refresh / SQL — owned by T-BE-EDGE-FUNCTIONS.
+- Master-set rules ENGINE (deciding which printings get
+  `include_in_master_set === true`) — already shipped in
+  `data-pipeline/src/master-set/`. This package READS the boolean;
+  it does not re-derive it.
+- Pricing-aware completion (e.g. "what % by value"). Non-goal v1.
+- Adding a `setCompletionResult` zod schema to `@binderly/api-contracts`.
+  The result types live here in v1 (see Notes from execution
+  for the per-cycle handoff plan). If T-BE-EDGE-FUNCTIONS needs a
+  zod parser at the wire boundary, that's an api-contracts edit
+  in a later iter.
+- Generation-as-an-enum: callers pre-filter the input arrays; this
+  package doesn't ship a `generation` table.
 
 ## Branch & PR
 
 - Branch: `agent/T-SP-SET-COMPLETION`
 - PR title: `T-SP-SET-COMPLETION: Set completion math package (Set %, Master %, All Pokémon %)`
-- Commit format: Conventional Commits
+- Commit format: Conventional Commits.
+- **Authorized out-of-`owns_paths` edits** (mention each in the PR body):
+  - `pnpm-lock.yaml` (new workspace package).
+  - `dependencies.yaml` (status flip pending → review, stub: false).
+  - `tasks/03-shared-packages/T-SP-SET-COMPLETION.md` (this elaboration).
+  - `open-questions.md` (escalation notes — append-only).
 
 ## Escalation triggers
 
-Stop and surface to orchestrator if:
+Stop and surface to the orchestrator if:
 
-- A required completion DTO needs to live in `@binderly/api-contracts`
-  rather than this package (composition over the existing types isn't
-  enough).
-- Performance budget is unmeetable without a sub-quadratic algorithm
-  change that needs ratification.
-- The per-set "Set %" definition turns out to need to count secret rares
-  separately (PROJECT.md § 8 currently says "every numbered card", which
-  this task interprets as every `card` row — secret rares are cards too).
-- The master-set engine's `includeInMasterSet` boolean turns out not to
-  fully enumerate the variant categories (e.g., per-user overrides leak
-  into v1).
+- The "All Pokémon %" definition diverges between the dispatch
+  brief and `PROJECT.md § 8` (dispatch says "Pokémon species",
+  spec says "unique numbered cards"). Recommend per-card per
+  spec; flag for ratification.
+- The performance budget is unmeetable with a linear-scan
+  algorithm at the documented scale (5,000 items × 30,000
+  printings).
+- A required result-shape addition to `@binderly/api-contracts`
+  cannot be substituted with package-local types.
+- The `printing.includeInMasterSet` boolean does not in fact
+  match the seed pipeline output (would indicate a regression in
+  T-DL-MASTER-SET-RULES, not this task).
 
 ## Notes from execution
-
 _(Sub-agent appends here at end. Empty until then.)_
