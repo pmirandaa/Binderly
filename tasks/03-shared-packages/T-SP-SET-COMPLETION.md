@@ -3,83 +3,141 @@
 **Stage:** 03-shared-packages
 **Agent role:** backend
 **Effort:** M
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** in_progress
 
----
+## Hard dependencies
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 8 (Master Set), § 9 (Custom & Smart), § 10 (Core App Features)) and any
->    referenced sections.
-> 2. Read `rules/03-shared-packages.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-SP-SET-COMPLETION`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+- T-BE-API-CONTRACTS (merged) — DTO shapes for cards / printings / collection
+- T-DL-MASTER-SET-RULES (merged) — `printing.include_in_master_set` is the
+  materialized boolean we read; the per-set rules engine is the upstream
+  source of truth (see `data-pipeline/src/master-set/`)
 
----
+## Soft dependencies
 
-## Provisional metadata (from `dependencies.yaml`)
+- T-SP-SMART-DSL, T-SP-UI-TOKENS — parallel-safe; no shared paths
 
-**Hard dependencies:**
+## Required reading
 
-- T-BE-API-CONTRACTS
-- T-DL-MASTER-SET-RULES
+- `PROJECT.md` § 8 (Master Set Definition) — the canonical metric definitions
+- `context/tcg-domain.md` § 2 (Master Set rules), § 5 (canonical keys)
+- `context/data-model.md` § "completion" (the materialized-view shapes the
+  edge-functions worker recomputes; our output mirrors them)
+- `context/glossary.md` § "Collection completion terms"
+- `rules/03-shared-packages.md`
+- `data-pipeline/src/master-set/README.md`
 
-**Parallel-safe with:** T-SP-SMART-DSL, T-SP-UI-TOKENS
+## Goal
 
-**Owns paths:**
+Pure-logic shared package that computes Binderly's four completion
+percentages from a printing roster + a user's collection. The package is
+runtime-agnostic (Node, browser, React Native, edge) and has no I/O — the
+edge-functions recompute worker (T-BE-EDGE-FUNCTIONS) feeds it data from
+the catalog tables and writes the result to materialized views, while the
+clients call the same functions for optimistic local recompute after a
+mutation.
 
-- `packages/set-completion/`
+## Deliverables
 
-## Provisional goal
+- `packages/set-completion/package.json` — workspace package mirroring the
+  `@binderly/api-contracts` layout (main / types / exports / scripts).
+- `packages/set-completion/tsconfig.json` — extends `@binderly/tsconfig/library.json`.
+- `packages/set-completion/eslint.config.js` — node preset, dist/coverage ignored.
+- `packages/set-completion/vitest.config.ts` — node env, src/\*\*/\*.test.ts.
+- `packages/set-completion/README.md` — package overview + usage.
+- `packages/set-completion/src/types.ts` — input DTOs (printing roster +
+  collection) and output DTOs (`SetCompletionStats`, `GlobalCompletionStats`,
+  `CompletionResult`), reusing `@binderly/api-contracts` primitives.
+- `packages/set-completion/src/set-pct.ts` — per-set `computeSetCompletion`:
+  variant-agnostic count of distinct cards owned in the set divided by
+  total cards in the set (per PROJECT.md § 8).
+- `packages/set-completion/src/master-pct.ts` — per-set
+  `computeMasterCompletion`: count of distinct master-included printings
+  owned divided by total master-included printings.
+- `packages/set-completion/src/all-pokemon-pct.ts` —
+  `computeAllPokemonCompletion`: distinct cards owned (catalog or scoped)
+  divided by total cards in scope, plus the global Master %.
+- `packages/set-completion/src/aggregate.ts` — top-level `computeCompletion`
+  that orchestrates per-set + global metrics in a single pass and returns
+  the unified result.
+- `packages/set-completion/src/index.ts` — public barrel.
+- Tests live next to each module as `*.test.ts`.
+- `pnpm-lock.yaml` — refreshed by `pnpm install`.
+- `dependencies.yaml` — status flip pending → review, stub: false.
 
-Set completion math package (Set %, Master %, All Pokémon %).
+## Acceptance criteria
 
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
+- [ ] Package builds, lints, typechecks, tests under
+      `pnpm --filter @binderly/set-completion <task>` and the workspace
+      `pnpm -w <task>` aggregations.
+- [ ] `computeSetCompletion` is variant-agnostic per PROJECT.md § 8
+      ("a reverse holo Charizard alone counts as having Charizard").
+- [ ] `computeMasterCompletion` only counts printings whose
+      `includeInMasterSet === true`, matching the materialized boolean
+      written by the master-set rules engine.
+- [ ] `computeAllPokemonCompletion` counts unique cards (per
+      `card.canonical_key`) globally; Charizard from Base + Charizard from
+      Hidden Fates count as 2 (per glossary § "All Pokémon %").
+- [ ] `computeAllPokemonCompletion` accepts an optional scope filter
+      (set ids / languages / series) that restricts BOTH numerator and
+      denominator.
+- [ ] All functions are pure: no `Date.now()`, no randomness, no async, no
+      I/O. Same input → identical output (idempotency test asserts
+      structural equality across two runs).
+- [ ] Empty collection → every percentage is `0`. Empty roster →
+      percentage is `0` (denominator-zero guard). 100% ownership → every
+      percentage is `100`.
+- [ ] Master Set % ≥ Set % is NOT a universal invariant (master counts
+      printings, set counts cards) — but a property test asserts that
+      when the user owns only base printings, master % ≤ set % numerically
+      because master adds variants that aren't owned. Asserted as the
+      narrower property: `setOwned ≥ ceil(masterOwned / printingsPerCard)`
+      doesn't hold either; the spec really only constrains both into
+      `[0, 100]` independently.
+- [ ] Performance: `computeCompletion` for a 5,000-item collection over a
+      30,000-printing / 15,000-card / 200-set roster completes in
+      < 100ms wall-clock on the CI runner (asserted in a vitest test).
+- [ ] Output shape integrates cleanly with the
+      `recompute-set-completion` edge-function worker stub
+      (T-BE-EDGE-FUNCTIONS); the package surface is documented in the
+      README and the result type is exported from `index.ts`.
+- [ ] No edits outside `owns_paths` except the pre-authorized list
+      (`pnpm-lock.yaml`, `dependencies.yaml`, this task file).
 
-## Provisional reading list
+## Out of scope
 
-- PROJECT.md § 8 (Master Set), § 9 (Custom & Smart), § 10 (Core App Features)
-- rules/03-shared-packages.md
-- (context files added at elaboration time based on the stage rules)
+- DB reads, HTTP, edge-function wiring (owned by T-BE-EDGE-FUNCTIONS).
+- The `mv_user_set_completion` / `mv_user_global_completion` materialized
+  views themselves (DDL is owned by an earlier data-layer task; this
+  package returns shapes the worker can write into them).
+- Per-user master-set overrides ("I want errors in my master") — deferred
+  per `tcg-domain.md` § 3.
+- Pricing / portfolio value math — separate package family.
+- Adding a new completion-result schema to `@binderly/api-contracts` — if
+  needed, escalate via `open-questions.md`. The package re-exports its
+  own types for now.
 
 ## Branch & PR
 
 - Branch: `agent/T-SP-SET-COMPLETION`
 - PR title: `T-SP-SET-COMPLETION: Set completion math package (Set %, Master %, All Pokémon %)`
+- Commit format: Conventional Commits
+
+## Escalation triggers
+
+Stop and surface to orchestrator if:
+
+- A required completion DTO needs to live in `@binderly/api-contracts`
+  rather than this package (composition over the existing types isn't
+  enough).
+- Performance budget is unmeetable without a sub-quadratic algorithm
+  change that needs ratification.
+- The per-set "Set %" definition turns out to need to count secret rares
+  separately (PROJECT.md § 8 currently says "every numbered card", which
+  this task interprets as every `card` row — secret rares are cards too).
+- The master-set engine's `includeInMasterSet` boolean turns out not to
+  fully enumerate the variant categories (e.g., per-user overrides leak
+  into v1).
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+_(Sub-agent appends here at end. Empty until then.)_
