@@ -508,4 +508,70 @@ nothing in this PR or the existing v1 posture has to be undone.
 
 ---
 
+## Q-008 — "All Pokémon %" — per-card (PROJECT.md § 8) vs per-species (dispatch brief)?
+
+**Raised:** 2026-05-15 (T-SP-SET-COMPLETION)
+**Blocking:** none directly — `T-SP-SET-COMPLETION` ships the
+**per-card** interpretation per `PROJECT.md § 8` (canonical spec)
+and `context/data-model.md`'s `mv_user_global_completion.unique_cards_owned`
+column shape. Future decision could flip this with a single edit
+inside `packages/set-completion/src/all-pokemon-pct.ts` and a
+`pokemon` schema addition; no migration needed for v1 since the
+materialized view stores already-computed numbers.
+
+**Context:** PROJECT.md § 8 defines All Pokémon % unambiguously as
+"counts unique numbered cards across all sets the user has ≥1
+printing of, divided by total numbered cards in the database."
+Pablo's quoted explanation: "if I have only the normal one of a
+card in one set, count like ok, you have that card." The materialized
+view column is `unique_cards_owned` / `unique_cards_total` —
+per-card.
+
+The orchestrator's dispatch brief for T-SP-SET-COMPLETION described
+the same metric as "% of distinct *Pokémon species* (not printings)
+the user owns at least one printing of, across the entire catalog
+(or scoped to a generation if the caller passes a filter)."
+
+The two definitions diverge because the same Pokémon (e.g.
+Charizard) appears as DOZENS of distinct cards across different
+sets (Base Set, Hidden Fates, Brilliant Stars, Obsidian Flames, …).
+Per-card treats them as 30+ separate slots in the denominator;
+per-species would treat them as one.
+
+The shipped implementation matches **PROJECT.md** (per-card) — that
+is the ratified spec. The dispatch brief's "species" framing was
+loose paraphrasing; flagged here so Pablo can either confirm or
+flip the metric if he wants per-species.
+
+**Options:**
+
+1. **Stay per-card** (current implementation). Pros: matches
+   PROJECT.md verbatim, matches the existing
+   `mv_user_global_completion` column shape, matches Pablo's
+   quoted intent ("you have that card"). The natural unit of the
+   product is the card. Sets / generations / subtypes are scoped
+   by caller pre-filter — composable. **Recommended.**
+2. **Flip to per-species.** Would require a `card.species` field
+   (no such column exists today; `card.name` is the closest proxy
+   but isn't normalized — "Charizard ex" and "Charizard" are
+   distinct names for the same Pokémon, while "Mr. Mime" and
+   "Mr. Rime" share a prefix despite being different species).
+   Net cost: a new ingestion step in `data-pipeline/`, a new
+   `card.species_id` column, a new `species` table, and an
+   in-package species-id input on `RosterCard`. The metric would
+   feel different to users — "I'm at 100%!" with vastly fewer
+   slots. Not recommended without explicit ask from Pablo.
+3. **Ship both.** Add `computeAllSpeciesPct` alongside
+   `computeAllPokemonPct`. Doubles the surface for marginal
+   product value pre-launch. Not recommended.
+
+**Recommendation:** Option 1 (current shipped behavior). If Pablo
+decides per-species is the right metric post-launch, the migration
+path is additive: add `species` table + ingestion step, then add
+the optional per-species function next to the per-card one.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
 _(no other open questions yet)_

@@ -515,14 +515,14 @@ tasks:
     stage: 03-shared-packages
     title: Set completion math package (Set %, Master %, All Pokémon %)
     agent_role: backend
-    status: pending
+    status: review
     depends_on: [T-BE-API-CONTRACTS, T-DL-MASTER-SET-RULES]
     parallel_safe_with: [T-SP-SMART-DSL, T-SP-UI-TOKENS]
     provides: [pkg:set-completion]
     owns_paths: [packages/set-completion/]
     task_file: tasks/03-shared-packages/T-SP-SET-COMPLETION.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-SP-SMART-DSL
     stage: 03-shared-packages
