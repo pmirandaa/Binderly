@@ -129,4 +129,38 @@ Stop and append to `open-questions.md` if:
 
 ## Notes from execution
 
-_(empty until the sub-agent finishes)_
+- **NULL semantics chosen.** Every leaf comparison emits `(... ) IS
+  TRUE` so NULLs collapse to FALSE before `NOT` / `AND` / `OR`
+  consider them. The evaluator mirrors this — null/undefined
+  operands short-circuit a leaf to false. Without this, the
+  evaluator and the SQL compiler would diverge under `NOT eq(...)`
+  on a NULL-valued row (SQL would yield `NULL` → filtered out;
+  the JS evaluator would yield `true` after negation). This is the
+  load-bearing design decision that makes the round-trip property
+  test pass.
+- **`collection.isOwned` is a synthetic boolean.** Compiles to
+  `<alias>.id IS NOT NULL`, assuming the caller LEFT JOINs
+  `collection_item` filtered by user_id. Documented in
+  `src/sql.ts` and the README; the join is a query-shape concern
+  the backend evaluator owns, not the DSL.
+- **`api-contracts` wiring is a follow-up.** The contracts package
+  keeps `smartExpressionSchema` opaque (`z.custom<unknown>`) so
+  importing it doesn't pull this package into transitive graphs
+  that don't need it. The README has a snippet showing how
+  consumers parse expressions today; a small follow-up task can
+  switch `smartExpressionSchema` to delegate to
+  `expressionSchema` without API churn.
+- **Round-trip property test approach.** Wrote a tiny
+  recursive-descent SQL interpreter (~120 LOC) that knows the
+  exact grammar `expressionToSql` emits. Runs the evaluator and
+  the SQL interpreter against 200 randomly-generated
+  (expression, item) pairs (deterministic Mulberry32 PRNG seed)
+  and asserts identical truth values. Avoids the fast-check
+  dependency.
+- **i18n is deferred.** Explainer outputs literal English. v1
+  decision; flagged here for translation tooling later (string
+  keys + ICU plurals).
+- **Test count.** 212 tests (slightly above the 120–200 aim);
+  every leaf operator gets explicit positive + negative cases,
+  and the property test runs 200 random expressions against the
+  agreement check.

@@ -1,0 +1,46 @@
+{
+  "name": "@binderly/smart-collection-dsl",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure-logic Smart Collection DSL — schema, parser, evaluator, SQL compiler, and human explainer for Binderly's smart custom collections.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:write": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@binderly/api-contracts": "workspace:*",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@types/node": "22.19.17",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
