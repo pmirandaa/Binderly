@@ -268,4 +268,49 @@ recommendation in this PR; revert is one-line if rejected)_
 
 ---
 
+## Q-010 — `mv_user_set_completion` materialized view (T-M-COLLECTION)
+
+**Asked by:** T-M-COLLECTION sub-agent
+**Asked at:** 2026-05-15
+**Status:** Open — flagged for T-BE-EDGE-FUNCTIONS
+
+PROJECT.md § 8 promises a materialized view (`mv_user_set_completion`) keyed by
+`(user_id, set_id)` that the per-set completion rows would read from. The
+recompute job (T-SP-SET-COMPLETION) is merged but the read endpoint is still a
+stub — `T-BE-EDGE-FUNCTIONS` hasn't shipped. The `@binderly/api-client`
+`collection` resource only exposes `listCollectionItems` (the raw owned-printings
+list) and `getCollectionStats` is not yet wired.
+
+**What I did instead (in this PR):**
+
+- The home `CollectionScreen` walks `/v1/me/collection`, fans out
+  `getPrinting(id)` per owned printing to enrich with `setId / cardId /
+  includeInMasterSet`, and computes Set % on-device using `set.total` as the
+  denominator and the count of distinct owned cards per set as the numerator.
+- Master % on the home row is intentionally left at 0 with an "Open set to
+  compute" affordance — the precise denominator requires the *full* per-set
+  printing roster, which would fan out to hundreds of network calls per home
+  render. The drill-down (`CollectionSetScreen`) loads that roster once per set
+  visited and shows precise Set / Master percentages via
+  `@binderly/set-completion`.
+- All Pokémon % is the global aggregate (sum of unique-cards-owned across all
+  sets / sum of `set.total` across all sets).
+
+**What needs to happen later:**
+
+When `mv_user_set_completion` ships:
+
+1. The home screen should switch to reading the materialized view directly (one
+   query, no fan-out) for both Set % and Master %.
+2. `useOwnedPrintingsContextQuery` becomes the *fallback* / offline-cache path
+   instead of the primary data source.
+3. The drill-down's per-set computation can stay as-is — having the full roster
+   on hand is useful for the "Missing" tab anyway.
+
+**Pablo's answer:** _(empty — proceeding with on-device computation per partial
+roster; documented prominently in the PR body so the orchestrator can rescope
+when T-BE-EDGE-FUNCTIONS dispatches)_
+
+---
+
 _(no other open questions yet)_
