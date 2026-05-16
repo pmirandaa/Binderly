@@ -22,6 +22,7 @@
     "@binderly/api-client": "workspace:*",
     "@binderly/api-contracts": "workspace:*",
     "@binderly/set-completion": "workspace:*",
+    "@binderly/smart-collection-dsl": "workspace:*",
     "@binderly/ui": "workspace:*",
     "@supabase/supabase-js": "2.105.3",
     "@tamagui/core": "1.123.3",

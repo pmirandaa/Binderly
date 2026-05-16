@@ -169,6 +169,9 @@ importers:
       '@binderly/set-completion':
         specifier: workspace:*
         version: link:../../packages/set-completion
+      '@binderly/smart-collection-dsl':
+        specifier: workspace:*
+        version: link:../../packages/smart-collection-dsl
       '@binderly/ui':
         specifier: workspace:*
         version: link:../../packages/ui
