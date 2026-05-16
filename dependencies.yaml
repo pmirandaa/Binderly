@@ -596,14 +596,14 @@ tasks:
     stage: 04-web
     title: Web collection home + per-set progress views
     agent_role: frontend-web
-    status: pending
+    status: review
     depends_on: [T-W-AUTH, T-SP-SET-COMPLETION]
     parallel_safe_with: [T-W-CUSTOM, T-W-SMART]
     provides: [web:collection]
     owns_paths: [apps/web/app/collection/]
     task_file: tasks/04-web/T-W-COLLECTION.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-W-CUSTOM
     stage: 04-web
