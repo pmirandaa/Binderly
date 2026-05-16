@@ -622,14 +622,14 @@ tasks:
     stage: 04-web
     title: Web smart collections (search free, save paid; gated UI)
     agent_role: frontend-web
-    status: pending
+    status: in_review
     depends_on: [T-W-COLLECTION, T-SP-SMART-DSL]
     parallel_safe_with: [T-W-CUSTOM]
     provides: [web:smart-collections]
     owns_paths: [apps/web/app/collections/smart/]
     task_file: tasks/04-web/T-W-SMART.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-W-SHAREABLE-PUBLIC
     stage: 04-web
