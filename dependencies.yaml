@@ -609,14 +609,14 @@ tasks:
     stage: 04-web
     title: Web manual custom collections (3-cap on free)
     agent_role: frontend-web
-    status: pending
+    status: in_review
     depends_on: [T-W-COLLECTION]
     parallel_safe_with: [T-W-SMART]
     provides: [web:custom-collections]
     owns_paths: [apps/web/app/collections/custom/]
     task_file: tasks/04-web/T-W-CUSTOM.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-W-SMART
     stage: 04-web
