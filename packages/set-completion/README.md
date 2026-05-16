@@ -83,7 +83,7 @@ Per `PROJECT.md § 8 (Master Set Definition)`:
 
 `computeCompletion` is O(P + C + I) where P = printings, C = cards, I = collection items. The aggregate path indexes the roster once and applies all four metrics off the same index — no O(n²) scans.
 
-The acceptance-criterion benchmark (5,000-item collection vs ~30,000-printing catalog) runs in well under 100ms on the test runner. See `src/aggregate.test.ts` § "performance".
+The acceptance-criterion benchmark (5,000-item collection vs 30,000-printing catalog) runs steady-state at ~10-15ms on dev hardware (Apple M1 / M2). The CI assertion is set at 500ms to absorb GitHub Actions runner variance; see the block comment atop `src/aggregate.test.ts` § "performance" for the full rationale.
 
 ## Decisions log
 

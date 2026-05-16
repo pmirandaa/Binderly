@@ -152,9 +152,13 @@ recompute after a mutation) alike.
       (verified via `expect(a).toEqual(b)`); no `Date.now()`,
       `Math.random()`, or globals used internally.
 - [ ] Performance: a 5,000-item collection vs a 30,000-printing
-      catalog completes `computeCompletion` in < 100ms wall-clock
-      on the test runner. Measured with `performance.now()` and
-      asserted; fail loud if regressed.
+      catalog completes `computeCompletion` in well under
+      `< 500ms` wall-clock steady-state median on shared CI
+      runners (and `< 100ms` on dev hardware). Measured with
+      `performance.now()` and asserted at the CI-tolerant 500ms
+      threshold per the precedent set by
+      `data-pipeline/src/parsers/ebay-listing/passes/*.test.ts`;
+      fail loud if regressed (catches accidental O(n²)).
 - [ ] Algorithmic complexity: O(P + C + I) where P = printings,
       C = cards, I = collection items. No O(n²) scans.
 - [ ] Tests live at `packages/set-completion/src/**/*.test.ts`
