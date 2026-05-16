@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@binderly/api-client": "workspace:*",
+    "@binderly/api-contracts": "workspace:*",
     "@binderly/ui": "workspace:*",
     "@react-native-community/netinfo": "11.4.1",
     "@supabase/supabase-js": "2.105.3",
