@@ -499,14 +499,14 @@ tasks:
     stage: 02-backend
     title: Edge Functions for collection mutations + completion recompute
     agent_role: backend
-    status: pending
+    status: review
     depends_on: [T-BE-API-CONTRACTS, T-DL-RLS-POLICIES]
     parallel_safe_with: []
     provides: [api:edge]
     owns_paths: [infra/supabase/functions/]
     task_file: tasks/02-backend/T-BE-EDGE-FUNCTIONS.md
     est_effort: L
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 3 — SHARED PACKAGES
@@ -515,14 +515,14 @@ tasks:
     stage: 03-shared-packages
     title: Set completion math package (Set %, Master %, All Pokémon %)
     agent_role: backend
-    status: pending
+    status: review
     depends_on: [T-BE-API-CONTRACTS, T-DL-MASTER-SET-RULES]
     parallel_safe_with: [T-SP-SMART-DSL, T-SP-UI-TOKENS]
     provides: [pkg:set-completion]
     owns_paths: [packages/set-completion/]
     task_file: tasks/03-shared-packages/T-SP-SET-COMPLETION.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-SP-SMART-DSL
     stage: 03-shared-packages
