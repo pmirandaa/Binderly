@@ -528,14 +528,14 @@ tasks:
     stage: 03-shared-packages
     title: Smart Collection DSL — schema, parser, evaluator
     agent_role: backend
-    status: pending
+    status: review
     depends_on: [T-BE-API-CONTRACTS]
     parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-UI-TOKENS]
     provides: [pkg:smart-dsl]
     owns_paths: [packages/smart-collection-dsl/]
     task_file: tasks/03-shared-packages/T-SP-SMART-DSL.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-SP-UI-TOKENS
     stage: 03-shared-packages
