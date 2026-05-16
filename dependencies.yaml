@@ -349,7 +349,7 @@ tasks:
     stage: 03-shared-packages
     title: Pricing display package — FX-aware price formatting (lookup rate of observation date)
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-DL-FX-RATES, T-BE-API-CONTRACTS]
     parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-SMART-DSL, T-SP-UI-TOKENS]
     provides: [pkg:pricing-display]
@@ -583,7 +583,7 @@ tasks:
     stage: 04-web
     title: Browse + search (sets ordered by release desc, filters, full-text)
     agent_role: frontend-web
-    status: in_review
+    status: merged
     depends_on: [T-W-SHELL, T-BE-API-CLIENT, T-DL-SEED-INGEST]
     parallel_safe_with: [T-W-AUTH]
     provides: [web:browse]
@@ -690,7 +690,7 @@ tasks:
     stage: 05-mobile
     title: Mobile browse, set, card detail
     agent_role: frontend-mobile
-    status: in_review
+    status: merged
     depends_on: [T-M-SHELL, T-DL-SEED-INGEST]
     parallel_safe_with: [T-M-AUTH]
     provides: [mobile:browse]

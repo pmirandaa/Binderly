@@ -1,14 +1,14 @@
-# Build status — Iter 16 closed. Stage 02 complete; 3 shared-packages parallel landed. Iter 17 dispatching pricing + cross-platform browse pair.
+# Build status — Iter 17 closed. Stage 03 shared packages complete; browse live cross-platform. Iter 18 dispatching collection pair.
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11.
-**Phase 2 backend (Stage 02):** **Complete (4/4 merged)** — closed at iter 16 with T-BE-EDGE-FUNCTIONS.
-**Phase 3 shared packages (Stage 03):** 3/4 merged (T-SP-UI-TOKENS, T-SP-SET-COMPLETION, T-SP-SMART-DSL). T-SP-PRICING-DISPLAY is the last one — dispatching iter 17.
-**Phase 4 web (Stage 04):** 2/8 merged (T-W-SHELL #48, T-W-AUTH #51). T-W-BROWSE dispatching iter 17.
-**Phase 5 mobile (Stage 05):** 2/5 merged (T-M-SHELL #47, T-M-AUTH #52). T-M-BROWSE dispatching iter 17.
+**Phase 2 backend (Stage 02):** **Complete (4/4 merged)** — closed at iter 16.
+**Phase 3 shared packages (Stage 03):** **Complete (4/4 merged)** — closed at iter 17 with T-SP-PRICING-DISPLAY.
+**Phase 4 web (Stage 04):** 3/8 merged (T-W-SHELL #48, T-W-AUTH #51, T-W-BROWSE #60). T-W-COLLECTION dispatching iter 18.
+**Phase 5 mobile (Stage 05):** 3/5 merged (T-M-SHELL #47, T-M-AUTH #52, T-M-BROWSE #58). T-M-COLLECTION dispatching iter 18.
 **Stages 06-11:** 0 / 32 merged.
 
-**In progress:** 3 (iter 17 — see dispatch block below).
+**In progress:** 2 (iter 18 dispatching — see block below).
 **Blocked:** 0.
 **Blocked on humans:** 0 (Pablo has granted full autonomy: "don't wait for my approval to do stuff").
 
@@ -47,9 +47,9 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 16 closed 2026-05-15 ~20:30 UTC-4 with **Stage 02 backend
-complete** + 2/4 shared packages landing in the same wave. Phase
-2+ progression so far:
+Iter 17 closed 2026-05-15 ~21:00 UTC-4 with **Stage 03 shared
+packages complete** + cross-platform browse live. Phase 2+
+progression so far:
 
 iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
 foundation) →
@@ -61,14 +61,23 @@ iter 15 (T-W-AUTH + T-M-AUTH — cross-platform sign-in /
 callback / sign-out on top of iter-12 backend auth) →
 iter 16 (T-BE-EDGE-FUNCTIONS + T-SP-SET-COMPLETION +
 T-SP-SMART-DSL — 3-worker parallel; closes Stage 02 backend;
-ratified Q-008 in the merge commit).
+ratified Q-008 at merge time) →
+iter 17 (T-SP-PRICING-DISPLAY + T-W-BROWSE + T-M-BROWSE —
+3-worker parallel; closes Stage 03 shared packages; cross-platform
+browse live; resolved Q-009 in PR #60; **zero pnpm-lock merge
+conflicts despite three siblings touching the root lockfile** —
+GitHub's auto-merge handled all three).
 
-iter 17 dispatching now: T-SP-PRICING-DISPLAY (last shared
-package; closes Stage 03) + T-W-BROWSE (web catalog browse)
-+ T-M-BROWSE (mobile catalog browse). Three orthogonal owns_paths
-trees (packages/pricing-display/, apps/web/app/{browse,sets,cards}/,
-apps/mobile/src/screens/{browse,set,card}/) — zero merge-conflict
-expected, three different ownership areas.
+iter 18 dispatching now: T-W-COLLECTION (web collection home +
+per-set progress) + T-M-COLLECTION (mobile collection home +
+per-set progress). Cross-platform sibling pair, same posture as
+iter 14 / 15. Orthogonal owns_paths
+(`apps/web/app/collection/` vs `apps/mobile/src/screens/collection/`),
+different agent roles. Both consume the merged
+@binderly/set-completion (the math), @binderly/api-client (data
+fetch), and the auth shells. Both render per-set progress bars
++ user collection list. Foundation for Custom + Smart collection
+UIs (iter 19).
 
 Phase 1 progression (closed at iter 11):
 
@@ -165,6 +174,59 @@ exist atomically regardless of which platform signs the user up.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 15).
+
+## Iter 17 close summary (Stage 03 cap + cross-platform browse)
+
+Three workers, three orthogonal owns_paths, three independent
+deliverables. All three modified the root `pnpm-lock.yaml`;
+**GitHub auto-merged all three with zero conflicts** (each
+worker added deps in non-overlapping sections — packages/,
+apps/web/, apps/mobile/). No `--theirs + reinstall` dance
+needed for the first time across iters 12-17.
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-SP-PRICING-DISPLAY | merged | #59 (`b2ab9bf`) | 144 | Pure-logic FX-aware price formatting. USD-base FX with cross-currency composition through USD. Identity path skips lookup entirely. Fallback walks BACKWARD only (up to N days; default 7), never forward. Cross-currency `rateDate` reports the OLDER of the two underlying legs (honest about freshness). 7 supported currencies (USD + 6 Frankfurter quotes — worker shipped 7 vs brief's 6; **accepted at merge**). `bestEffortConvert` distinguishes `RangeError` (programmer error → 400) from `Error` (data gap → 503). All three bonus helpers shipped (range, current-price-row, best-effort). **Closes Stage 03 shared packages (4/4).** |
+| T-M-BROWSE | merged | #58 (`85972cd`) | +73 (241 total in @binderly/mobile) | FlatList over FlashList (no new native dep; v1 catalog sits inside FlatList's range). Slug = `printing.canonical_key` (e.g. `en-base1`) for `/sets/[slug]` — URL-friendly; resolved via `useSetBySlugQuery` against the same `/v1/sets` cache. CardScreen hero picks HOLO printing if present. TanStack Query data layer at `apps/mobile/src/lib/browse/`. Route wrappers under `apps/mobile/app/` are 2-line re-exports from owns_paths. Follow-up #13 honoured: `vi.hoisted({ routerMocks })` pattern in all three screen-level navigation tests. |
+| T-W-BROWSE | merged | #60 (`8b87630`) | +59 (171 total in @binderly/web) | Server-component pages + `dynamic = 'force-dynamic'` + lazy api-client construction in client `*Route` glue components inside useEffect — iter-14 W-SHELL hotfix lesson applied verbatim. `unset NEXT_PUBLIC_SUPABASE_* && pnpm --filter @binderly/web build` ✅. Narrow `BrowseApi` interface (4 methods); props injection beats module mocks. `notFound()` invoked synchronously during render via `kind: 'not-found'` state flag. **Uses raw UUIDs** for `/sets/[id]` and `/cards/[id]` (api-client only exposes by-id; diverges from T-M-BROWSE's slug — see #FU-18). **Q-009 raised AND resolved in-PR** via sibling `chore(web)` commit deleting the colliding `(tabs)/browse/page.tsx` placeholder. |
+
+**Q-009 resolution (at merge time of PR #60):** T-W-SHELL's
+shell-bootstrap placeholder at `apps/web/app/(tabs)/browse/page.tsx`
+collided with T-W-BROWSE's authoritative
+`apps/web/app/browse/page.tsx`. Both map to `/browse` in Next.js
+App Router (the `(tabs)` group adds no URL segment). Worker chose
+Option 1 (delete placeholder + drop its test); other three
+`(tabs)/*` placeholders untouched until their feature tasks land
+(T-W-COLLECTION will reclaim `(tabs)/collection/`). Q-009 closed.
+
+**URL convention divergence between web and mobile (#FU-18):**
+T-W-BROWSE went with UUID-based `/sets/[id]` and `/cards/[id]`
+(api-client only exposes by-id). T-M-BROWSE went with
+slug-based `/sets/[slug]` resolving against the `/v1/sets` list
+cache. Both work. Future cross-platform consolidation task can
+pick one (likely slug, after a `getSetBySlug` endpoint lands)
+and migrate the other; logged as follow-up #18 below.
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 17).
+
+## Iter 18 dispatch — cross-platform collection pair
+
+Two workers, two orthogonal owns_paths, same agent-role pairing
+as iters 14/15 (web vs mobile). Both depend on the just-merged
+shared packages (set-completion, pricing-display) and the
+already-merged auth + browse foundations.
+
+| Task | Stage | Effort | Owns paths | Depends on (all merged) | Why now |
+|---|---|---|---|---|---|
+| T-W-COLLECTION | 04-web | L | `apps/web/app/collection/` | T-W-AUTH + T-SP-SET-COMPLETION | First auth-gated web feature. Personal collection home + per-set progress bars (Set %, Master %, All Pokémon %). Foundation for T-W-CUSTOM (manual custom collections) and T-W-SMART (smart collection DSL UI). |
+| T-M-COLLECTION | 05-mobile | L | `apps/mobile/src/screens/collection/` | T-M-AUTH + T-SP-SET-COMPLETION | Cross-platform sibling. Same backend contract, mobile-native UX (pull-to-refresh, list virtualization, per-set chevron rows). Foundation for T-M-CUSTOM. |
+
+**Why two and not three:** affiliates (T-W-AFFILIATE-LINKS, S) and
+scanner stage (T-SC-*) are unblocked, but the collection pair
+is the natural next critical-path step — it unblocks the entire
+custom/smart collection chain. Affiliates can ride along in iter
+19 after the collection pair lands.
 
 ## Iter 16 close summary (Stage 02 cap + 2 shared packages)
 
@@ -275,18 +337,27 @@ close Stage 02.
   only scope on the debug views, not full DB superuser. **Status:
   open; not blocking. Decide before the admin UI lands.**
 
-All other open questions (Q-003 / Q-004 / Q-005 / Q-006 / Q-008) are closed.
+All other open questions (Q-002 / Q-003 / Q-004 / Q-005 / Q-006 /
+Q-008 / Q-009) are closed.
+**Q-002** (Docker Desktop bouncing — raised 2026-04-30) explicitly
+acknowledged closed by Pablo on 2026-05-15 ("this is solved") on
+top of the existing 2026-05-04 RESOLVED note.
 **Q-008** (raised by T-SP-SET-COMPLETION, PR #55) closed at merge
 time: All Pokémon % is per-card, matching `PROJECT.md § 8` and
 the `mv_user_global_completion.unique_cards_owned` column.
+**Q-009** (raised by T-W-BROWSE worker mid-task, PR #60) resolved
+in-PR: shell's `(tabs)/browse/page.tsx` placeholder collided with
+the new `/browse` route; worker deleted the placeholder + its
+test in a sibling `chore(web)` commit. Other three `(tabs)/*`
+placeholders untouched.
 
 ## Last 5 merges
 
+- T-W-BROWSE — `8b87630` (web browse + per-set + card-detail routes; +59 tests; SC + force-dynamic + lazy api-client init; Q-009 resolved in-PR; UUID-based URLs) — **iter 17 cap**
+- T-M-BROWSE — `85972cd` (mobile BrowseScreen/SetScreen/CardScreen; +73 tests; FlatList + TanStack hooks; canonical_key slug; vi.hoisted router mocks)
+- T-SP-PRICING-DISPLAY — `b2ab9bf` (pricing-display: FX-aware formatting; 144 tests; 7 currencies; USD-base cross-currency; **closes Stage 03 shared packages**)
 - T-SP-SMART-DSL — `3c6f56d` (smart-collection-dsl: schema, parser, evaluator, SQL compiler, explainer; 212 tests; IS-TRUE wrapping for tri-valued logic parity) — **iter 16 cap**
 - T-SP-SET-COMPLETION — `e6e82d7` (set-completion: Set %, Master %, All Pokémon % per-card; 125 tests; Q-008 ratified at merge)
-- T-BE-EDGE-FUNCTIONS — `15d63b3` (Supabase Edge `v1` muxing all `/v1/me/...` collection-mutation paths; 231 tests; Deno lockfile outside pnpm workspace; **closes Stage 02 backend**)
-- T-W-AUTH — `e7b3ebf` (web sign-in/callback/sign-out; +55 tests; refs+startedRef pattern for hydration-flip-safe effects) — **iter 15 cap**
-- T-M-AUTH — `c970b4b` (mobile sign-in/callback; magic-link + Google/Apple/Discord OAuth via expo-auth-session; +58 tests; expo-router test-mock pattern logged for follow-ups)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -325,6 +396,9 @@ the `mv_user_global_completion.unique_cards_owned` column.
 13. **Mobile router-asserting tests need a local `vi.hoisted({ routerMocks })` mock** because M-SHELL's global `setup.ts` returns a fresh `useRouter()` per call (breaks `mockReturnValueOnce` and observable `.mock.calls`). T-M-AUTH worked around it locally; M-SHELL cleanup pass could lift the stable mock into the global setup. Worth a short follow-up task for whoever next touches `apps/mobile/src/test-utils/`.
 14. **Dead M-SHELL placeholder screens** at `apps/mobile/src/screens/SignInScreen.tsx` and `AuthCallbackScreen.tsx` (legacy duplicates from before T-M-AUTH repointed the route shells). Outside any current task's owns_paths; flag for an M-SHELL cleanup follow-up.
 15. **`apps/web/components/providers/AuthProvider.tsx` not prettier-compliant** — `pnpm --filter @binderly/web format:write` reformats it. T-W-SHELL committed it in this state and `format:check` isn't a CI gate, so workers can't safely re-run format on the file. Worth a one-shot cleanup commit.
+16. **Iter-17 pre-rendered placeholders waiting on pricing-display.** T-W-BROWSE's `CardView` and T-M-BROWSE's `CardScreen` both render an explicit "Prices coming soon" placeholder section. Now that `@binderly/pricing-display` is merged in iter 17, an iter-18+ pass should wire it into both `Card*` views. May also need a new `/v1/printings/:id/prices` (or `/v1/printings/:id/current-price`) endpoint exposed by edge functions to expose the `mv_current_price` row to clients — currently the read API doesn't surface prices. Could be a tiny T-BE-EDGE-FUNCTIONS-V2 follow-up, or fold into the iter-18 collection-detail work if natural. **Logged as #FU-17.**
+17. **(Reserved — duplicate slot; see #FU-17 above.)**
+18. **URL convention divergence between web and mobile browse routes.** T-W-BROWSE uses raw UUIDs for `/sets/[id]` and `/cards/[id]` (api-client only exposes by-id). T-M-BROWSE uses slug-based `/sets/[slug]` resolving against the `/v1/sets` list cache (e.g. `en-base1`). Both work; both shipped green. Future cross-platform consolidation: pick one convention (probably slug, after a `getSetBySlug` endpoint lands) and migrate the other. Low priority — neither is user-visible while routes are SSR-hidden. **Logged as #FU-18.**
 
 ## Phase 0 ledger (closed; 10/10 merged)
 

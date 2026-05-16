@@ -124,7 +124,7 @@ continue dispatching in parallel; Phase 1 will block on this if it
 isn't resolved by the time the iteration-3/4 dispatch wants
 T-FN-SUPABASE-LOCAL.
 
-**Pablo's answer:** _(empty until answered)_
+**Pablo's answer:** this is solved
 
 **Diagnostic round 1 (2026-04-30, end-of-day):**
 A diagnostic sub-agent identified the root cause as stale
