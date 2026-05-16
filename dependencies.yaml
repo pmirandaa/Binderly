@@ -635,7 +635,7 @@ tasks:
     stage: 04-web
     title: Public shareable pages (SSR, OG images)
     agent_role: frontend-web
-    status: review
+    status: merged
     depends_on: [T-W-COLLECTION]
     parallel_safe_with: []
     provides: [web:public-shareable]
@@ -648,7 +648,7 @@ tasks:
     stage: 04-web
     title: TCGplayer affiliate "Buy" CTAs on card detail (web + mobile)
     agent_role: frontend-web
-    status: in_review
+    status: merged
     depends_on: [T-W-BROWSE]
     parallel_safe_with: []
     provides: [web:affiliate-links]

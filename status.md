@@ -49,8 +49,19 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 19 closed 2026-05-15 ~22:30 UTC-4 with **Phase 5 mobile
-complete (5/5)** and Phase 4 web at 6/8. Progression so far:
+**Iter 20 CLOSED 2026-05-15 ~23:30 UTC-4. Stage 04 web is now
+complete (8/8); Phases 0-5 are ALL complete. The entire frontend
+foundation is merged.** Pausing here per Pablo's "finish the
+current ones and the next batch and lets call it a night."
+
+When work resumes, the next dispatch is either a **backend
+tidy-up iter** (#FU-19 server-side completion endpoint, #FU-17
+pricing-display wiring, Q-012 public shareable endpoint —
+three additive Edge routes unblock four frontend follow-ups)
+or **open the scanner stage** (T-SC-CAMERA + T-SC-EMBED-MODEL
+in parallel).
+
+Progression so far:
 
 iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
 foundation) →
@@ -68,24 +79,20 @@ iter 17 (T-SP-PRICING-DISPLAY + T-W-BROWSE + T-M-BROWSE —
 iter 18 (T-W-COLLECTION + T-M-COLLECTION — cross-platform
 collection w/ client-side-compute stop-gap; Q-010 → #FU-19) →
 iter 19 (T-W-CUSTOM + T-W-SMART + T-M-CUSTOM — 3-worker
-parallel; custom+smart collections live cross-platform; **closes
-Stage 05 mobile**; T-M-CUSTOM combines custom+smart per the spec
-while web splits into two tasks).
+parallel; custom+smart collections live cross-platform; closes
+Stage 05 mobile; T-M-CUSTOM combines custom+smart per the spec
+while web splits into two tasks) →
+iter 20 (T-W-SHAREABLE-PUBLIC + T-W-AFFILIATE-LINKS — 2-worker
+parallel; public OG-imaged shareable pages + TCGplayer buy-CTAs;
+**closes Stage 04 web 8/8 → frontend foundation COMPLETE**;
+Q-011 + Q-012 raised, both non-blocking).
 
-iter 20 dispatching now (FINAL iter of the night per Pablo's
-"finish current + next batch and call it a night"):
-T-W-SHAREABLE-PUBLIC (public OG-imaged shareable pages) +
-T-W-AFFILIATE-LINKS (TCGplayer buy-CTAs on card detail; touches
-both web and a tiny mobile component). Two workers, orthogonal
-owns_paths. **These close Stage 04 web entirely (8/8) and
-finish the entire frontend foundation.**
-
-After iter 20 lands, every Phase 0-5 task is merged: foundation
-(Phase 0), data layer (Phase 1), backend core (Phase 2), shared
-packages (Phase 3), web (Phase 4), mobile (Phase 5). Remaining
-work splits into ops + advanced features: scanner (Stage 06),
-ML (07), integrations (08), admin (09), billing (10), deploy
-(11). 32 tasks remaining.
+Every Phase 0-5 task is merged: foundation (Phase 0), data layer
+(Phase 1), backend core (Phase 2), shared packages (Phase 3),
+web (Phase 4 — 8/8), mobile (Phase 5 — 5/5). Remaining work
+splits into ops + advanced features: scanner (Stage 06), ML (07),
+integrations (08), admin (09), billing (10), deploy (11). 32
+tasks remaining.
 
 Phase 1 progression (closed at iter 11):
 
@@ -199,26 +206,49 @@ mobile vs packages) is reliably mergeable in parallel.
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
 
-## Iter 20 dispatch — web tail (Stage 04 cap)
+## Iter 20 close summary (Stage 04 cap — frontend foundation COMPLETE)
 
-Two workers, two orthogonal owns_paths. **These close Stage 04
-web (8/8) and finish the entire frontend foundation.**
+Two workers, two orthogonal owns_paths trees, both green CI, both
+squash-merged. **Phases 0-5 are now ALL complete: foundation, data
+layer, backend core, shared packages, web (8/8), mobile (5/5).**
 
-| Task | Stage | Effort | Owns paths | Depends on (all merged) | Why now |
-|---|---|---|---|---|---|
-| T-W-SHAREABLE-PUBLIC | 04-web | L | `apps/web/app/c/` | T-W-COLLECTION | Public shareable pages (no auth required; SSR + OG images). User shares a link like `/c/[handle]/[slug]` and viewers see a read-only snapshot of the collection. Foundation for organic growth. |
-| T-W-AFFILIATE-LINKS | 04-web | S | `apps/web/lib/affiliate/`, `apps/web/components/buy-cta/`, `apps/mobile/src/components/buy-cta/` | T-W-BROWSE | TCGplayer affiliate "Buy" CTAs on card detail (web + mobile). Smaller scope than the other web tasks; the only iter-20 task that also touches mobile (single component under `apps/mobile/src/components/buy-cta/` — won't conflict since mobile is now done). |
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-W-AFFILIATE-LINKS | merged | #66 (`d028681`) | +57 (target 20-35; URL-builder edge cases pushed higher) | TCGplayer affiliate `<BuyCta>` on web + mobile card detail. Documented placeholder URL format (Impact partner docs unverified → **Q-011 / #FU-24**). Env-missing degraded path: disabled button + "Coming soon" hint — production default until affiliate id lands. Mobile uses `expo-web-browser.openBrowserAsync` (better Impact cookie attribution + one-swipe back) with silent `Linking.openURL` fallback. Pure URL builder duplicated web↔mobile (~30 LOC each) since cross-app shared package over-engineered at this scope. |
+| T-W-SHAREABLE-PUBLIC | merged | #67 (`79ad293`) | +67 (target 25-45; extras are cheap pure-unit on `format.ts` + `api.ts`) | Public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` `ImageResponse` OG card. Logged-out users see real collection snapshot. `force-dynamic` server component + lazy client glue (T-W-BROWSE pattern); `generateMetadata()` URL-params-only (no SSR fetch failure mode for crawlers). **Q-011 → Q-012 renamed in-merge** (collided with affiliate's Q-011); orchestrator resolved the open-questions.md conflict + lockstep-renumbered all in-PR refs (`lib/share/api.ts`, `opengraph-image.tsx` comments, task file). Backend follow-up: `GET /v1/c/{handle}/{slug}` Edge route + additive `publicShareableDto` in `@binderly/api-contracts` (Option 1 in Q-012). Page ships against a richer injectable `PublicSharePayload` contract; runtime adapter synthesises a degraded payload (URL-derived handle + empty members + zero counts) from existing `getPublicShareable` until backend lands. |
 
-After iter 20 lands tonight, **Phases 0-5 will all be complete**:
-foundation, data layer, backend core, shared packages, web,
-mobile. Remaining work (Stages 06-11): scanner, ML,
-integrations, admin, billing, deploy. 32 tasks, all backend /
-mobile-scanner / ops surfaces. Logical next iter (when Pablo
-resumes after the night): open the scanner stage with
-T-SC-CAMERA + T-SC-EMBED-MODEL as a parallel pair, OR tackle
-#FU-19 (server-side completion endpoint) + #FU-17 (wire
-pricing-display into Card{View,Screen}) as a backend tidy-up
-iter.
+**Q-011 raised** (T-W-AFFILIATE-LINKS, PR #66) — TCGplayer URL
+format placeholder until Pablo signs up for Impact / TCGplayer
+affiliate program. Non-blocking: env-missing degraded path is
+production default. **Logged as #FU-24.**
+
+**Q-012 raised** (T-W-SHAREABLE-PUBLIC, PR #67; renumbered from
+in-PR Q-011 at merge time to avoid collision with affiliate's
+Q-011) — public shareable read endpoint not yet implemented in
+Edge Function + `shareableDto` is metadata-only. Page scaffold
+ships green; backend follow-up is additive. **Logged as the
+backend-side companion to #FU-23 (smart-collection server eval)
+and #FU-19 (server-side completion).**
+
+**Frontend foundation status: COMPLETE.** Remaining work (Stages
+06-11): scanner, ML, integrations, admin, billing, deploy. 32
+tasks, all backend / mobile-scanner / ops surfaces. **Logical
+next iter (when Pablo resumes after the night):**
+
+1. **Backend tidy-up iter** — clear #FU-19 (server-side
+   `/v1/me/collection/completion`), #FU-17 (wire pricing-display
+   into Card{View,Screen} + expose `mv_current_price`), Q-012
+   (additive `publicShareableDto` + `GET /v1/c/{handle}/{slug}`
+   Edge route). Three additive edge-function endpoints unblock
+   four frontend follow-ups.
+2. **Or: open scanner stage** — T-SC-CAMERA + T-SC-EMBED-MODEL
+   as a parallel pair. Standalone (no frontend dependency); MVP
+   scope.
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 20). HEAD: `79ad293`. Open questions: 3
+(Q-007 admin role + Q-011 TCGplayer + Q-012 shareable backend);
+all non-blocking.
 
 ## Iter 18 close summary (cross-platform collection)
 
@@ -429,7 +459,7 @@ api-client `auth` resource — best cross-platform validation we
 can do at this layer. Iter 16 candidate: T-BE-EDGE-FUNCTIONS to
 close Stage 02.
 
-## Open questions (1 open; non-blocking)
+## Open questions (3 open; all non-blocking)
 
 - **Q-007** (raised by T-DL-ADMIN-DEBUG-SURFACES, PR #40):
   should we provision a narrower Postgres `admin` role for read-only
@@ -439,6 +469,22 @@ close Stage 02.
   human admins via a UI, we likely want a narrower role with SELECT-
   only scope on the debug views, not full DB superuser. **Status:
   open; not blocking. Decide before the admin UI lands.**
+- **Q-011** (raised by T-W-AFFILIATE-LINKS, PR #66): exact TCGplayer
+  affiliate URL format unconfirmed. `<BuyCta>` ships with a documented
+  placeholder URL (`/search/pokemon/product?productLineName=pokemon
+  &q=…&utm_source=binderly&utm_medium=affiliate&utm_campaign=binderly-
+  buy-cta&utm_id=<NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID>`). Real format +
+  Impact tracking param come once Pablo signs up. Non-blocking: env-
+  missing degraded path is production default until affiliate id lands.
+  **Logged as #FU-24.**
+- **Q-012** (raised by T-W-SHAREABLE-PUBLIC, PR #67; renumbered in-merge
+  from Q-011): public shareable read endpoint not implemented; richer
+  payload needed. `api-client.shareables.getPublicShareable` calls
+  `GET /v1/c/{handle}/{slug}` but Edge Function's `routes-table.ts` does
+  NOT carry that route, and `shareableDto` is metadata-only. Page ships
+  against richer injectable `PublicSharePayload` contract; runtime
+  adapter synthesises a degraded payload until backend lands additive
+  `publicShareableDto` + Edge route (Option 1).
 
 All other open questions (Q-002 / Q-003 / Q-004 / Q-005 / Q-006 /
 Q-008 / Q-009 / Q-010) are closed.
@@ -464,11 +510,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
+- T-W-SHAREABLE-PUBLIC — `79ad293` (public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` OG image; +67 tests; force-dynamic SSR + URL-params-only metadata; PublicSharePayload injectable contract + degraded runtime adapter; **Q-012 raised** (additive `publicShareableDto` Edge route follow-up); merge-time conflict resolution renumbered in-PR Q-011 → Q-012 to avoid collision with affiliate's Q-011) — **iter 20 cap / Stage 04 cap / frontend foundation COMPLETE**
+- T-W-AFFILIATE-LINKS — `d028681` (TCGplayer affiliate `<BuyCta>` on web + mobile card detail; +57 tests; documented placeholder URL; env-missing "Coming soon" degraded path is production default; mobile via `expo-web-browser.openBrowserAsync` for Impact attribution; **Q-011 / #FU-24** raised for URL format verification)
 - T-W-SMART — `b59c427` (web smart collections; +37 tests; client-side DSL eval; plan-gated save; reuses custom-collection persistence with kind='smart') — **iter 19 cap**
 - T-W-CUSTOM — `f796e2e` (web manual custom collections w/ 3-cap on free; +54 tests; in-tree Modal primitive; smart-kind 404 boundary)
-- T-M-CUSTOM — `487fef4` (mobile custom+smart combined; +107 tests; routes under /collections/... not bottom tab; **closes Stage 05 mobile 5/5**)
-- T-M-COLLECTION — `7339ab0` (mobile CollectionScreen + CollectionSetScreen; +64 tests; client-side-compute v1 stop-gap; Q-010 ratified as #FU-19; vi.hoisted router mocks) — **iter 18 cap**
-- T-W-COLLECTION — `402d59e` (web /collection + /collection/sets/[id]; +53 tests; soft auth gate via SignInPrompt; same client-side-compute v1 stop-gap as mobile; Q-009 in-PR resolve for `(tabs)/collection/`)
+- T-M-CUSTOM — `487fef4` (mobile custom+smart combined; +107 tests; routes under /collections/... not bottom tab; closes Stage 05 mobile 5/5)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -515,6 +561,8 @@ placeholders untouched.
 21. **`@binderly/ui` `<Input>` doesn't expose `onBlur` / `onEndEditing`.** T-W-CUSTOM's detail screen uses raw `<input>`/`<textarea>` for inline-edit name/description because the shared `<Input>` wrapper doesn't surface blur events. Future T-SP-UI-INPUT-BLUR adds the prop pass-through (additive). **Logged as #FU-21.**
 22. **Catalog-wide PrintingPicker on mobile.** T-M-CUSTOM's `<PrintingPicker>` (manual collection "Add cards" flow) sources from the user's OWNED printings, not the full catalog. Tight v1 scope; product can lift this later if "browse-and-add" becomes a friction point. Same goes for T-M-CUSTOM's smart-editor Run preview (also owned-only). **Logged as #FU-22.**
 23. **Server-evaluated smart-collection preview.** Both T-W-SMART and T-M-CUSTOM evaluate smart-collection expressions client-side via `@binderly/smart-collection-dsl`'s `evaluate()` on a 200-printing preview window. For larger collections / future "run against entire catalog" semantics, the right shape is a server-side compile-to-SQL via an edge function (`@binderly/smart-collection-dsl`'s `compileToSql()` already supports this). **Logged as #FU-23.**
+24. **TCGplayer affiliate URL format verification (Q-011).** T-W-AFFILIATE-LINKS' `<BuyCta>` ships with a documented placeholder URL (`/search/pokemon/product?productLineName=pokemon&q=<name> <number> <set>&utm_source=binderly&utm_medium=affiliate&utm_campaign=binderly-buy-cta&utm_id=<id>`). The Impact partner program may expect a different storefront path (`/search/all/product?productLineName=pokemon` is also common in the wild) and a different tracking param (`clickref` / `irclickid` / `partner` vs `utm_id`). Fix: sign up for the TCGplayer affiliate program once the business entity is ready; receive exact wire format + tracking param spec from Impact; update both `apps/web/lib/affiliate/tcgplayer.ts` and `apps/mobile/src/components/buy-cta/tcgplayer.ts` in lockstep (~5 LOC each + tests). Non-blocking: env-missing "Coming soon" degraded path is production default until an affiliate id lands in `NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID` / `EXPO_PUBLIC_TCGPLAYER_AFFILIATE_ID`. **Logged as #FU-24.**
+25. **Server-side public shareable read endpoint (Q-012).** T-W-SHAREABLE-PUBLIC ships a richer `PublicSharePayload` contract (`{ shareable, owner, collectionTitle, description, counts, members, lastUpdatedAt }`) on the frontend, but `@binderly/api-client.shareables.getPublicShareable` only returns the bare `ShareableDto` (and the route isn't wired in `infra/supabase/functions/_shared/routes-table.ts` — every entry is `/me/...`). Runtime adapter synthesises a degraded payload (URL-derived handle + empty members + zero counts) so SSR + OG image render correctly with header-only data. Backend fix (Option 1): add `GET /v1/c/{handle}/{slug}` Edge route + additive `publicShareableDto` in `@binderly/api-contracts`; the Edge handler joins `shareable` ↔ `profile` ↔ `collection_item` (and optionally `custom_collection`) once and returns one anonymous envelope. Web data layer drops in unchanged — only the runtime adapter swaps degraded synthesis for a direct call. **Logged as the backend companion to Q-012; pairs naturally with #FU-19 + #FU-23 in a single backend tidy-up iter.**
 
 ## Phase 0 ledger (closed; 10/10 merged)
 
