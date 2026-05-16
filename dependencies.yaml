@@ -349,14 +349,14 @@ tasks:
     stage: 03-shared-packages
     title: Pricing display package — FX-aware price formatting (lookup rate of observation date)
     agent_role: backend
-    status: pending
+    status: review
     depends_on: [T-DL-FX-RATES, T-BE-API-CONTRACTS]
     parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-SMART-DSL, T-SP-UI-TOKENS]
     provides: [pkg:pricing-display]
     owns_paths: [packages/pricing-display/]
     task_file: tasks/03-shared-packages/T-SP-PRICING-DISPLAY.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-DL-PRICING-CURRENT-VIEW
     stage: 01-data-layer

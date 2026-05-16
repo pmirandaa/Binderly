@@ -1,0 +1,7 @@
+# Build outputs never go through prettier — tsc owns dist/. The
+# repo-root `.prettierignore` already lists these; this local copy
+# makes `pnpm --filter @binderly/pricing-display format:check` work
+# the same way as a root `prettier --check`.
+dist/
+node_modules/
+coverage/
