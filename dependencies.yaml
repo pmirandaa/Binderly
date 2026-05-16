@@ -690,14 +690,14 @@ tasks:
     stage: 05-mobile
     title: Mobile browse, set, card detail
     agent_role: frontend-mobile
-    status: pending
+    status: in_review
     depends_on: [T-M-SHELL, T-DL-SEED-INGEST]
     parallel_safe_with: [T-M-AUTH]
     provides: [mobile:browse]
     owns_paths: [apps/mobile/src/screens/browse/, apps/mobile/src/screens/set/, apps/mobile/src/screens/card/]
     task_file: tasks/05-mobile/T-M-BROWSE.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-M-COLLECTION
     stage: 05-mobile

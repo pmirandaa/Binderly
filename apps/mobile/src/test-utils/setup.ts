@@ -14,6 +14,7 @@
 import '@testing-library/jest-dom/vitest';
 
 import { cleanup } from '@testing-library/react';
+import * as React from 'react';
 import { afterEach, vi } from 'vitest';
 
 // ---- expo-secure-store -----------------------------------------------
@@ -149,17 +150,105 @@ export function setMockColorScheme(scheme: 'light' | 'dark' | null): void {
 vi.mock('react-native', () => {
   const View = ({
     children,
+    testID,
     ...rest
-  }: { children?: React.ReactNode } & Record<string, unknown>) => {
+  }: { children?: React.ReactNode; testID?: string } & Record<string, unknown>) => {
     void rest;
+    if (testID !== undefined) {
+      return React.createElement('div', { 'data-testid': testID }, children);
+    }
     return children ?? null;
   };
   const Text = ({ children }: { children?: React.ReactNode }) => children ?? null;
   const Pressable = ({ children }: { children?: React.ReactNode }) => children ?? null;
+  // ScrollView needs to preserve testID so screen-level wrappers
+  // (e.g. `<ScrollView testID="card-screen">`) remain queryable.
+  const ScrollView = ({
+    children,
+    testID,
+    ...rest
+  }: { children?: React.ReactNode; testID?: string } & Record<string, unknown>) => {
+    void rest;
+    if (testID !== undefined) {
+      return React.createElement('div', { 'data-testid': testID }, children);
+    }
+    return React.createElement('div', null, children);
+  };
+  // FlatList stub: render every item synchronously so tests can
+  // observe the rendered rows via testID / text content. We
+  // expose the renderItem path the screens hit (the `{ item, index }`
+  // signature mirrors RN's contract). `ListHeaderComponent` and
+  // `ListEmptyComponent` accept either a node or a render fn, also
+  // mirroring RN. Implemented with `React.createElement` (file is
+  // `.ts`, not `.tsx`) so the setup module stays JSX-free.
+  type FlatListItemInfo<T> = { item: T; index: number };
+  interface FlatListLikeProps<T> {
+    data?: ReadonlyArray<T> | null;
+    renderItem?: (info: FlatListItemInfo<T>) => React.ReactNode;
+    keyExtractor?: (item: T, index: number) => string;
+    ListHeaderComponent?: React.ReactNode | (() => React.ReactNode);
+    ListEmptyComponent?: React.ReactNode | (() => React.ReactNode);
+    ListFooterComponent?: React.ReactNode | (() => React.ReactNode);
+    refreshControl?: React.ReactNode;
+    testID?: string;
+  }
+  function FlatList<T>(props: FlatListLikeProps<T>): React.ReactElement {
+    const data = props.data ?? [];
+    const header = resolveSlot(props.ListHeaderComponent);
+    const footer = resolveSlot(props.ListFooterComponent);
+    const empty = data.length === 0 ? resolveSlot(props.ListEmptyComponent) : null;
+    const rendered = data.map((item, index) => {
+      const key = props.keyExtractor ? props.keyExtractor(item, index) : String(index);
+      const child = props.renderItem ? props.renderItem({ item, index }) : null;
+      return React.createElement(
+        'div',
+        { key, 'data-testid': `${props.testID ?? 'list'}-item-${index}` },
+        child,
+      );
+    });
+    return React.createElement(
+      'div',
+      { 'data-testid': props.testID ?? 'list' },
+      props.refreshControl ?? null,
+      header,
+      rendered,
+      empty,
+      footer,
+    );
+  }
+  function resolveSlot(slot: unknown): React.ReactNode {
+    if (slot === undefined || slot === null) return null;
+    if (typeof slot === 'function') {
+      return (slot as () => React.ReactNode)();
+    }
+    return slot as React.ReactNode;
+  }
+  // RefreshControl stub: exposes its `onRefresh` callback through
+  // a tappable element so tests can simulate a pull-to-refresh.
+  interface RefreshControlLikeProps {
+    refreshing?: boolean;
+    onRefresh?: () => void;
+    testID?: string;
+  }
+  function RefreshControl(props: RefreshControlLikeProps): React.ReactElement {
+    return React.createElement(
+      'button',
+      {
+        type: 'button',
+        'data-testid': props.testID ?? 'refresh-control',
+        'aria-busy': props.refreshing ? true : undefined,
+        onClick: props.onRefresh,
+      },
+      'refresh',
+    );
+  }
   return {
     View,
     Text,
     Pressable,
+    ScrollView,
+    FlatList,
+    RefreshControl,
     useColorScheme: () => mockColorScheme,
     Platform: {
       OS: 'ios',
