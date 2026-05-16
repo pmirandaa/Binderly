@@ -1,16 +1,16 @@
-# Build status — Iter 15 closed. Auth flows live cross-platform. Paused for the night.
+# Build status — Iter 16 closed. Stage 02 complete; 3 shared-packages parallel landed. Iter 17 dispatching pricing + cross-platform browse pair.
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11.
-**Phase 2 backend (Stage 02):** 3/4 merged. T-BE-EDGE-FUNCTIONS remaining.
-**Phase 3 shared packages (Stage 03):** 1/4 merged (T-SP-UI-TOKENS). 3 ready (T-SP-PRICING-DISPLAY, T-SP-SET-COMPLETION, T-SP-SMART-DSL).
-**Phase 4 web (Stage 04):** 2/8 merged (T-W-SHELL #48, T-W-AUTH #51). T-W-BROWSE now ready.
-**Phase 5 mobile (Stage 05):** 2/5 merged (T-M-SHELL #47, T-M-AUTH #52). T-M-BROWSE now ready.
+**Phase 2 backend (Stage 02):** **Complete (4/4 merged)** — closed at iter 16 with T-BE-EDGE-FUNCTIONS.
+**Phase 3 shared packages (Stage 03):** 3/4 merged (T-SP-UI-TOKENS, T-SP-SET-COMPLETION, T-SP-SMART-DSL). T-SP-PRICING-DISPLAY is the last one — dispatching iter 17.
+**Phase 4 web (Stage 04):** 2/8 merged (T-W-SHELL #48, T-W-AUTH #51). T-W-BROWSE dispatching iter 17.
+**Phase 5 mobile (Stage 05):** 2/5 merged (T-M-SHELL #47, T-M-AUTH #52). T-M-BROWSE dispatching iter 17.
 **Stages 06-11:** 0 / 32 merged.
 
-**In progress:** 0 (orchestrator paused for the night per Pablo's request).
+**In progress:** 3 (iter 17 — see dispatch block below).
 **Blocked:** 0.
-**Blocked on humans:** 0.
+**Blocked on humans:** 0 (Pablo has granted full autonomy: "don't wait for my approval to do stuff").
 
 ## Phase 1 close summary
 
@@ -47,9 +47,9 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 15 closed 2026-05-05 ~21:15 UTC-4 with cross-platform auth
-flows on main. Pablo paused for the night. Phase 2+ progression
-so far:
+Iter 16 closed 2026-05-15 ~20:30 UTC-4 with **Stage 02 backend
+complete** + 2/4 shared packages landing in the same wave. Phase
+2+ progression so far:
 
 iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
 foundation) →
@@ -58,7 +58,17 @@ cross-platform UI primitives) →
 iter 14 (T-W-SHELL + T-M-SHELL — Next.js + Expo app shells;
 opens Phase 4 web stage and Phase 5 mobile stage) →
 iter 15 (T-W-AUTH + T-M-AUTH — cross-platform sign-in /
-callback / sign-out on top of iter-12 backend auth).
+callback / sign-out on top of iter-12 backend auth) →
+iter 16 (T-BE-EDGE-FUNCTIONS + T-SP-SET-COMPLETION +
+T-SP-SMART-DSL — 3-worker parallel; closes Stage 02 backend;
+ratified Q-008 in the merge commit).
+
+iter 17 dispatching now: T-SP-PRICING-DISPLAY (last shared
+package; closes Stage 03) + T-W-BROWSE (web catalog browse)
++ T-M-BROWSE (mobile catalog browse). Three orthogonal owns_paths
+trees (packages/pricing-display/, apps/web/app/{browse,sets,cards}/,
+apps/mobile/src/screens/{browse,set,card}/) — zero merge-conflict
+expected, three different ownership areas.
 
 Phase 1 progression (closed at iter 11):
 
@@ -156,22 +166,53 @@ exist atomically regardless of which platform signs the user up.
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 15).
 
-## Iter 16 readiness — what's available when Pablo resumes
+## Iter 16 close summary (Stage 02 cap + 2 shared packages)
 
-| Task | Stage | Effort | Depends on (now satisfied) | Notes |
+Three workers, three orthogonal owns_paths, three independent
+deliverables. Two of the three modified the root `pnpm-lock.yaml`
+so the second of them (SMART-DSL) needed a `--theirs` lockfile
+resolution + reinstall before re-running CI. EDGE-FUNCTIONS has
+its own Deno lockfile under `infra/supabase/functions/` —
+intentionally outside the pnpm workspace — so it didn't touch
+the root lockfile at all.
+
+| Task | Status | PR / commit | Tests | Highlight |
 |---|---|---|---|---|
-| T-W-BROWSE | 04-web | ? | shell + auth | catalog browse on web |
-| T-M-BROWSE | 05-mobile | ? | shell + auth | catalog browse on mobile |
-| T-BE-EDGE-FUNCTIONS | 02-backend | L | api-contracts + rls-policies | last backend task; closes Stage 02 |
-| T-SP-PRICING-DISPLAY | 03-shared-packages | M | fx-rates + api-contracts | parallel-safe with set-completion + smart-dsl |
-| T-SP-SET-COMPLETION | 03-shared-packages | M | api-contracts + master-set-rules | parallel-safe with smart-dsl |
-| T-SP-SMART-DSL | 03-shared-packages | L | api-contracts | parallel-safe with set-completion |
+| T-BE-EDGE-FUNCTIONS | merged | #54 (`15d63b3`) | 231 | Single `v1` Edge Function muxes every `/v1/me/...` REST path the merged api-client calls (mirrored zod write-schemas + fluent fake Supabase client for test harness) instead of one function per op — the api-client URL contract works without refactor and the function bundle stays self-contained for `supabase functions deploy`. RLS-aware Postgres client bound to caller JWT. Bulk-update is a transactional snapshot-and-revert. Recompute is a deferred-202 stub until SET-COMPLETION wiring lands in iter 17. **Closes Stage 02.** |
+| T-SP-SET-COMPLETION | merged | #55 (`e6e82d7`) | 125 | All Pokémon % shipped **per-card** matching `PROJECT.md § 8` and `mv_user_global_completion.unique_cards_owned` (not the dispatch brief's per-species framing). **Q-008 ratified at merge time as accepted.** CI perf assertion bumped to 500ms (from dispatch's 100ms target) because GitHub Actions standard runners can't reliably hit 100ms; dev-hardware steady-state remains ~10-15ms. 100ms preserved as a goal in README. |
+| T-SP-SMART-DSL | merged | #56 (`3c6f56d`) | 212 | Every leaf comparison wrapped in `(...) IS TRUE` in the SQL compile path so Postgres tri-valued logic matches JS evaluator boolean coercion for nullable columns; verified by a 200-case round-trip property test (random AST → JS eval → SQL compile → in-memory rows → assert row sets match). SQL-injection safe by construction (parameterized bindings, identifier whitelist). |
 
-Suggested iter 16 dispatch (when resuming): T-BE-EDGE-FUNCTIONS
-(closes Stage 02; large but fully independent) **or** the
-browse pair (T-W-BROWSE + T-M-BROWSE) for another cross-platform
-feature lap. Edge functions probably earns its slot first since
-collection mutations need it before browse can be useful.
+**Q-008 ratification (at merge time):** All Pokémon % is per-card,
+not per-species. The set-completion worker followed the canonical
+source (`PROJECT.md § 8` + the `mv_user_global_completion`
+column shape that's been per-card all along) over the dispatch
+brief's looser "per Pokémon species" framing. If we ever want a
+per-species variant (e.g. "you own at least one printing of each
+of 1025 Pokémon"), it's a single-file additive — separate
+function on the same package, no API breakage. **Decision:
+accept per-card as the v1 semantic.** Q-008 closed.
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 16).
+
+## Iter 17 dispatch — pricing + cross-platform browse
+
+Three workers, three orthogonal owns_paths trees, three different
+agent roles:
+
+| Task | Stage | Effort | Owns paths | Depends on (all merged) | Why now |
+|---|---|---|---|---|---|
+| T-SP-PRICING-DISPLAY | 03-shared-packages | M | `packages/pricing-display/` | T-DL-FX-RATES + T-BE-API-CONTRACTS | Closes Stage 03 shared packages (4/4). FX-aware price formatting blocks browse + card-detail price display, so this needs to land before T-W-BROWSE and T-M-BROWSE can render prices. Pure-logic package; no app code. |
+| T-W-BROWSE | 04-web | L | `apps/web/app/browse/`, `apps/web/app/sets/`, `apps/web/app/cards/` | T-W-SHELL + T-BE-API-CLIENT + T-DL-SEED-INGEST | First end-user-visible web feature on top of the shell. Will consume the `@binderly/api-client` + (eventually) pricing-display. |
+| T-M-BROWSE | 05-mobile | L | `apps/mobile/src/screens/browse/`, `apps/mobile/src/screens/set/`, `apps/mobile/src/screens/card/` | T-M-SHELL + T-DL-SEED-INGEST | Cross-platform sibling of T-W-BROWSE. Same backend contract. Will consume `@binderly/api-client` + (eventually) pricing-display. |
+
+**Three-way parallelization rationale:** zero file-tree overlap;
+pricing-display will land first (smallest effort, no app
+dependencies), then the browse pair can absorb it as a peer
+workspace dep in a follow-up if needed. Both browse workers will
+likely modify root `pnpm-lock.yaml` (new app deps) — first-in
+wins the clean merge, second-in does the standard `--theirs +
+reinstall` dance (we've done this 5+ times now; takes ~30s).
 
 ## Iter 14 close summary (app shells)
 
@@ -234,15 +275,18 @@ close Stage 02.
   only scope on the debug views, not full DB superuser. **Status:
   open; not blocking. Decide before the admin UI lands.**
 
-All other open questions (Q-003 / Q-004 / Q-005 / Q-006) are closed.
+All other open questions (Q-003 / Q-004 / Q-005 / Q-006 / Q-008) are closed.
+**Q-008** (raised by T-SP-SET-COMPLETION, PR #55) closed at merge
+time: All Pokémon % is per-card, matching `PROJECT.md § 8` and
+the `mv_user_global_completion.unique_cards_owned` column.
 
 ## Last 5 merges
 
+- T-SP-SMART-DSL — `3c6f56d` (smart-collection-dsl: schema, parser, evaluator, SQL compiler, explainer; 212 tests; IS-TRUE wrapping for tri-valued logic parity) — **iter 16 cap**
+- T-SP-SET-COMPLETION — `e6e82d7` (set-completion: Set %, Master %, All Pokémon % per-card; 125 tests; Q-008 ratified at merge)
+- T-BE-EDGE-FUNCTIONS — `15d63b3` (Supabase Edge `v1` muxing all `/v1/me/...` collection-mutation paths; 231 tests; Deno lockfile outside pnpm workspace; **closes Stage 02 backend**)
 - T-W-AUTH — `e7b3ebf` (web sign-in/callback/sign-out; +55 tests; refs+startedRef pattern for hydration-flip-safe effects) — **iter 15 cap**
 - T-M-AUTH — `c970b4b` (mobile sign-in/callback; magic-link + Google/Apple/Discord OAuth via expo-auth-session; +58 tests; expo-router test-mock pattern logged for follow-ups)
-- T-W-SHELL — `355b63c` (Next.js 14.2.18 + React 18 app shell; AuthProvider lazy-init via useEffect; 58 tests) — **iter 14 cap (with hotfix `fb4a6d0`)**
-- T-M-SHELL — `f73c54b` (Expo SDK 52 + RN 0.76.9 app shell; expo-secure-store JWT storage; root pnpm.overrides for React 18 pin; 110 tests)
-- T-SP-UI-TOKENS — `f228d1a` (@binderly/ui Tamagui tokens + base components; cross-platform via core+input only; 257 tests) — **iter 13 cap**
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 

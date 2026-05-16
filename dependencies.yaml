@@ -284,7 +284,7 @@ tasks:
     stage: 01-data-layer
     title: Pricing aggregator adapter (Layer 1 — eBay sold + Cardmarket via paid API)
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING]
     parallel_safe_with: [T-DL-PRICING-EBAY-BROWSE, T-DL-EBAY-LISTING-PARSER, T-DL-SOURCE-TCGDEX-EN, T-DL-SOURCE-PTCGIO, T-DL-SOURCE-BULBAPEDIA, T-DL-SOURCE-TCGDEX-JP]
     provides: [adapter:pricing-aggregator]
@@ -310,7 +310,7 @@ tasks:
     stage: 01-data-layer
     title: eBay Browse API adapter (Layer 2 — active listings, free, no approval)
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-SOURCE-INTERFACES, T-DL-SCHEMA-PRICING, T-DL-EBAY-LISTING-PARSER]
     parallel_safe_with: [T-DL-PRICING-AGGREGATOR]
     provides: [adapter:pricing-ebay-browse]
@@ -323,7 +323,7 @@ tasks:
     stage: 01-data-layer
     title: Daily price observation -> aggregate rollup job (idempotent)
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-PRICING-AGGREGATOR, T-DL-PRICING-EBAY-BROWSE]
     parallel_safe_with: []
     provides: [job:pricing-rollup]
@@ -362,7 +362,7 @@ tasks:
     stage: 01-data-layer
     title: mv_current_price materialized view + nightly refresh
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-DL-PRICING-ROLLUP]
     parallel_safe_with: []
     provides: [view:current-price]
@@ -429,7 +429,7 @@ tasks:
     stage: 01-data-layer
     title: data_conflict table + resolver write path (admin debug surface)
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-RLS-POLICIES, T-DL-SOURCE-INTERFACES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-ADMIN-DEBUG-SURFACES]
     provides: [table:data_conflict]
@@ -442,7 +442,7 @@ tasks:
     stage: 01-data-layer
     title: Admin debug views (pg_stat_statements + catalog audit views)
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-DL-PROFILE-GRANTS-FIX, T-DL-DATA-CONFLICT-TABLE]
     provides: [debug:admin-surfaces]
@@ -499,14 +499,14 @@ tasks:
     stage: 02-backend
     title: Edge Functions for collection mutations + completion recompute
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-BE-API-CONTRACTS, T-DL-RLS-POLICIES]
     parallel_safe_with: []
     provides: [api:edge]
     owns_paths: [infra/supabase/functions/]
     task_file: tasks/02-backend/T-BE-EDGE-FUNCTIONS.md
     est_effort: L
-    stub: false
+    stub: true
 
   # ============================================================
   # PHASE 3 — SHARED PACKAGES
@@ -515,7 +515,7 @@ tasks:
     stage: 03-shared-packages
     title: Set completion math package (Set %, Master %, All Pokémon %)
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-BE-API-CONTRACTS, T-DL-MASTER-SET-RULES]
     parallel_safe_with: [T-SP-SMART-DSL, T-SP-UI-TOKENS]
     provides: [pkg:set-completion]
@@ -528,7 +528,7 @@ tasks:
     stage: 03-shared-packages
     title: Smart Collection DSL — schema, parser, evaluator
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-BE-API-CONTRACTS]
     parallel_safe_with: [T-SP-SET-COMPLETION, T-SP-UI-TOKENS]
     provides: [pkg:smart-dsl]
