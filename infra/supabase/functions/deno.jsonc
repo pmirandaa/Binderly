@@ -1,0 +1,46 @@
+// Deno project config for the Binderly Supabase Edge Functions.
+//
+// The source files in `_shared/` and `v1/` are written to be runnable
+// in BOTH:
+//
+//   1. Deno (production) — Supabase's Edge Runtime. The `imports` map
+//      below resolves bare specifiers (`zod`, `@supabase/supabase-js`)
+//      to `npm:` so the source files can use ESM-friendly imports
+//      without `npm:` prefix sprinkled throughout the codebase.
+//
+//   2. Node 22 (vitest) — the test harness in `package.json`. Bare
+//      specifiers resolve via `node_modules/`, populated by the
+//      standalone `pnpm install` (or `npm install`) inside this
+//      directory. See `README.md` § Testing.
+//
+// Versions are pinned identical to the workspace (`zod@3.25.76`,
+// `@supabase/supabase-js@2.105.3`) so the Deno bundle and the Node
+// test harness exercise the same library code paths.
+//
+// The `tasks` block exposes a few convenience entry points; production
+// deploy is `supabase functions deploy v1` from the repo root, NOT
+// `deno task deploy` (the supabase CLI is the trust boundary).
+{
+  "imports": {
+    "zod": "npm:zod@3.25.76",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.105.3"
+  },
+  "tasks": {
+    "check": "deno check v1/index.ts _shared/**/*.ts",
+    "fmt": "deno fmt _shared/ v1/",
+    "test": "deno test --allow-env --allow-net _shared/ v1/"
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 100,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": true,
+    "proseWrap": "preserve"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["recommended"]
+    }
+  }
+}

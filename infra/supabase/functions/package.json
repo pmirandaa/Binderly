@@ -1,0 +1,22 @@
+{
+  "name": "@binderly/edge-functions",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Supabase Edge Functions for Binderly. Standalone Node sub-project (NOT a pnpm workspace member) — exists solely to run vitest against the Deno-targeted source files. Production deploys via `supabase functions deploy v1` and runs on Deno; the deno.jsonc import-map resolves bare specifiers to npm:.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.105.3",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.17",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
