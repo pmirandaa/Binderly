@@ -1,16 +1,18 @@
-# Build status — Iter 18 closed. Cross-platform collection live. Iter 19 dispatching custom+smart trio.
+# Build status — Iter 19 closed. Phase 5 mobile COMPLETE. Iter 20 dispatching web tail (final iter of the night).
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11.
 **Phase 2 backend (Stage 02):** **Complete (4/4 merged)** — closed at iter 16.
 **Phase 3 shared packages (Stage 03):** **Complete (4/4 merged)** — closed at iter 17.
-**Phase 4 web (Stage 04):** 4/8 merged (T-W-SHELL #48, T-W-AUTH #51, T-W-BROWSE #60, T-W-COLLECTION #61). T-W-CUSTOM + T-W-SMART dispatching iter 19.
-**Phase 5 mobile (Stage 05):** 4/5 merged (T-M-SHELL #47, T-M-AUTH #52, T-M-BROWSE #58, T-M-COLLECTION #62). T-M-CUSTOM dispatching iter 19 (only Phase 5 task left).
+**Phase 4 web (Stage 04):** 6/8 merged (T-W-SHELL #48, T-W-AUTH #51, T-W-BROWSE #60, T-W-COLLECTION #61, T-W-CUSTOM #64, T-W-SMART #63). T-W-SHAREABLE-PUBLIC + T-W-AFFILIATE-LINKS dispatching iter 20 — those two close Stage 04.
+**Phase 5 mobile (Stage 05):** **Complete (5/5 merged)** — closed at iter 19 with T-M-CUSTOM.
 **Stages 06-11:** 0 / 32 merged.
 
-**In progress:** 3 (iter 19 dispatching — see block below).
+**In progress:** 2 (iter 20 dispatching — see block below).
 **Blocked:** 0.
 **Blocked on humans:** 0 (Pablo has granted full autonomy: "don't wait for my approval to do stuff").
+
+After iter 20 lands tonight, **Stage 04 web will be complete (8/8)** and the entire FRONTEND foundation (web + mobile + shared packages + backend core) is shipped. Remaining work for v1 launch: scanner stage (06), ML (07), integrations (08), admin (09), billing (10), deploy/launch (11) — 32 tasks, all backend / mobile-scanner / ops surfaces.
 
 ## Phase 1 close summary
 
@@ -47,11 +49,8 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-Iter 18 closed 2026-05-15 ~21:45 UTC-4 with **cross-platform
-collection live** on top of the iter-17 cross-platform browse.
-Phase 4/5 are now 4/8 and 4/5 respectively — only T-W-CUSTOM /
-T-W-SMART / T-W-SHAREABLE-PUBLIC / T-W-AFFILIATE-LINKS remain on
-web, only T-M-CUSTOM remains on mobile. Progression so far:
+Iter 19 closed 2026-05-15 ~22:30 UTC-4 with **Phase 5 mobile
+complete (5/5)** and Phase 4 web at 6/8. Progression so far:
 
 iter 12 (T-BE-API-CONTRACTS + T-BE-AUTH — opens Phase 2 backend
 foundation) →
@@ -60,30 +59,33 @@ cross-platform UI primitives) →
 iter 14 (T-W-SHELL + T-M-SHELL — Next.js + Expo app shells;
 opens Phase 4 web stage and Phase 5 mobile stage) →
 iter 15 (T-W-AUTH + T-M-AUTH — cross-platform sign-in /
-callback / sign-out on top of iter-12 backend auth) →
+callback / sign-out) →
 iter 16 (T-BE-EDGE-FUNCTIONS + T-SP-SET-COMPLETION +
 T-SP-SMART-DSL — 3-worker parallel; closes Stage 02 backend;
-ratified Q-008 at merge time) →
+ratified Q-008) →
 iter 17 (T-SP-PRICING-DISPLAY + T-W-BROWSE + T-M-BROWSE —
-3-worker parallel; closes Stage 03 shared packages; cross-platform
-browse live; resolved Q-009 in PR #60) →
+3-worker; closes Stage 03 shared packages; resolved Q-009) →
 iter 18 (T-W-COLLECTION + T-M-COLLECTION — cross-platform
-collection home + per-set drill-down; both auth-gated; both
-client-side-compute as v1 stop-gap pending the
-mv_user_set_completion read endpoint — surfaced as Q-010 /
-#FU-19).
+collection w/ client-side-compute stop-gap; Q-010 → #FU-19) →
+iter 19 (T-W-CUSTOM + T-W-SMART + T-M-CUSTOM — 3-worker
+parallel; custom+smart collections live cross-platform; **closes
+Stage 05 mobile**; T-M-CUSTOM combines custom+smart per the spec
+while web splits into two tasks).
 
-iter 19 dispatching now: T-W-CUSTOM (web manual custom
-collections, 3-cap on free) + T-W-SMART (web smart collections,
-search free / save paid) + T-M-CUSTOM (mobile custom + smart,
-combined per the spec). Three workers, three orthogonal
-owns_paths trees (`apps/web/app/collections/custom/`,
-`apps/web/app/collections/smart/`,
-`apps/mobile/src/screens/collections/`). T-M-CUSTOM is wider
-scope on mobile because the spec ships custom + smart as one
-mobile feature (vs two on web). After this iter, the only
-remaining web tasks are T-W-SHAREABLE-PUBLIC + T-W-AFFILIATE-LINKS;
-mobile is fully done.
+iter 20 dispatching now (FINAL iter of the night per Pablo's
+"finish current + next batch and call it a night"):
+T-W-SHAREABLE-PUBLIC (public OG-imaged shareable pages) +
+T-W-AFFILIATE-LINKS (TCGplayer buy-CTAs on card detail; touches
+both web and a tiny mobile component). Two workers, orthogonal
+owns_paths. **These close Stage 04 web entirely (8/8) and
+finish the entire frontend foundation.**
+
+After iter 20 lands, every Phase 0-5 task is merged: foundation
+(Phase 0), data layer (Phase 1), backend core (Phase 2), shared
+packages (Phase 3), web (Phase 4), mobile (Phase 5). Remaining
+work splits into ops + advanced features: scanner (Stage 06),
+ML (07), integrations (08), admin (09), billing (10), deploy
+(11). 32 tasks remaining.
 
 Phase 1 progression (closed at iter 11):
 
@@ -180,6 +182,43 @@ exist atomically regardless of which platform signs the user up.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 15).
+
+## Iter 19 close summary (custom + smart trio; Phase 5 mobile complete)
+
+Three workers, three orthogonal owns_paths trees, three clean
+merges. **Third consecutive 3-worker iter (16/17/19) with zero
+pnpm-lock conflicts** — the lockfile section pattern (web vs
+mobile vs packages) is reliably mergeable in parallel.
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-M-CUSTOM | merged | #65 (`487fef4`) | +107 (412 total in @binderly/mobile) | Combined custom + smart in one task per `PROJECT.md` § 9 (vs web's split). All 5 screens live under `/collections/...` NOT under `(tabs)/` — bottom tab bar stays at 5 fixed tabs per `rules/05-mobile.md`. PrintingPicker + smart-editor Run preview both source from owned printings (cap 200); catalog-wide picker + server-evaluated preview deferred to v2 follow-ups. Plan-gating via `useSubscriptionQuery` + `isPaidTier` derived selector. Two-step inline delete (jsdom doesn't render Alert.alert). Smart detail tolerates expressions that no longer parse (fix-via-Edit notice instead of crashing). `vi.hoisted({ routerMocks })` everywhere. **Closes Stage 05 mobile (5/5).** |
+| T-W-CUSTOM | merged | #64 (`f796e2e`) | +54 (278 total in @binderly/web) | Two routes (list + detail). 3-cap gate on free with upsell tooltip. **Modal primitive rolled in-tree** at `components/collections/custom/Modal.tsx` (Esc + backdrop close, ARIA dialog) since `@binderly/ui` doesn't ship `<Modal>` yet — proposed T-SP-UI-MODAL follow-up. **Inline-edit fields use raw `<input>`/`<textarea>`** since `<Input>` doesn't expose `onBlur` — proposed T-SP-UI-INPUT-BLUR follow-up. Drag-to-reorder skipped per the "ship if small" brief guidance; members in `addedAt` order. **Smart-kind 404**: smart and manual share id space; manual detail renders only `kind === 'manual'`, others trigger `notFound()` (clean boundary with T-W-SMART). Optimistic update strategy: local mutation, rollback on rejection with non-blocking banner. No api-client edits needed. |
+| T-W-SMART | merged | #63 (`b59c427`) | +37 (289 total in @binderly/web) | Three routes (list + new + detail). Client-side DSL evaluation for v1 (fetched printings cap 200, `evaluate()` locally) — server-side compile-to-SQL is the v2 follow-up. Plan-gating via `getMySubscription`. **Save flow reuses the custom-collection persistence path** (smart and manual share id space; saved smart collection is a `custom_collection` row with `kind === 'smart'` + `dsl_expression` field) — mirror of the T-W-CUSTOM smart-kind 404 boundary. No api-client edits needed (all ops exposed at iter 16 via T-BE-EDGE-FUNCTIONS). |
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 19).
+
+## Iter 20 dispatch — web tail (Stage 04 cap)
+
+Two workers, two orthogonal owns_paths. **These close Stage 04
+web (8/8) and finish the entire frontend foundation.**
+
+| Task | Stage | Effort | Owns paths | Depends on (all merged) | Why now |
+|---|---|---|---|---|---|
+| T-W-SHAREABLE-PUBLIC | 04-web | L | `apps/web/app/c/` | T-W-COLLECTION | Public shareable pages (no auth required; SSR + OG images). User shares a link like `/c/[handle]/[slug]` and viewers see a read-only snapshot of the collection. Foundation for organic growth. |
+| T-W-AFFILIATE-LINKS | 04-web | S | `apps/web/lib/affiliate/`, `apps/web/components/buy-cta/`, `apps/mobile/src/components/buy-cta/` | T-W-BROWSE | TCGplayer affiliate "Buy" CTAs on card detail (web + mobile). Smaller scope than the other web tasks; the only iter-20 task that also touches mobile (single component under `apps/mobile/src/components/buy-cta/` — won't conflict since mobile is now done). |
+
+After iter 20 lands tonight, **Phases 0-5 will all be complete**:
+foundation, data layer, backend core, shared packages, web,
+mobile. Remaining work (Stages 06-11): scanner, ML,
+integrations, admin, billing, deploy. 32 tasks, all backend /
+mobile-scanner / ops surfaces. Logical next iter (when Pablo
+resumes after the night): open the scanner stage with
+T-SC-CAMERA + T-SC-EMBED-MODEL as a parallel pair, OR tackle
+#FU-19 (server-side completion endpoint) + #FU-17 (wire
+pricing-display into Card{View,Screen}) as a backend tidy-up
+iter.
 
 ## Iter 18 close summary (cross-platform collection)
 
@@ -425,11 +464,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
+- T-W-SMART — `b59c427` (web smart collections; +37 tests; client-side DSL eval; plan-gated save; reuses custom-collection persistence with kind='smart') — **iter 19 cap**
+- T-W-CUSTOM — `f796e2e` (web manual custom collections w/ 3-cap on free; +54 tests; in-tree Modal primitive; smart-kind 404 boundary)
+- T-M-CUSTOM — `487fef4` (mobile custom+smart combined; +107 tests; routes under /collections/... not bottom tab; **closes Stage 05 mobile 5/5**)
 - T-M-COLLECTION — `7339ab0` (mobile CollectionScreen + CollectionSetScreen; +64 tests; client-side-compute v1 stop-gap; Q-010 ratified as #FU-19; vi.hoisted router mocks) — **iter 18 cap**
 - T-W-COLLECTION — `402d59e` (web /collection + /collection/sets/[id]; +53 tests; soft auth gate via SignInPrompt; same client-side-compute v1 stop-gap as mobile; Q-009 in-PR resolve for `(tabs)/collection/`)
-- T-W-BROWSE — `8b87630` (web browse + per-set + card-detail routes; +59 tests; SC + force-dynamic + lazy api-client init; Q-009 resolved in-PR; UUID-based URLs) — **iter 17 cap**
-- T-M-BROWSE — `85972cd` (mobile BrowseScreen/SetScreen/CardScreen; +73 tests; FlatList + TanStack hooks; canonical_key slug; vi.hoisted router mocks)
-- T-SP-PRICING-DISPLAY — `b2ab9bf` (pricing-display: FX-aware formatting; 144 tests; 7 currencies; USD-base cross-currency; **closes Stage 03 shared packages**)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -472,6 +511,10 @@ placeholders untouched.
 17. **(Reserved — duplicate slot; see #FU-17 above.)**
 18. **URL convention divergence between web and mobile browse routes.** T-W-BROWSE uses raw UUIDs for `/sets/[id]` and `/cards/[id]` (api-client only exposes by-id). T-M-BROWSE uses slug-based `/sets/[slug]` resolving against the `/v1/sets` list cache (e.g. `en-base1`). Both work; both shipped green. T-W-COLLECTION inherited UUID; T-M-COLLECTION inherited slug — divergence persists in iter 18. Future cross-platform consolidation: pick one convention (probably slug, after a `getSetBySlug` endpoint lands) and migrate the other. Low priority — neither is user-visible while routes are SSR-hidden. **Logged as #FU-18.**
 19. **Server-side `/v1/me/collection/completion` endpoint (Q-010 ratified).** Both T-W-COLLECTION and T-M-COLLECTION ship a client-side-compute v1 stop-gap: fan out catalog reads, pre-project `{cards, printings}` + owned-ids, hand to `computeCompletion()`. Works for v1 sizes, but is O(catalog) per page-load. The fix is a backend endpoint exposing the existing `mv_user_set_completion` and `mv_user_global_completion` materialised views directly, so both screens read O(1) rows instead. Spec is in `PROJECT.md § 8`; the mv definitions already exist in the data layer (Phase 1) but lack a read-side wrapper. Likely a `T-BE-EDGE-FUNCTIONS-V2` follow-up or a small new edge-function task. **Logged as #FU-19.**
+20. **`@binderly/ui` `<Modal>` primitive missing.** T-W-CUSTOM rolled a modal in-tree at `apps/web/components/collections/custom/Modal.tsx` (Esc + backdrop close, ARIA dialog, no focus trap). T-W-SMART likely makes the same trade-off; iter-20+ tasks will too. Proposed `T-SP-UI-MODAL` follow-up to hoist a shared cross-platform modal into `@binderly/ui` once 2+ consumers are in main. **Logged as #FU-20.**
+21. **`@binderly/ui` `<Input>` doesn't expose `onBlur` / `onEndEditing`.** T-W-CUSTOM's detail screen uses raw `<input>`/`<textarea>` for inline-edit name/description because the shared `<Input>` wrapper doesn't surface blur events. Future T-SP-UI-INPUT-BLUR adds the prop pass-through (additive). **Logged as #FU-21.**
+22. **Catalog-wide PrintingPicker on mobile.** T-M-CUSTOM's `<PrintingPicker>` (manual collection "Add cards" flow) sources from the user's OWNED printings, not the full catalog. Tight v1 scope; product can lift this later if "browse-and-add" becomes a friction point. Same goes for T-M-CUSTOM's smart-editor Run preview (also owned-only). **Logged as #FU-22.**
+23. **Server-evaluated smart-collection preview.** Both T-W-SMART and T-M-CUSTOM evaluate smart-collection expressions client-side via `@binderly/smart-collection-dsl`'s `evaluate()` on a 200-printing preview window. For larger collections / future "run against entire catalog" semantics, the right shape is a server-side compile-to-SQL via an edge function (`@binderly/smart-collection-dsl`'s `compileToSql()` already supports this). **Logged as #FU-23.**
 
 ## Phase 0 ledger (closed; 10/10 merged)
 

@@ -609,7 +609,7 @@ tasks:
     stage: 04-web
     title: Web manual custom collections (3-cap on free)
     agent_role: frontend-web
-    status: in_review
+    status: merged
     depends_on: [T-W-COLLECTION]
     parallel_safe_with: [T-W-SMART]
     provides: [web:custom-collections]
@@ -622,7 +622,7 @@ tasks:
     stage: 04-web
     title: Web smart collections (search free, save paid; gated UI)
     agent_role: frontend-web
-    status: in_review
+    status: merged
     depends_on: [T-W-COLLECTION, T-SP-SMART-DSL]
     parallel_safe_with: [T-W-CUSTOM]
     provides: [web:smart-collections]
@@ -716,7 +716,7 @@ tasks:
     stage: 05-mobile
     title: Mobile custom + smart collections (with gating)
     agent_role: frontend-mobile
-    status: in_review
+    status: merged
     depends_on: [T-M-COLLECTION, T-SP-SMART-DSL]
     parallel_safe_with: []
     provides: [mobile:custom-collections]
