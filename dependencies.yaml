@@ -596,7 +596,7 @@ tasks:
     stage: 04-web
     title: Web collection home + per-set progress views
     agent_role: frontend-web
-    status: review
+    status: merged
     depends_on: [T-W-AUTH, T-SP-SET-COMPLETION]
     parallel_safe_with: [T-W-CUSTOM, T-W-SMART]
     provides: [web:collection]
@@ -703,7 +703,7 @@ tasks:
     stage: 05-mobile
     title: Mobile collection home + per-set progress
     agent_role: frontend-mobile
-    status: in_review
+    status: merged
     depends_on: [T-M-AUTH, T-SP-SET-COMPLETION]
     parallel_safe_with: [T-M-CUSTOM]
     provides: [mobile:collection]
