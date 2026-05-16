@@ -24,13 +24,13 @@ import {
   type CreateSmartCollectionInput,
   type SmartCollectionsApi,
 } from './api';
-import { makeCollectionItem } from '../../collection/fixtures';
 import {
   makeCard,
   makeCardWithPrintings,
   makePrinting,
   makeSet,
 } from '../../browse/fixtures';
+import { makeCollectionItem } from '../../collection/fixtures';
 
 const NOW = '2026-05-15T20:00:00.000Z';
 
@@ -172,8 +172,8 @@ const pikachuSwsh = makeCardWithPrintings(
     makePrinting({
       id: 'p-swsh-pikachu-norm',
       cardId: 'card-swsh-pikachu',
-      variantClass: 'NORMAL',
-      variantCode: 'normal',
+      variantClass: 'NON_HOLO',
+      variantCode: 'non-holo',
       includeInMasterSet: true,
     }),
   ],

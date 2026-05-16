@@ -15,6 +15,12 @@
 // I/O) and stage 2 only when the user clicks "Run" (linear in
 // the preview size).
 
+import type {
+  CardWithPrintingsDto,
+  CollectionItemDto,
+  PrintingDto,
+  SetDto,
+} from '@binderly/api-contracts';
 import {
   evaluateExpression,
   explainExpression,
@@ -30,12 +36,6 @@ import {
   type CatalogPreview,
 } from './api';
 
-import type {
-  CardWithPrintingsDto,
-  CollectionItemDto,
-  PrintingDto,
-  SetDto,
-} from '@binderly/api-contracts';
 
 /**
  * Discriminated union from the editor's textarea content. The
