@@ -1,0 +1,5 @@
+# Build outputs never go through prettier — tsc owns dist/. Mirrors
+# the pattern used by `packages/api-contracts` and `packages/auth`.
+dist/
+node_modules/
+coverage/
