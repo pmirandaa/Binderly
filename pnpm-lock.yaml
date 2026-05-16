@@ -30,6 +30,9 @@ importers:
       '@binderly/api-contracts':
         specifier: workspace:*
         version: link:../../packages/api-contracts
+      '@binderly/set-completion':
+        specifier: workspace:*
+        version: link:../../packages/set-completion
       '@binderly/ui':
         specifier: workspace:*
         version: link:../../packages/ui

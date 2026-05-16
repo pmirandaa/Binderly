@@ -1,3 +1,3 @@
-import { CollectionScreen } from '../../src/screens/CollectionScreen';
+import { CollectionScreen } from '../../src/screens/collection';
 
 export default CollectionScreen;
