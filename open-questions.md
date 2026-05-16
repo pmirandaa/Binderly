@@ -208,4 +208,64 @@ sibling `computeAllPokemonByPokedex()` (or similar).
 
 ---
 
+## Q-009 — `(tabs)/browse` placeholder collides with T-W-BROWSE's `app/browse/` route
+
+**Raised:** 2026-05-15
+**Blocking:** T-W-BROWSE
+
+**Context:** T-W-SHELL (PR merged at iter-14) created placeholder
+pages at `apps/web/app/(tabs)/browse/page.tsx`,
+`(tabs)/collection/page.tsx`, `(tabs)/scanner/page.tsx`, and
+`(tabs)/profile/page.tsx`, plus a sibling
+`apps/web/app/(tabs)/tabs.test.tsx` that imports each. The
+`(tabs)` route group does not add a URL segment in Next.js App
+Router — `(tabs)/browse/page.tsx` resolves to `/browse`.
+
+T-W-BROWSE's authoritative `owns_paths` (per `dependencies.yaml`)
+is `apps/web/app/browse/`, `apps/web/app/sets/`,
+`apps/web/app/cards/`. Creating
+`apps/web/app/browse/page.tsx` triggers a Next.js
+"You cannot have two parallel pages that resolve to the same
+path" build error because both `app/browse/page.tsx` and
+`app/(tabs)/browse/page.tsx` map to `/browse`.
+
+The shell appears to have anticipated a tab-navigation layout
+under `(tabs)/layout.tsx` that was never built — none of the
+four placeholder folders has a layout, and there's no
+shared-nav component. The placeholders exist solely so
+`(tabs)/tabs.test.tsx` has something to import.
+
+**Options:**
+
+1. **Delete `(tabs)/browse/page.tsx` and update
+   `(tabs)/tabs.test.tsx` to drop the browse test.** Land the
+   real `/browse` implementation under
+   `apps/web/app/browse/page.tsx` per the
+   T-W-BROWSE `owns_paths`. The other three `(tabs)/*`
+   placeholders stay untouched until their feature tasks land
+   (T-W-COLLECTION, T-W-AUTH/profile, scanner is mobile-only).
+   This is the minimal-blast-radius option.
+2. **Move the real implementation under
+   `(tabs)/browse/page.tsx`.** Cleaner long-term if a real tab
+   layout lands later, but it edits paths outside T-W-BROWSE's
+   `owns_paths` and effectively redirects the whole task into
+   `(tabs)/`, which the brief did not authorize. Also moves
+   set / card routes (`(tabs)/sets/[id]`,
+   `(tabs)/cards/[id]`) to mirror.
+3. **Keep both pages and special-case the conflict** — not an
+   option: Next.js refuses to compile.
+
+**Recommendation:** Option 1, executed inside this PR. The
+delete-and-update is a pure follow-up to a shell drift bug
+(empty placeholder + no tab layout) and the only path that
+both ships T-W-BROWSE at its declared `owns_paths` and
+preserves the build. Documented prominently in the PR body so
+the orchestrator can rescope T-W-COLLECTION /
+T-W-PROFILE / etc. when those tasks dispatch.
+
+**Pablo's answer:** _(empty until answered — proceeding with
+recommendation in this PR; revert is one-line if rejected)_
+
+---
+
 _(no other open questions yet)_
