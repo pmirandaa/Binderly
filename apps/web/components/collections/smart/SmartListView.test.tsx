@@ -160,16 +160,16 @@ describe('SmartListView — error & loading', () => {
 
   it('renders a loading state until the read resolves', async () => {
     const api = createFakeSmartCollectionsApi();
-    let resolve: (() => void) | null = null;
+    let resolveFn: (() => void) | null = null;
     api.listSmartCollections.mockImplementation(
       () =>
-        new Promise<never[]>((r) => {
-          resolve = (): void => r([]);
+        new Promise((r: (v: never[]) => void) => {
+          resolveFn = (): void => r([]);
         }),
     );
     renderWithProviders(<SmartListView api={api} />);
     expect(screen.getByText(/loading smart collections/i)).toBeInTheDocument();
-    resolve?.();
+    (resolveFn as (() => void) | null)?.();
     await waitFor(() => {
       expect(
         within(screen.getByTestId('smart-list-page')).getByTestId('smart-list-upgrade'),
