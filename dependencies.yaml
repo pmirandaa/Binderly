@@ -583,14 +583,14 @@ tasks:
     stage: 04-web
     title: Browse + search (sets ordered by release desc, filters, full-text)
     agent_role: frontend-web
-    status: pending
+    status: in_review
     depends_on: [T-W-SHELL, T-BE-API-CLIENT, T-DL-SEED-INGEST]
     parallel_safe_with: [T-W-AUTH]
     provides: [web:browse]
     owns_paths: [apps/web/app/browse/, apps/web/app/sets/, apps/web/app/cards/]
     task_file: tasks/04-web/T-W-BROWSE.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-W-COLLECTION
     stage: 04-web
