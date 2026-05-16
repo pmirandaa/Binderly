@@ -635,14 +635,14 @@ tasks:
     stage: 04-web
     title: Public shareable pages (SSR, OG images)
     agent_role: frontend-web
-    status: pending
+    status: review
     depends_on: [T-W-COLLECTION]
     parallel_safe_with: []
     provides: [web:public-shareable]
     owns_paths: [apps/web/app/c/]
     task_file: tasks/04-web/T-W-SHAREABLE-PUBLIC.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-W-AFFILIATE-LINKS
     stage: 04-web

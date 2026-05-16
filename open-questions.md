@@ -313,4 +313,88 @@ when T-BE-EDGE-FUNCTIONS dispatches)_
 
 ---
 
+## Q-011 — Public shareable read endpoint not implemented; richer payload needed (T-W-SHAREABLE-PUBLIC)
+
+**Raised:** 2026-05-15
+**Blocking:** None as of this PR — page scaffold compiles & ships with
+the existing client surface and a degraded runtime adapter. Blocks the
+end-to-end "logged-out user sees a real collection snapshot" UX.
+**Status:** Open — flagged for the backend track (likely a follow-up
+to T-BE-EDGE-FUNCTIONS).
+
+**Context:**
+
+`@binderly/api-client` exposes `shareables.getPublicShareable({handle, slug})`
+which `POST /v1/c/{handle}/{slug}` (`anonymous: true`, returns
+`shareableDto`). The contract is wired client-side, but:
+
+1. **The route is not implemented in the Edge Function.** The dispatch
+   table at `infra/supabase/functions/_shared/routes-table.ts` carries
+   no `/c/...` entry — every entry is `/me/...`. Calling
+   `getPublicShareable` against the live function would 404 today.
+2. **`shareableDto` is metadata only.** It contains
+   `{ id, userId, slug, target, theme, show*, timestamps }` — no
+   owner handle, no display name, no collection name, no member
+   list, no ownership counts. The SSR page needs at minimum:
+   - owner `{ handle, displayName, avatarUrl?, bio? }`
+   - human title for the collection (custom name or "Full collection")
+   - counts: `{ ownedUnique, catalogTotal, masterPct? }`
+   - member list: `[{ printingId, cardId, cardName, setName, setCode, imageUrl }]`
+   The data layer in this PR (`apps/web/lib/share/api.ts`) defines a
+   `PublicSharePayload` type that captures that contract. Tests use a
+   fake adapter that returns a fully populated payload; the runtime
+   adapter calls `getPublicShareable` and synthesises a degraded
+   payload (metadata + URL-derived handle + empty members + zero
+   counts) so production renders the page header without crashing.
+
+**What this PR does:**
+
+- Builds the page (`/c/[handle]/[slug]`) and OG image route
+  (`/c/[handle]/[slug]/opengraph-image`) against `ShareApi` —
+  injectable, props-pattern — so tests exercise the full surface
+  without the backend.
+- Defines `PublicSharePayload` as the contract we expect the
+  backend to return; the runtime adapter fills as much of it as
+  the current client surface allows. The data layer is the seam
+  the backend follow-up edits.
+- Ships SSR meta tags + an OG image that renders correctly when
+  the payload is populated (test-injected).
+
+**Options for the backend follow-up:**
+
+1. **Add a single `GET /v1/c/{handle}/{slug}` Edge route** that
+   returns `{ shareable, owner, collectionTitle, counts, members }`
+   in one anonymous payload. The client surface already calls
+   this URL; the response shape would be a NEW `publicShareableDto`
+   in `@binderly/api-contracts` (the existing `getPublicShareable`
+   returns `shareableDto` only — promote it to the richer shape, or
+   add a sibling method that returns the richer shape). Lowest
+   client churn; one round-trip; the SSR page reads exactly what
+   it renders.
+2. **Two endpoints.** One returns `shareableDto` (as today), the
+   other returns the member list paginated. Lets the OG image and
+   header render before the member grid streams in — but adds a
+   client round-trip and the public page is intentionally simple
+   so this complexity isn't earning anything yet.
+3. **Compose from existing primitives.** Add anonymous-readable
+   variants of `/v1/me/collection` and `/v1/me/profile` gated by a
+   "shareable token" header. Reuses the existing handlers — but
+   the RLS rewrite is deep and the SSR page would have to fan out
+   3+ requests on the hot path. Worst option.
+
+**Recommendation:** Option 1. The contract change is additive
+(`publicShareableDto` is new) and the client surface already
+expects an anonymous round-trip at this URL. The Edge handler
+joins `shareable` ↔ `profile` ↔ `collection_item` (and
+optionally `custom_collection`) once and returns one envelope.
+The web data layer in this PR drops in unchanged — only the
+runtime adapter swaps the degraded synthesis for a direct
+`getPublicShareablePayload(...)` call.
+
+**Pablo's answer:** _(empty — proceeding with degraded runtime
+adapter + injectable test fake; backend follow-up flagged for the
+next backend iteration)_
+
+---
+
 _(no other open questions yet)_
