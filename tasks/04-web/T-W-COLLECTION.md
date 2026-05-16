@@ -3,83 +3,243 @@
 **Stage:** 04-web
 **Agent role:** frontend-web
 **Effort:** L
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** in_review
 
----
+## Hard dependencies
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 10 (Core App Features), § 14 (Shareables), § 16 (Freemium)) and any
->    referenced sections.
-> 2. Read `rules/04-web.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-W-COLLECTION`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+- T-W-AUTH (merged) — `useAuth()` provider + `/auth/sign-in?next=…` round-trip.
+- T-SP-SET-COMPLETION (merged) — `computeCompletion()` orchestrator + DTO shapes.
 
----
+## Soft dependencies
 
-## Provisional metadata (from `dependencies.yaml`)
+- T-W-BROWSE (merged) — the patterns this task mirrors (`BrowseApi`
+  interface, `createFakeBrowseApi()` test seam, `notFound()` render-
+  branch).
 
-**Hard dependencies:**
+## Required reading
 
-- T-W-AUTH
-- T-SP-SET-COMPLETION
+- PROJECT.md § 8 (Master Set & Completion), § 10 (Core App Features).
+- rules/04-web.md — stage rules.
+- `apps/web/app/layout.tsx`,
+  `apps/web/components/providers/AuthProvider.tsx`,
+  `apps/web/lib/env.ts`,
+  `apps/web/lib/api-client.ts`,
+  `apps/web/lib/supabase-browser.ts` — the shell.
+- `apps/web/app/auth/sign-in/page.tsx` — auth-gated UX patterns.
+- `apps/web/app/browse/page.tsx`,
+  `apps/web/components/browse/BrowseView.tsx`,
+  `apps/web/lib/browse/api.ts` — the closest sibling. `BrowseApi`
+  interface + `createFakeBrowseApi()` + `notFound()` render-time
+  pattern are EXACTLY what this task mirrors.
+- `packages/set-completion/src/index.ts` — `computeCompletion`,
+  per-set + global DTO shapes.
+- `packages/api-client/src/resources/collection.ts` — already
+  exposes `listCollectionItems` for `/v1/me/collection`.
+- `packages/api-contracts/src/collection.ts` — `CollectionItemDto`.
 
-**Parallel-safe with:** T-W-CUSTOM, T-W-SMART
+## Goal
 
-**Owns paths:**
+Ship the user's personal collection experience on web at
+`/collection`. Three surfaces (collection home, per-set drill-down)
+sit behind a soft auth gate (sign-in prompt; no crash) and read
+catalog data via `@binderly/api-client`, owned-item data via the
+same client's `collection.listCollectionItems`, and compute Set %,
+Master % and All Pokémon % via `@binderly/set-completion`'s
+top-level orchestrator.
 
-- `apps/web/app/collection/`
+This task is the FOUNDATION for T-W-CUSTOM (manual collections),
+T-W-SMART (smart collections), and T-W-SHAREABLE-PUBLIC (public
+shareable pages) — every one of those tasks depends on the
+`CollectionApi` interface, the `CollectionView` data flow, and the
+`ProgressBar` component this task introduces. The brief explicitly
+forbids building any of those features here.
 
-## Provisional goal
+## Deliverables
 
-Web collection home + per-set progress views.
+- `apps/web/app/collection/page.tsx` — `/collection` route
+  (server component, `dynamic = 'force-dynamic'`).
+- `apps/web/app/collection/loading.tsx` — route loading
+  skeleton.
+- `apps/web/app/collection/sets/[id]/page.tsx` —
+  `/collection/sets/[id]` per-set drill-down route.
+- `apps/web/app/collection/sets/[id]/loading.tsx` — route
+  loading skeleton.
+- `apps/web/components/collection/CollectionRoute.tsx` —
+  auth-gate glue + lazy api-client construction (mirrors
+  T-W-BROWSE's `BrowseRoute`).
+- `apps/web/components/collection/CollectionView.tsx` — home
+  view (global completion badge + per-set rollups).
+- `apps/web/components/collection/CollectionSetRoute.tsx` —
+  per-set auth-gate glue.
+- `apps/web/components/collection/CollectionSetView.tsx` —
+  per-set drill-down with Owned/Missing tabs.
+- `apps/web/components/collection/ProgressBar.tsx` — accessible
+  progress bar primitive (kept local; see §
+  "Non-obvious decisions").
+- `apps/web/components/collection/SignInPrompt.tsx` — friendly
+  sign-in upsell shown when auth is missing.
+- `apps/web/lib/collection/api.ts` — `CollectionApi` narrow
+  interface + `apiToCollectionApi(client)` adapter +
+  `rosterFromCardsWithPrintings` / `ownedPrintingIds` helpers.
+- `apps/web/lib/collection/format.ts` — `formatPercent`,
+  `formatOwnedCount`, `formatGlobalCount`, `conditionLabel`,
+  `languageBadge`, `sortByCompletionThenRelease`.
+- `apps/web/lib/collection/fixtures.ts` — test-only fixtures +
+  `createFakeCollectionApi(...)` mirroring the browse fixtures
+  shape.
+- Test suites alongside each component / module —
+  CollectionView (12), CollectionSetView (17),
+  CollectionRoute (2), ProgressBar (4), SignInPrompt (3),
+  lib/collection/api (7), lib/collection/format (8) =
+  **53 new tests**, all passing.
+- `apps/web/package.json` — added `@binderly/set-completion`
+  workspace dep. (Outside `owns_paths` but pre-authorized by the
+  brief.)
+- `apps/web/app/(tabs)/collection/page.tsx` — DELETED (Q-009
+  pattern repeat — see "Non-obvious decisions").
+- `apps/web/app/(tabs)/tabs.test.tsx` — updated to drop the
+  collection placeholder test (Q-009 pattern).
+- `pnpm-lock.yaml` — regenerated by `pnpm install`.
+- `dependencies.yaml` — `T-W-COLLECTION` flipped
+  `status: pending → status: review`,
+  `stub: true → stub: false`.
 
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
+## Acceptance criteria
 
-## Provisional reading list
+- [x] `pnpm install` succeeds.
+- [x] `pnpm --filter @binderly/web typecheck` succeeds.
+- [x] `pnpm --filter @binderly/web lint` succeeds.
+- [x] `pnpm --filter @binderly/web test` succeeds with at least
+      30 tests covering the brief's nine bullet items. We landed
+      53 collection-specific tests across:
+      - `/collection` shows sign-in prompt for signed-out user
+        (CollectionRoute test).
+      - `/collection` renders set list ordered by completion % desc
+        when signed in (CollectionView tests).
+      - global completion badge renders correct totals from
+        mocked api-client (CollectionView tests).
+      - empty state shows when user has zero owned items
+        (CollectionView empty-state tests).
+      - error state shows when api-client throws (CollectionView
+        error test).
+      - `/collection/sets/[id]` renders Owned tab by default with
+        mocked data (CollectionSetView tab tests).
+      - `/collection/sets/[id]` Missing tab renders catalog minus
+        owned (CollectionSetView tab tests).
+      - `/collection/sets/[id]` 404 for unknown id
+        (CollectionSetView 404 test).
+      - tab switch updates the URL query string
+        (CollectionSetView tab → URL test).
+      - progress bars show correct percentages for known fixtures
+        (CollectionView + CollectionSetView fixture-math tests
+        using `computeCompletion()` directly on the same
+        fixtures, NOT duplicated math).
+- [x] `unset NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY
+      && pnpm --filter @binderly/web build` succeeds — both
+      `/collection` and `/collection/sets/[id]` are marked
+      `ƒ (Dynamic)` in the build output. Lazy-init pattern from
+      T-W-BROWSE is reused verbatim.
+- [x] Replace the STUB section per `AGENT_ORCHESTRATOR.md` § 7.
+- [x] PR title matches `feat(web): T-W-COLLECTION — collection
+      home + per-set progress drill-down`.
 
-- PROJECT.md § 10 (Core App Features), § 14 (Shareables), § 16 (Freemium)
-- rules/04-web.md
-- (context files added at elaboration time based on the stage rules)
+## Out of scope
+
+- Mutations (add / remove collection items). The brief
+  explicitly defers these: per-card "Add" lives on
+  `/cards/[id]` in T-W-BROWSE as a DISABLED button with a
+  sign-in tooltip; "Remove" is a follow-up. The per-set Owned
+  grid only DISPLAYS owned state.
+- Custom collections (T-W-CUSTOM).
+- Smart collections (T-W-SMART).
+- Shareable links (T-W-SHAREABLE-PUBLIC).
+- Pricing display wire-up (T-SP-PRICING-DISPLAY is merged but
+  per follow-up #FU-17 the wire-up is a separate pass). The per-
+  set view shows a "Total value coming soon" placeholder.
+- Scanner / camera.
+
+## Non-obvious decisions
+
+- **Soft auth gate.** The brief was emphatic: do NOT crash if
+  the user is signed out. `CollectionRoute` / `CollectionSetRoute`
+  consume `useAuth()`, render a `<PageLoading>` while
+  `loading === true`, then either render the `<SignInPrompt>`
+  upsell (with `?next=` round-trip) or the real view. No
+  middleware redirect needed — the route is `dynamic =
+  'force-dynamic'` so auth is checked at runtime in the
+  browser.
+- **`@binderly/set-completion` wired via the top-level
+  `computeCompletion()` orchestrator.** The brief specifies the
+  "global completion badge" uses the orchestrator's `global`
+  output. We pre-project the catalog into the narrow
+  `{ cards: RosterCard[], printings: RosterPrinting[] }` shape
+  in `lib/collection/api.ts` (`catalogRoster()` + the
+  `rosterFromCardsWithPrintings` helper for per-set re-use), and
+  hand `ownedPrintingIds(items)` to `computeCompletion`. Per-set
+  results come from the same call's `perSet` array, indexed by
+  `setId` for O(1) lookup in the home view.
+- **No new api-client methods needed.**
+  `client.collection.listCollectionItems` already exists from
+  T-BE-API-CLIENT / T-BE-EDGE-FUNCTIONS. We exhaust the cursor
+  in `apiToCollectionApi.listOwnedItems` (cap = 200 pages × 100
+  = ~20k items, covers a year-one Pro user). Mirrors T-W-BROWSE's
+  `apiToBrowseApi.listAllSets` cursor-exhaustion pattern.
+- **Roster fetch is expensive.** `catalogRoster()` walks every
+  set → every card in every set → every printing in every card.
+  This is the price of computing All Pokémon % client-side. At
+  v1 catalog size (≤ ~1000 sets, ≤ ~30k printings) it's
+  acceptable. Future optimisation: materialised view exposed
+  via `/v1/me/collection/completion` (deferred — would require
+  a separate task touching api-client + edge functions).
+- **Tab state mirrors the URL.** The brief allows either query
+  string or local state; we picked `?tab=missing` so deep-links
+  reproduce, AND mirror it via `router.replace` so back/forward
+  doesn't re-stack history. Local state is the source of truth
+  during a session; URL sync only fires when an explicit URL
+  value disagrees with local state (so `initialTab` props in
+  tests aren't clobbered).
+- **`ProgressBar` lives in `components/collection/` not
+  `@binderly/ui`.** Only one consumer right now; moving it into
+  the shared UI package would be premature. If a second feature
+  (custom collections, shareables) needs progress bars, lift
+  then. Documented inline in the component.
+- **Test-only fixtures import from
+  `lib/browse/fixtures.ts`.** Re-using `makeSet`, `makeCard`,
+  `makePrinting`, etc. keeps the per-row defaults consistent
+  with the browse suite — and `lib/browse/fixtures.ts` is also
+  test-only (no production import), so the test-only graph stays
+  isolated from production code. The `void` lints on the
+  imported helpers in `CollectionSetView.test.tsx` ensure
+  unused-imports doesn't trip when the test suite narrows
+  later.
+- **`(tabs)/collection/` placeholder collision resolved via the
+  Q-009 in-PR pattern T-W-BROWSE established.** Deleted
+  `apps/web/app/(tabs)/collection/page.tsx` and removed the
+  `collection page renders without crashing` case from
+  `apps/web/app/(tabs)/tabs.test.tsx`. The other `(tabs)/*`
+  placeholders (`profile`, `scanner`) stay. Both edits are
+  pre-authorized by the brief.
 
 ## Branch & PR
 
 - Branch: `agent/T-W-COLLECTION`
-- PR title: `T-W-COLLECTION: Web collection home + per-set progress views`
+- PR title:
+  `feat(web): T-W-COLLECTION — collection home + per-set progress drill-down`
+- Commit format: Conventional Commits.
+
+## Escalation triggers
+
+- None hit during this task.
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+- Sub-agent ran on iteration 18.
+- 53 collection-specific tests pass; total `apps/web` test
+  count is **223 tests** across 33 files.
+- `pnpm --filter @binderly/web build` with no env vars set:
+  **succeeded**, `/collection` and `/collection/sets/[id]`
+  render as `ƒ (Dynamic)` per the iter-14 W-SHELL hotfix
+  pattern.
+- No `open-questions.md` additions — the `(tabs)/collection`
+  collision was resolved by the same Q-009 in-PR pattern, so
+  no new question was raised.
