@@ -18,16 +18,11 @@ import { ApiNotFoundError } from '@binderly/api-client';
 import type { PrintingWithContextDto } from '@binderly/api-contracts';
 import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
-
-import {
-  formatReleaseDate,
-  languageLabel,
-  rarityLabel,
-} from '../../lib/browse/format';
+import { formatReleaseDate, languageLabel, rarityLabel } from '../../lib/browse/format';
+import { BuyCta } from '../buy-cta';
 import { PageLoading } from '../loading/PageLoading';
 
 import type { BrowseApi } from '../../lib/browse/api';
-
 
 export interface CardViewProps {
   api: BrowseApi;
@@ -129,13 +124,7 @@ export function CardView({ api, printingId, onNotFound }: CardViewProps): React.
   const variantLabel = data.variantClass.replace(/_/g, ' ').toLowerCase();
 
   return (
-    <YStack
-      padding="$6"
-      gap="$5"
-      maxWidth={1200}
-      marginHorizontal="auto"
-      data-testid="card-page"
-    >
+    <YStack padding="$6" gap="$5" maxWidth={1200} marginHorizontal="auto" data-testid="card-page">
       <Link
         href={`/sets/${encodeURIComponent(set.id)}`}
         style={{ textDecoration: 'none' }}
@@ -202,11 +191,26 @@ export function CardView({ api, printingId, onNotFound }: CardViewProps): React.
             </Text>
           </Card>
 
+          <Card variant="outlined" padding="$4" gap="$3" data-testid="card-buy">
+            <Text variant="subtitle">Buy</Text>
+            <Text variant="body" tone="muted">
+              Open this card on TCGplayer. Binderly earns a small affiliate commission on purchases
+              — see our pricing &amp; disclosure footer.
+            </Text>
+            <BuyCta
+              card={{
+                cardName: card.name,
+                setName: set.name,
+                number: card.number,
+              }}
+            />
+          </Card>
+
           <Card variant="outlined" padding="$4" gap="$3" data-testid="card-add-placeholder">
             <Text variant="subtitle">Add to collection</Text>
             <Text variant="body" tone="muted">
-              Tracking lands with the collection task. For now, sign in and head to your
-              collection to add cards manually or via the scanner on mobile.
+              Tracking lands with the collection task. For now, sign in and head to your collection
+              to add cards manually or via the scanner on mobile.
             </Text>
             <span title={ADD_TO_COLLECTION_TOOLTIP} data-testid="card-add-tooltip">
               <Button

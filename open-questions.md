@@ -34,7 +34,7 @@ need GitHub-side permissions the sandbox can't perform:
 2. The `master` branch can't be deleted on origin until the default
    branch is changed.
 
-`gh auth status` reports: *"The token in keyring is invalid."*
+`gh auth status` reports: _"The token in keyring is invalid."_
 
 **Options:**
 
@@ -55,7 +55,7 @@ need GitHub-side permissions the sandbox can't perform:
    the agent. Cons: a few clicks per task × ~109 tasks; tedious.
 
 **Recommendation:** Option 1. The orchestrator will continue dispatching
-sub-agents who *push* their branches and print the GitHub
+sub-agents who _push_ their branches and print the GitHub
 "Create a pull request for `agent/<task-id>`" URL in their completion
 summary. Pablo opens those PRs manually until `gh` is re-authed; after
 that, sub-agents will use `gh pr create --base main` automatically.
@@ -64,12 +64,14 @@ that, sub-agents will use `gh pr create --base main` automatically.
 
 **Orchestrator follow-up (2026-04-30, post-T-FN-CI):** still broken.
 `gh auth status` returns:
+
 ```
 github.com
   X Failed to log in to github.com account pmirandaa (keyring)
   - Active account: true
   - The token in keyring is invalid.
 ```
+
 Pablo: please re-run `gh auth login -h github.com` (HTTPS, paste a
 fresh PAT with `repo` + `workflow` + `admin:public_key` scopes, or
 the device-code flow). The orchestrator will run the default-branch
@@ -81,13 +83,14 @@ PRs were opened that way and it's working.
 **RESOLVED 2026-04-30 (post-Q-001 re-auth round 2):**
 `gh auth status` clean — token `gho_…`, scopes `gist, read:org, repo,
 workflow`. Orchestrator executed the cleanup actions:
+
 - `gh repo edit pmirandaa/Binderly --default-branch main` ✓
 - `git ls-remote --heads origin` confirms no `master` ref (already
   gone — likely cleared during the GH-side default-branch swap).
 - `git push origin --delete agent/T-FN-CI` ✓ (merged branch tidied).
-Default branch verified `main` via `gh repo view --json
+  Default branch verified `main` via `gh repo view --json
 defaultBranchRef`. Future sub-agent dispatches will use
-`gh pr create --base main` automatically.
+  `gh pr create --base main` automatically.
 
 ---
 
@@ -98,8 +101,8 @@ defaultBranchRef`. Future sub-agent dispatches will use
 T-FN-DB-MIGRATIONS, T-FN-ENV-CONVENTIONS, all of Phase 1).
 
 **Context:** The T-FN-DOCKER sub-agent ran its mandatory pre-flight
-(`docker info`) and the daemon refused: *"Cannot connect to the Docker
-daemon at unix:///Users/pmiranda/.docker/run/docker.sock"*. The Docker
+(`docker info`) and the daemon refused: _"Cannot connect to the Docker
+daemon at unix:///Users/pmiranda/.docker/run/docker.sock"_. The Docker
 CLI is installed (v28.3.3, context `desktop-linux`, darwin/arm64), but
 Docker Desktop itself isn't running. Per the task's escalation rule the
 sub-agent stopped immediately without modifying any files. The worktree
@@ -147,6 +150,7 @@ work**. Diagnostic files left in `/tmp/docker-bounce-trace.log` +
 `/tmp/docker-bounce-trace.pid` for the next session.
 
 **Recommended next step (next session):**
+
 1. Reboot the Mac. launchd will not respawn the zombie Electrons,
    guaranteeing a clean process tree. This is the safest "did the
    pkill miss something?" hammer before anything destructive.
@@ -155,8 +159,8 @@ work**. Diagnostic files left in `/tmp/docker-bounce-trace.log` +
 3. If it STILL bounces post-reboot: re-tail
    `~/Library/Containers/com.docker.docker/Data/log/host/monitor.log`
    immediately after the bounce and paste the `[main.bugsnag]
-   notifying bugsnag: [starting]` line. If pids of the form
-   "* pid <N>: Docker Desktop" reappear, something is auto-launching
+notifying bugsnag: [starting]` line. If pids of the form
+   "\* pid <N>: Docker Desktop" reappear, something is auto-launching
    them — check Login Items (System Settings → General → Login Items)
    for stray Docker entries.
 4. If still broken: try Docker Desktop's built-in factory reset from
@@ -285,10 +289,10 @@ list) and `getCollectionStats` is not yet wired.
 
 - The home `CollectionScreen` walks `/v1/me/collection`, fans out
   `getPrinting(id)` per owned printing to enrich with `setId / cardId /
-  includeInMasterSet`, and computes Set % on-device using `set.total` as the
+includeInMasterSet`, and computes Set % on-device using `set.total` as the
   denominator and the count of distinct owned cards per set as the numerator.
 - Master % on the home row is intentionally left at 0 with an "Open set to
-  compute" affordance — the precise denominator requires the *full* per-set
+  compute" affordance — the precise denominator requires the _full_ per-set
   printing roster, which would fan out to hundreds of network calls per home
   render. The drill-down (`CollectionSetScreen`) loads that roster once per set
   visited and shows precise Set / Master percentages via
@@ -302,7 +306,7 @@ When `mv_user_set_completion` ships:
 
 1. The home screen should switch to reading the materialized view directly (one
    query, no fan-out) for both Set % and Master %.
-2. `useOwnedPrintingsContextQuery` becomes the *fallback* / offline-cache path
+2. `useOwnedPrintingsContextQuery` becomes the _fallback_ / offline-cache path
    instead of the primary data source.
 3. The drill-down's per-set computation can stay as-is — having the full roster
    on hand is useful for the "Missing" tab anyway.
@@ -310,6 +314,61 @@ When `mv_user_set_completion` ships:
 **Pablo's answer:** _(empty — proceeding with on-device computation per partial
 roster; documented prominently in the PR body so the orchestrator can rescope
 when T-BE-EDGE-FUNCTIONS dispatches)_
+
+---
+
+## Q-011 — Exact TCGplayer affiliate URL format unconfirmed
+
+**Raised:** 2026-05-15
+**Blocking:** _(none — `<BuyCta>` shipped with a documented placeholder)_
+**Related follow-up:** #FU-24
+
+**Context:** T-W-AFFILIATE-LINKS ships a `<BuyCta>` component (web + mobile)
+that builds TCGplayer affiliate search URLs of the form:
+
+```
+https://tcgplayer.com/search/pokemon/product?productLineName=pokemon
+  &q=<name> <number> <set name>
+  &utm_source=binderly
+  &utm_medium=affiliate
+  &utm_campaign=binderly-buy-cta
+  &utm_id=<NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID>
+```
+
+The brief explicitly told us to ship a documented placeholder if we
+couldn't verify the wire format against Impact's partner docs. We
+have not signed up for TCGplayer's affiliate program (via Impact) yet,
+so the URL above is a best-effort approximation:
+
+1. TCGplayer's storefront URL templates use both `search/pokemon/product`
+   and `search/all/product?productLineName=pokemon` in the wild — both
+   load card-search pages but the canonical "affiliate-friendly" path
+   isn't pinned anywhere we could find.
+2. Impact's standard tracking param is `clickref=<id>` or `irclickid=<id>`.
+   TCGplayer in particular has historically used `partner=<vendor>` on
+   their consumer storefront. The `utm_id` we ship will not break the
+   redirect, but it may not be what Impact's dashboard listens to.
+
+**Options:**
+
+1. **Sign up for the TCGplayer affiliate program once Pablo has the
+   business entity ready; receive the exact wire format + tracking
+   param spec from Impact; update both `apps/web/lib/affiliate/tcgplayer.ts`
+   and `apps/mobile/src/components/buy-cta/tcgplayer.ts` in lockstep.**
+   Tracked as #FU-24. Pros: the only path that guarantees attribution
+   is recorded server-side. Recommended.
+2. Ship the placeholder URL and trust that TCGplayer's frontend hashes
+   our `utm_id` into something Impact can correlate later. Pros: zero
+   work now. Cons: silent revenue loss if attribution doesn't land.
+
+**Recommendation:** Option 1 — but #FU-24 is non-blocking for this
+PR. The "Coming soon" degraded path is the production default until
+an affiliate id lands in the environment, so users see the same
+"button disabled" UX they did before this PR until we have a real id.
+The URL template change, when it lands, is a 5-line edit in two
+files + a test update.
+
+**Pablo's answer:** _(empty until answered)_
 
 ---
 

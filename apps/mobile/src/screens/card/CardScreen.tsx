@@ -22,8 +22,8 @@ import { ApiNotFoundError } from '@binderly/api-client';
 import type { CardWithPrintingsDto, PrintingDto } from '@binderly/api-contracts';
 import { Button, Card, Spinner, Text, XStack, YStack } from '@binderly/ui';
 
+import { BuyCta } from '../../components/buy-cta/index.js';
 import { languageLabel, useCardQuery, variantClassLabel } from '../../lib/browse/index.js';
-
 
 const styles = StyleSheet.create({
   heroImage: { width: '100%', height: '100%' },
@@ -47,11 +47,7 @@ export function CardScreen(): ReactNode {
     if (cardQuery.error instanceof ApiNotFoundError) {
       return <CardNotFoundState reason="unknown-id" id={id} />;
     }
-    return (
-      <CardErrorState
-        message={cardQuery.error?.message ?? 'Failed to load this card.'}
-      />
-    );
+    return <CardErrorState message={cardQuery.error?.message ?? 'Failed to load this card.'} />;
   }
 
   const card = cardQuery.data;
@@ -68,13 +64,7 @@ function CardDetailView({ card }: { card: CardWithPrintingsDto }): ReactNode {
 
   return (
     <ScrollView testID="card-screen">
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        gap="$4"
-        padding="$4"
-        paddingTop="$6"
-      >
+      <YStack flex={1} backgroundColor="$background" gap="$4" padding="$4" paddingTop="$6">
         <YStack
           alignItems="center"
           justifyContent="center"
@@ -142,6 +132,22 @@ function CardDetailView({ card }: { card: CardWithPrintingsDto }): ReactNode {
           <Text variant="caption" tone="muted">
             Prices land here once pricing display ships (T-SP-PRICING-DISPLAY).
           </Text>
+        </Card>
+
+        <Card variant="outlined" gap="$2" testID="card-buy">
+          <Text variant="label" tone="default">
+            Buy
+          </Text>
+          <Text variant="caption" tone="muted">
+            Open this card on TCGplayer. Binderly earns a small affiliate commission on purchases —
+            see our pricing & disclosure footer.
+          </Text>
+          <BuyCta
+            card={{
+              cardName: card.name,
+              number: card.number,
+            }}
+          />
         </Card>
 
         <YStack gap="$1" testID="card-add">
