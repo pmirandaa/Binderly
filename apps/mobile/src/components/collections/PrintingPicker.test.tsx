@@ -37,7 +37,7 @@ describe('<PrintingPicker>', () => {
       />,
     );
     expect(result.queryByTestId('printing-picker-empty')).not.toBeNull();
-    expect(result.container.textContent).toContain("don't own any cards");
+    expect(result.container.textContent).toContain('own any cards');
   });
 
   it('renders an Add button per owned printing', () => {

@@ -23,6 +23,7 @@
 // untouched; the server re-evaluates against the full catalog
 // when the smart collection is read.
 
+import type { CardDto, PrintingDto, SetDto } from '@binderly/api-contracts';
 import {
   evaluateExpression,
   explainExpression,
@@ -32,7 +33,6 @@ import {
   type Expression,
 } from '@binderly/smart-collection-dsl';
 
-import type { CardDto, PrintingDto, SetDto } from '@binderly/api-contracts';
 
 /**
  * Result of `parseDslText`. Discriminated by `status` so the editor

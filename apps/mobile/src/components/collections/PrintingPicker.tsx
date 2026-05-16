@@ -16,11 +16,12 @@
 //   - Add fires a callback per row; the parent screen owns the
 //     mutation. Multiple Add presses queue independent mutations.
 
-import type { ReactNode } from 'react';
 import { useMemo, useState } from 'react';
 
 import type { CollectionItemDto } from '@binderly/api-contracts';
 import { Button, Card, Input, Pressable, Text, XStack, YStack } from '@binderly/ui';
+
+import type { ReactNode } from 'react';
 
 export interface PrintingPickerProps {
   /** Owned printings (from `useCollectionItemsQuery`). */
@@ -90,7 +91,7 @@ export function PrintingPicker(props: PrintingPickerProps): ReactNode {
       {ownedItems.length === 0 ? (
         <YStack padding="$3" testID={`${testID}-empty`}>
           <Text variant="caption" tone="muted">
-            You don't own any cards yet — add some from the catalog first.
+            You don&rsquo;t own any cards yet — add some from the catalog first.
           </Text>
         </YStack>
       ) : filtered.length === 0 ? (

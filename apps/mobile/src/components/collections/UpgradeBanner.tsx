@@ -16,9 +16,10 @@
 // task can't support. The button captures the intent (testable)
 // and the screen owner wires it up later.
 
+import { Button, Card, Text, YStack } from '@binderly/ui';
+
 import type { ReactNode } from 'react';
 
-import { Button, Card, Text, YStack } from '@binderly/ui';
 
 export interface UpgradeBannerProps {
   /** Headline above the body (defaults to a generic "paid plan required"). */

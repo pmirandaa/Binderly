@@ -716,14 +716,14 @@ tasks:
     stage: 05-mobile
     title: Mobile custom + smart collections (with gating)
     agent_role: frontend-mobile
-    status: pending
+    status: in_review
     depends_on: [T-M-COLLECTION, T-SP-SMART-DSL]
     parallel_safe_with: []
     provides: [mobile:custom-collections]
     owns_paths: [apps/mobile/src/screens/collections/]
     task_file: tasks/05-mobile/T-M-CUSTOM.md
     est_effort: L
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 6 — SCANNER
