@@ -1,0 +1,42 @@
+{
+  "name": "@binderly/set-completion",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure-logic set completion math for Binderly: Set %, Master Set %, All Pokémon %, and global Master %. No IO, no DB, no HTTP — safe to call from server (recompute job) and client (optimistic local recompute) alike.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:write": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@types/node": "22.19.17",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
