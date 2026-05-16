@@ -14,7 +14,7 @@
 // from prerender via `force-dynamic`), we fall back to a
 // metadata-only image. The fallback also covers the case when
 // the backend's public read endpoint hasn't shipped yet
-// (`open-questions.md` § Q-011).
+// (`open-questions.md` § Q-012).
 //
 // The OG render template intentionally uses inline styles only:
 // `next/og` (Satori under the hood) does NOT understand external

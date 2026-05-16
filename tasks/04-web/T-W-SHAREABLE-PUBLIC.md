@@ -44,7 +44,7 @@
   slug)`).
 - `infra/supabase/functions/_shared/routes-table.ts` — confirms
   the `/v1/c/{handle}/{slug}` route is NOT yet implemented in
-  the Edge Function (see Q-011).
+  the Edge Function (see Q-012).
 
 ## Goal
 
@@ -112,7 +112,7 @@ introduces.
   `lib/share/format` (15) = **67 new tests**, all passing.
 - `dependencies.yaml` — `T-W-SHAREABLE-PUBLIC` flipped
   `status: pending → status: review`, `stub: true → stub: false`.
-- `open-questions.md` — appended `Q-011` (public-read endpoint
+- `open-questions.md` — appended `Q-012` (public-read endpoint
   not implemented; richer `publicShareableDto` proposed —
   see "Escalations").
 
@@ -161,7 +161,7 @@ introduces.
   `getPublicShareable` calls `GET /v1/c/{handle}/{slug}` which
   the Edge Function does not yet implement. The page still
   ships (with a degraded runtime adapter) and tests use a fake
-  api that returns a rich payload. See "Escalations" + Q-011.
+  api that returns a rich payload. See "Escalations" + Q-012.
 - No edit-shareable UI — that's a follow-up. The Stage 08
   shareables track (`T-SH-CONFIG-MODEL`) owns the configure-
   shareable surface.
@@ -182,7 +182,7 @@ introduces.
   the page programs against; the runtime adapter synthesises
   a degraded payload from `getPublicShareable` (empty members,
   zero counts) until the backend lands the richer endpoint
-  (Q-011).
+  (Q-012).
 - **Page is `force-dynamic` + uses a client glue component.**
   We considered a true server-component fetch (and ditched it)
   because:
@@ -247,7 +247,7 @@ introduces.
 
 ## Escalations
 
-- **Q-011 raised** — the api-client's `getPublicShareable`
+- **Q-012 raised** — the api-client's `getPublicShareable`
   expects a `/v1/c/{handle}/{slug}` route that is NOT
   implemented in the merged Edge Function code (the dispatch
   table in `infra/supabase/functions/_shared/routes-table.ts`
@@ -255,7 +255,7 @@ introduces.
   route, the response shape (`shareableDto`) carries metadata
   only — no owner display name, no collection name, no
   members, no counts. The proposed follow-up adds a richer
-  `publicShareableDto` (Option 1 in Q-011). This PR ships the
+  `publicShareableDto` (Option 1 in Q-012). This PR ships the
   data layer (`lib/share/api.ts`) declaring the richer shape
   so the backend follow-up has zero web-side churn beyond
   swapping the runtime adapter's degraded synthesis for a
@@ -271,4 +271,4 @@ introduces.
 - `pnpm --filter @binderly/web build` with no env vars set:
   **succeeded**, both `/c/[handle]/[slug]` and
   `/c/[handle]/[slug]/opengraph-image` render as `ƒ (Dynamic)`.
-- One open question appended (`Q-011`); no other escalations.
+- One open question appended (`Q-012`); no other escalations.

@@ -14,7 +14,7 @@
 // names + images + set context, and ownership counts. None of
 // that is on the api-client's `shareables.getPublicShareable`
 // surface today — it returns the `shareable` row only.
-// See `open-questions.md` § Q-011 for the proposed backend
+// See `open-questions.md` § Q-012 for the proposed backend
 // follow-up; this file declares the contract the page renders
 // against so the backend follow-up has zero web-side churn.
 //
@@ -131,7 +131,7 @@ export interface ShareApi {
  * shows an empty state.
  *
  * When the backend lands the richer `publicShareableDto` endpoint
- * (`open-questions.md` § Q-011) this function swaps the synthesis
+ * (`open-questions.md` § Q-012) this function swaps the synthesis
  * branch for a direct call. Nothing else changes — the page +
  * OG image are unaware of the seam.
  *
@@ -149,7 +149,7 @@ export function apiToShareApi(client: BinderlyClient): ShareApi {
           slug,
           ...(signal !== undefined ? { signal } : {}),
         });
-        // Degraded synthesis until Q-011's richer endpoint lands.
+        // Degraded synthesis until Q-012's richer endpoint lands.
         // The handle in the URL is the source of truth (the
         // backend resolves it before returning the shareable); we
         // surface it verbatim so the page header matches the URL.

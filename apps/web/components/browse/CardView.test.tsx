@@ -68,9 +68,7 @@ describe('CardView — success path', () => {
     expect(screen.getByTestId('card-meta-row-number')).toHaveTextContent('4');
     expect(screen.getByTestId('card-meta-row-variant')).toHaveTextContent('holo');
     expect(screen.getByTestId('card-meta-row-rarity')).toHaveTextContent('Holo Rare');
-    expect(screen.getByTestId('card-meta-row-illustrator')).toHaveTextContent(
-      'Mitsuhiro Arita',
-    );
+    expect(screen.getByTestId('card-meta-row-illustrator')).toHaveTextContent('Mitsuhiro Arita');
     expect(screen.getByTestId('card-meta-row-language')).toHaveTextContent('English');
     expect(screen.getByTestId('card-meta-row-released').textContent ?? '').toMatch(/1999/);
   });
@@ -83,6 +81,18 @@ describe('CardView — success path', () => {
       expect(screen.getByTestId('card-prices-placeholder')).toBeInTheDocument();
     });
     expect(screen.getByTestId('card-prices-placeholder')).toHaveTextContent('Prices');
+  });
+
+  it('renders the BuyCta inside a "card-buy" section using card name + set + number', async () => {
+    const fixture = makeStandardPrintingFixture();
+    const api = createFakeBrowseApi({ printingsById: { [PRINTING_ID]: fixture } });
+    renderWithProviders(<CardView api={api} printingId={PRINTING_ID} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('card-buy')).toBeInTheDocument();
+    });
+    // No affiliate id env var set → degraded "Coming soon" state.
+    expect(screen.getByTestId('buy-cta-tooltip')).toBeInTheDocument();
+    expect(screen.getByTestId('buy-cta-button').textContent).toContain('Buy on TCGplayer');
   });
 
   it('renders a disabled "Add to collection" button with the sign-in tooltip', async () => {
@@ -139,12 +149,8 @@ describe('CardView — 404 + error', () => {
   it('invokes onNotFound on ApiNotFoundError', async () => {
     const onNotFound = vi.fn();
     const api = createFakeBrowseApi();
-    api.getPrintingDetail = vi.fn().mockRejectedValue(
-      new ApiNotFoundError('printing not found'),
-    );
-    renderWithProviders(
-      <CardView api={api} printingId="missing" onNotFound={onNotFound} />,
-    );
+    api.getPrintingDetail = vi.fn().mockRejectedValue(new ApiNotFoundError('printing not found'));
+    renderWithProviders(<CardView api={api} printingId="missing" onNotFound={onNotFound} />);
     await waitFor(() => {
       expect(onNotFound).toHaveBeenCalledTimes(1);
     });
@@ -152,9 +158,7 @@ describe('CardView — 404 + error', () => {
 
   it('renders an inline error when no onNotFound is provided', async () => {
     const api = createFakeBrowseApi();
-    api.getPrintingDetail = vi.fn().mockRejectedValue(
-      new ApiNotFoundError('printing not found'),
-    );
+    api.getPrintingDetail = vi.fn().mockRejectedValue(new ApiNotFoundError('printing not found'));
     renderWithProviders(<CardView api={api} printingId="missing" />);
     await waitFor(() => {
       expect(screen.getByTestId('card-error')).toBeInTheDocument();
