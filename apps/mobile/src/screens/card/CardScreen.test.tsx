@@ -12,6 +12,16 @@ import { renderWithProvider } from '../../test-utils/render';
 
 import type { ReactNode } from 'react';
 
+// `<CardScreen>` now embeds `<BuyCta>` which imports
+// `expo-web-browser`. The shell's global test setup does not stub
+// that module (it's only used by auth + the new buy-cta), so we
+// inline a minimal mock here — same pattern used by
+// `SignInScreen.test.tsx` and friends.
+vi.mock('expo-web-browser', () => ({
+  openBrowserAsync: vi.fn(async () => ({ type: 'opened' })),
+  openAuthSessionAsync: vi.fn(async () => ({ type: 'cancel' })),
+}));
+
 // `useLocalSearchParams()` returns whatever the holder is currently
 // pointing at. The router isn't used by CardScreen (back is owned
 // by the expo-router shell) but we keep the same posture as the
@@ -199,6 +209,24 @@ describe('<CardScreen>', () => {
     expect(meta.textContent).toContain('Mitsuhiro Arita');
     expect(meta.textContent).toContain('120');
     expect(result.getByTestId('card-prices').textContent).toContain('Prices');
+  });
+
+  it('renders the BuyCta in a "card-buy" section', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        name: 'Charizard',
+        number: '4',
+      }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() => expect(result.queryByTestId('card-buy')).not.toBeNull());
+    // No EXPO_PUBLIC_TCGPLAYER_AFFILIATE_ID in jsdom env → disabled state.
+    expect(result.queryByTestId('buy-cta-disabled')).not.toBeNull();
+    expect(result.getByTestId('buy-cta-button').textContent).toContain('Buy on TCGplayer');
   });
 
   it('disables the Add to collection button and surfaces sign-in copy', async () => {

@@ -648,14 +648,14 @@ tasks:
     stage: 04-web
     title: TCGplayer affiliate "Buy" CTAs on card detail (web + mobile)
     agent_role: frontend-web
-    status: pending
+    status: in_review
     depends_on: [T-W-BROWSE]
     parallel_safe_with: []
     provides: [web:affiliate-links]
     owns_paths: [apps/web/lib/affiliate/, apps/web/components/buy-cta/, apps/mobile/src/components/buy-cta/]
     task_file: tasks/04-web/T-W-AFFILIATE-LINKS.md
     est_effort: S
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 5 — MOBILE APP
