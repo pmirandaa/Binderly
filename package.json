@@ -25,8 +25,8 @@
     "check:env": "bash scripts/check-env.sh .env.local"
   },
   "devDependencies": {
-    "supabase": "2.98.1",
-    "turbo": "2.9.6"
+    "supabase": "2.98.2",
+    "turbo": "2.9.14"
   },
   "pnpm": {
     "overrides": {
