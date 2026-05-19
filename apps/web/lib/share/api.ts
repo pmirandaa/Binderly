@@ -8,26 +8,22 @@
 // inside a `useEffect` so the env-loading branch never runs during
 // `next build` (matches the T-W-BROWSE / T-W-COLLECTION pattern).
 //
-// Why a richer `PublicSharePayload` than the api-client's bare
-// `ShareableDto`: the SSR page needs the owner's handle / display
-// name, a human title for the collection, a member list with
-// names + images + set context, and ownership counts. None of
-// that is on the api-client's `shareables.getPublicShareable`
-// surface today — it returns the `shareable` row only.
-// See `open-questions.md` § Q-012 for the proposed backend
-// follow-up; this file declares the contract the page renders
-// against so the backend follow-up has zero web-side churn.
-//
-// Until the richer endpoint lands the runtime adapter
-// (`apiToShareApi`) calls `getPublicShareable` to obtain the
-// metadata, synthesises the owner handle from the URL (`handle`
-// is in the path), and returns an empty `members` list with zero
-// counts. The page header + OG meta render correctly; the member
-// grid renders an "owner hasn't synced yet" empty state. Once
-// the backend lands `publicShareableDto`, swap one branch here.
+// `PublicSharePayload` was designed as exactly the seam the
+// backend's `publicShareableDto` fills — same field set, same
+// nullability rules. The runtime adapter now opts into the
+// richer representation via `Accept:
+// application/vnd.binderly.share+json` through
+// `client.shareables.getPublicShareablePayload(...)` (V2 endpoint
+// shipped by T-BE-EDGE-FUNCTIONS-V2 / PR #68; Q-012 closed). The
+// fake-adapter tests (`createFakeShareApi`) keep passing
+// unchanged — only the production adapter wiring changes.
 
+import { ApiNotFoundError } from '@binderly/api-client';
 import type { BinderlyClient } from '@binderly/api-client';
-import type { ShareableDto } from '@binderly/api-contracts';
+import type {
+  PublicShareableDto,
+  ShareableDto,
+} from '@binderly/api-contracts';
 
 /**
  * Owner subset surfaced on a public shareable. Mirrors the
@@ -123,71 +119,73 @@ export interface ShareApi {
 /**
  * Adapt a `BinderlyClient` to the narrow `ShareApi`.
  *
- * Today the adapter calls `client.shareables.getPublicShareable`
- * (returns the bare `ShareableDto`) and synthesises the rest of
- * `PublicSharePayload` — the owner handle from the URL, an empty
- * member list, zero counts. This is a degraded-but-renderable
- * payload: the page header + OG meta look right, the member grid
- * shows an empty state.
+ * Calls `client.shareables.getPublicShareablePayload(...)` which
+ * sends the `Accept: application/vnd.binderly.share+json`
+ * representation negotiator — the V2 endpoint returns the full
+ * envelope (owner + counts + member list + collection title) in
+ * one round-trip. The DTO shape is structurally identical to
+ * `PublicSharePayload`, so the cast is a one-line projection.
  *
- * When the backend lands the richer `publicShareableDto` endpoint
- * (`open-questions.md` § Q-012) this function swaps the synthesis
- * branch for a direct call. Nothing else changes — the page +
- * OG image are unaware of the seam.
- *
- * 404 mapping: the api-client throws `ApiNotFoundError` on 404;
- * we catch it inline and return `null`. Other errors propagate so
- * the page renders its error state instead of a confusing empty
- * shareable.
+ * 404 → `null` so the page can call `notFound()`; the previous
+ * degraded-synthesis fallback (Q-012, iter 20) is gone — a 5xx
+ * now propagates as an error so the page renders its error
+ * state instead of a confusing half-broken header + empty grid.
  */
 export function apiToShareApi(client: BinderlyClient): ShareApi {
   return {
     async getPublicSharePayload({ handle, slug, signal }): Promise<PublicSharePayload | null> {
       try {
-        const shareable = await client.shareables.getPublicShareable({
+        const dto = await client.shareables.getPublicShareablePayload({
           handle,
           slug,
           ...(signal !== undefined ? { signal } : {}),
         });
-        // Degraded synthesis until Q-012's richer endpoint lands.
-        // The handle in the URL is the source of truth (the
-        // backend resolves it before returning the shareable); we
-        // surface it verbatim so the page header matches the URL.
-        const collectionTitle =
-          shareable.target.kind === 'full' ? 'Full collection' : 'Custom collection';
-        return {
-          shareable,
-          owner: {
-            handle,
-            displayName: null,
-            avatarUrl: null,
-            bio: null,
-          },
-          collectionTitle,
-          description: null,
-          counts: {
-            ownedUnique: 0,
-            ownedTotalQuantity: 0,
-            catalogTotal: 0,
-            completionPct: 0,
-          },
-          members: [],
-          lastUpdatedAt: shareable.updatedAt,
-        };
+        return publicShareableDtoToPayload(dto);
       } catch (error) {
-        // `ApiNotFoundError` is imported lazily to keep this
-        // module's static import graph minimal. The api-client
-        // re-exports the class from its barrel so the duck check
-        // is a single property read.
-        if (
-          typeof error === 'object' &&
-          error !== null &&
-          (error as { name?: string }).name === 'ApiNotFoundError'
-        ) {
-          return null;
-        }
+        if (error instanceof ApiNotFoundError) return null;
         throw error;
       }
     },
+  };
+}
+
+/**
+ * Project a `PublicShareableDto` (api-contracts) onto a
+ * `PublicSharePayload` (web view contract). Field-for-field
+ * pass-through — both shapes were designed to be the same.
+ *
+ * Returns a `readonly`-typed object that satisfies the
+ * `PublicSharePayload` interface (which itself is read-only) so
+ * downstream consumers can't mutate the payload by accident.
+ */
+function publicShareableDtoToPayload(dto: PublicShareableDto): PublicSharePayload {
+  return {
+    shareable: dto.shareable,
+    owner: {
+      handle: dto.owner.handle,
+      displayName: dto.owner.displayName,
+      avatarUrl: dto.owner.avatarUrl,
+      bio: dto.owner.bio,
+    },
+    collectionTitle: dto.collectionTitle,
+    description: dto.description,
+    counts: {
+      ownedUnique: dto.counts.ownedUnique,
+      ownedTotalQuantity: dto.counts.ownedTotalQuantity,
+      catalogTotal: dto.counts.catalogTotal,
+      completionPct: dto.counts.completionPct,
+    },
+    members: dto.members.map((m) => ({
+      printingId: m.printingId,
+      cardId: m.cardId,
+      cardName: m.cardName,
+      cardNumber: m.cardNumber,
+      setName: m.setName,
+      setCode: m.setCode,
+      variantLabel: m.variantLabel,
+      imageUrl: m.imageUrl,
+      quantity: m.quantity,
+    })),
+    lastUpdatedAt: dto.lastUpdatedAt,
   };
 }
