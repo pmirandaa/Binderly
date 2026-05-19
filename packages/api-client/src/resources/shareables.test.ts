@@ -12,7 +12,11 @@ import {
   ApiValidationError,
 } from '../error.js';
 import { errEnvelope, mockFetch, okEnvelope } from '../test-helpers.js';
-import { FIXTURE_IDS, VALID_SHAREABLE } from './_fixtures.js';
+import {
+  FIXTURE_IDS,
+  VALID_PUBLIC_SHAREABLE_PAYLOAD,
+  VALID_SHAREABLE,
+} from './_fixtures.js';
 import { makeShareablesResource } from './shareables.js';
 
 function makeResource(
@@ -218,6 +222,69 @@ describe('shareables.getPublicShareable', () => {
     const { shareables } = makeResource(mockFetch({ status: 404 }));
     await expect(
       shareables.getPublicShareable({ handle: 'pablo', slug: 'gone' }),
+    ).rejects.toBeInstanceOf(ApiNotFoundError);
+  });
+});
+
+// ============================================================
+// getPublicShareablePayload (new — richer SSR payload)
+// ============================================================
+
+describe('shareables.getPublicShareablePayload', () => {
+  it('returns the richer PublicShareableDto on happy path', async () => {
+    const { shareables } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PUBLIC_SHAREABLE_PAYLOAD) }),
+    );
+    const payload = await shareables.getPublicShareablePayload({
+      handle: 'pablo',
+      slug: 'my-binder',
+    });
+    expect(payload.owner.handle).toBe('pablo');
+    expect(payload.members).toHaveLength(1);
+    expect(payload.collectionTitle).toBe("Pablo's collection");
+  });
+
+  it('hits GET /v1/c/{handle}/{slug} with the share Accept header', async () => {
+    const { fetch, shareables } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PUBLIC_SHAREABLE_PAYLOAD) }),
+    );
+    await shareables.getPublicShareablePayload({ handle: 'pablo', slug: 'my-binder' });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/v1/c/pablo/my-binder');
+    const init = fetch.mock.calls[0]?.[1];
+    expect(init?.headers?.accept).toBe('application/vnd.binderly.share+json');
+  });
+
+  it('does NOT call getJwt (anonymous request)', async () => {
+    const getJwt = vi.fn(() => 'jwt-1');
+    const { fetch, shareables } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PUBLIC_SHAREABLE_PAYLOAD) }),
+      getJwt,
+    );
+    await shareables.getPublicShareablePayload({ handle: 'pablo', slug: 'my-binder' });
+    expect(getJwt).not.toHaveBeenCalled();
+    const init = fetch.mock.calls[0]?.[1];
+    expect(init?.headers?.authorization).toBeUndefined();
+  });
+
+  it('parses a zero-members payload (empty array, NOT 404)', async () => {
+    const { shareables } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope({ ...VALID_PUBLIC_SHAREABLE_PAYLOAD, members: [] }),
+      }),
+    );
+    const payload = await shareables.getPublicShareablePayload({
+      handle: 'pablo',
+      slug: 'empty',
+    });
+    expect(payload.members).toHaveLength(0);
+  });
+
+  it('throws ApiNotFoundError when the public page does not exist', async () => {
+    const { shareables } = makeResource(mockFetch({ status: 404 }));
+    await expect(
+      shareables.getPublicShareablePayload({ handle: 'pablo', slug: 'gone' }),
     ).rejects.toBeInstanceOf(ApiNotFoundError);
   });
 });

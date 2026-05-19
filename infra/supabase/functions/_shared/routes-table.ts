@@ -14,6 +14,10 @@ import {
   handleListCollection,
   handleUpdateCollectionItem,
 } from './handlers/collection.ts';
+import { handleGetCollectionCompletion } from './handlers/completion.ts';
+import { handleGetPrintingCurrentPrice } from './handlers/currentPrice.ts';
+import { handleGetPublicShareable } from './handlers/publicShareable.ts';
+import { handleSmartCollectionsPreview } from './handlers/smartPreview.ts';
 import {
   handleAddPrintingToCustomCollection,
   handleCreateCustomCollection,
@@ -86,6 +90,7 @@ export const ROUTES: readonly ContextualRoute[] = [
   entry('POST', '/me/collection', handleAddCollectionItem),
   entry('POST', '/me/collection/bulk', handleBulkUpdateCollection),
   entry('POST', '/me/collection/recompute-set-completion', handleRecomputeSetCompletion),
+  entry('GET', '/me/collection/completion', handleGetCollectionCompletion),
   entry('PATCH', '/me/collection/:id', handleUpdateCollectionItem),
   entry('DELETE', '/me/collection/:id', handleDeleteCollectionItem),
 
@@ -108,4 +113,13 @@ export const ROUTES: readonly ContextualRoute[] = [
   // ---- smart_collection_rule ----
   entry('GET', '/me/custom-collections/:id/smart-rule', handleGetSmartCollectionRule),
   entry('PUT', '/me/custom-collections/:id/smart-rule', handleUpdateSmartCollectionExpression),
+
+  // ---- pricing — additive read endpoints (T-BE-EDGE-FUNCTIONS-V2) ----
+  entry('GET', '/printings/:id/current-price', handleGetPrintingCurrentPrice),
+
+  // ---- public shareable — anonymous SSR endpoint (T-BE-EDGE-FUNCTIONS-V2) ----
+  entry('GET', '/c/:handle/:slug', handleGetPublicShareable),
+
+  // ---- smart collections preview (T-BE-EDGE-FUNCTIONS-V2) ----
+  entry('POST', '/smart-collections/preview', handleSmartCollectionsPreview),
 ];

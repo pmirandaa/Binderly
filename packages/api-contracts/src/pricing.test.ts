@@ -11,6 +11,8 @@ import {
   priceAggregateDto,
   priceHistoryQuery,
   priceObservationKindSchema,
+  printingCurrentPriceDto,
+  printingCurrentPriceFreshnessSchema,
 } from './pricing.js';
 
 const NOW = '2026-05-05T12:00:00Z';
@@ -182,6 +184,74 @@ describe('priceHistoryQuery', () => {
         gradeTier: 'PSA_10',
         unexpected: 'extra',
       }).success,
+    ).toBe(false);
+  });
+});
+
+// ============================================================
+// printingCurrentPriceDto (new — `/v1/printings/:id/current-price`)
+// ============================================================
+
+describe('printingCurrentPriceFreshnessSchema', () => {
+  it('accepts every documented bucket', () => {
+    expect(printingCurrentPriceFreshnessSchema.parse('fresh')).toBe('fresh');
+    expect(printingCurrentPriceFreshnessSchema.parse('stale')).toBe('stale');
+    expect(printingCurrentPriceFreshnessSchema.parse('stale_old')).toBe('stale_old');
+  });
+
+  it('rejects an unknown band', () => {
+    expect(printingCurrentPriceFreshnessSchema.safeParse('ancient').success).toBe(false);
+  });
+});
+
+describe('printingCurrentPriceDto', () => {
+  const VALID = {
+    printingId: PRINTING_ID,
+    gradeTier: 'RAW_NM' as const,
+    market: 'EBAY_US' as const,
+    currency: 'USD',
+    periodStart: '2026-05-05',
+    medianPrice: '120.00',
+    meanPrice: '125.00',
+    lowPrice: '90.00',
+    highPrice: '160.00',
+    sampleCount: 25,
+    computedAt: NOW,
+    freshness: 'fresh' as const,
+  };
+
+  it('parses a populated row', () => {
+    expect(printingCurrentPriceDto.parse(VALID).freshness).toBe('fresh');
+  });
+
+  it('parses a row with null price fields (no recent observations)', () => {
+    expect(
+      printingCurrentPriceDto.parse({
+        ...VALID,
+        medianPrice: null,
+        meanPrice: null,
+        lowPrice: null,
+        highPrice: null,
+        sampleCount: 0,
+        freshness: 'stale_old',
+      }).medianPrice,
+    ).toBeNull();
+  });
+
+  it('rejects a missing freshness', () => {
+    const { freshness: _freshness, ...without } = VALID;
+    expect(printingCurrentPriceDto.safeParse(without).success).toBe(false);
+  });
+
+  it('rejects an unknown freshness band', () => {
+    expect(
+      printingCurrentPriceDto.safeParse({ ...VALID, freshness: 'recent' }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unknown extra keys (strict)', () => {
+    expect(
+      printingCurrentPriceDto.safeParse({ ...VALID, trend30d: 0.04 }).success,
     ).toBe(false);
   });
 });

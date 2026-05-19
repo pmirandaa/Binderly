@@ -313,3 +313,146 @@ export const updateSmartCollectionExpressionRequest = z
 export type UpdateSmartCollectionExpressionRequest = z.infer<
   typeof updateSmartCollectionExpressionRequest
 >;
+
+// ============================================================
+// Collection completion — read DTOs
+// ============================================================
+
+/**
+ * One row in the `perSet` array returned by
+ * `GET /v1/me/collection/completion`. Field names mirror the
+ * `mv_user_set_completion` materialized view documented in
+ * `context/data-model.md` § "Materialized views" with the
+ * addition of `setCode` / `setName` so the home-screen list
+ * doesn't need to fan out a second `getSet(id)` per row.
+ *
+ * Percentages are in the 0..100 range as plain `number`s (not
+ * strings) — the endpoint computes them as JavaScript floats
+ * and the home-screen UI renders one decimal place. Empty /
+ * zero-denominator sets carry `setPct: 0` / `masterPct: 0`
+ * (never NaN) per the `@binderly/set-completion` contract.
+ */
+export const perSetCompletionEntryDto = z
+  .object({
+    setId: uuidSchema,
+    setCode: z.string().min(1),
+    setName: z.string().min(1),
+    setPct: z.number().min(0).max(100),
+    masterPct: z.number().min(0).max(100),
+    ownedNumbered: z.number().int().nonnegative(),
+    totalNumbered: z.number().int().nonnegative(),
+    ownedMaster: z.number().int().nonnegative(),
+    totalMaster: z.number().int().nonnegative(),
+  })
+  .strict();
+export type PerSetCompletionEntryDto = z.infer<typeof perSetCompletionEntryDto>;
+
+/**
+ * The cross-catalog tally — mirrors `mv_user_global_completion`.
+ * Same 0..100 rule for the two percentage fields.
+ */
+export const globalCompletionDto = z
+  .object({
+    allPokemonPct: z.number().min(0).max(100),
+    masterPct: z.number().min(0).max(100),
+    uniqueCardsOwned: z.number().int().nonnegative(),
+    uniqueCardsTotal: z.number().int().nonnegative(),
+    masterOwned: z.number().int().nonnegative(),
+    masterTotal: z.number().int().nonnegative(),
+  })
+  .strict();
+export type GlobalCompletionDto = z.infer<typeof globalCompletionDto>;
+
+/**
+ * Top-level response shape for `GET /v1/me/collection/completion`.
+ * `perSet` is sorted by `setName` ascending so the home screen can
+ * render the list without a second sort pass. Empty collection →
+ * `perSet: []` (the empty array, not zero-rows-per-set) and
+ * `global` all-zero — the home screen distinguishes "you own
+ * nothing yet" from "we couldn't compute" via the API error
+ * envelope rather than via an empty `perSet`.
+ *
+ * `lastUpdatedAt` is the maximum `collection_item.updated_at`
+ * across the user's collection, or `null` if the collection is
+ * empty. Used by client caches for stale-while-revalidate.
+ */
+export const completionDto = z
+  .object({
+    global: globalCompletionDto,
+    perSet: z.array(perSetCompletionEntryDto),
+    lastUpdatedAt: isoDateTimeSchema.nullable(),
+  })
+  .strict();
+export type CompletionDto = z.infer<typeof completionDto>;
+
+// ============================================================
+// Smart-collection preview — read DTOs
+// ============================================================
+
+/**
+ * Smart-collection preview request body. The `expression` is the
+ * DSL AST (the same shape stored in `smart_collection_rule.expression`);
+ * shape validation happens server-side via the smart-DSL schema
+ * mirror — the contracts package keeps the field opaque so the
+ * smart-DSL dependency is not pulled into every consumer.
+ *
+ * `limit` defaults to 200 server-side (max 500). `offset`
+ * defaults to 0. The endpoint clamps `limit` to the documented
+ * max rather than throwing — callers can ask for `limit: 1000`
+ * and silently receive 500 rows.
+ */
+export const smartPreviewRequestDto = z
+  .object({
+    expression: smartExpressionSchema,
+    limit: z.number().int().min(1).max(500).optional(),
+    offset: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type SmartPreviewRequestDto = z.infer<typeof smartPreviewRequestDto>;
+
+/**
+ * One row in the `items` array of the preview response — the
+ * narrow projection of a `printing` joined to its `card` and
+ * `set` the smart-collection UI's "matching printings" grid
+ * renders. NOT a full `printingDto` — only the columns the grid
+ * actually displays, to keep the wire size bounded for the
+ * 500-row max page.
+ */
+export const smartPreviewItemDto = z
+  .object({
+    printingId: uuidSchema,
+    cardId: uuidSchema,
+    setId: uuidSchema,
+    cardName: z.string().min(1),
+    cardNumber: z.string().min(1),
+    setName: z.string().min(1),
+    setCode: z.string().min(1),
+    variantLabel: z.string(),
+    imageSmallUrl: z.string().url().nullable(),
+  })
+  .strict();
+export type SmartPreviewItemDto = z.infer<typeof smartPreviewItemDto>;
+
+/**
+ * Response envelope for `POST /v1/smart-collections/preview`.
+ *
+ * - `items` — the page's matching printings (≤ `limit`).
+ * - `totalCount` — total matching printings across the catalog
+ *   (NOT just this page). The endpoint computes this with a
+ *   second `count()` query so the UI can render "showing X of Y".
+ *   For very large result sets the count may be approximate (the
+ *   handler caps the count query at 100k for performance — see
+ *   the handler's docstring); approximate counts are signalled
+ *   by `totalCount === 100000 && nextOffset !== null` (UI shows
+ *   "100,000+").
+ * - `nextOffset` — `offset + items.length` if more rows exist,
+ *   `null` if the page is the last.
+ */
+export const smartPreviewResponseDto = z
+  .object({
+    items: z.array(smartPreviewItemDto),
+    totalCount: z.number().int().nonnegative(),
+    nextOffset: z.number().int().nonnegative().nullable(),
+  })
+  .strict();
+export type SmartPreviewResponseDto = z.infer<typeof smartPreviewResponseDto>;

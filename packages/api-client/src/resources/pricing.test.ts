@@ -12,6 +12,7 @@ import {
   VALID_MARKET,
   VALID_PAGE,
   VALID_PRICE_AGGREGATE,
+  VALID_PRINTING_CURRENT_PRICE,
 } from './_fixtures.js';
 import { makePricingResource } from './pricing.js';
 
@@ -169,5 +170,79 @@ describe('pricing.getFxRate', () => {
     await expect(pricing.getFxRate({ date: '1900-01-01', currency: 'XXX' })).rejects.toBeInstanceOf(
       ApiNotFoundError,
     );
+  });
+});
+
+// ============================================================
+// getPrintingCurrentPrice (new — `/v1/printings/:id/current-price`)
+// ============================================================
+
+describe('pricing.getPrintingCurrentPrice', () => {
+  it('returns the typed payload on happy path', async () => {
+    const { pricing } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PRINTING_CURRENT_PRICE) }),
+    );
+    const price = await pricing.getPrintingCurrentPrice({
+      printingId: FIXTURE_IDS.printingId,
+    });
+    expect(price.freshness).toBe('fresh');
+    expect(price.medianPrice).toBe('120.00');
+  });
+
+  it('hits GET /v1/printings/{id}/current-price', async () => {
+    const { fetch, pricing } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PRINTING_CURRENT_PRICE) }),
+    );
+    await pricing.getPrintingCurrentPrice({ printingId: FIXTURE_IDS.printingId });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain(`/v1/printings/${FIXTURE_IDS.printingId}/current-price`);
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  it('propagates gradeTier + market as query params', async () => {
+    const { fetch, pricing } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PRINTING_CURRENT_PRICE) }),
+    );
+    await pricing.getPrintingCurrentPrice({
+      printingId: FIXTURE_IDS.printingId,
+      gradeTier: 'PSA_10',
+      market: 'CARDMARKET_EU',
+    });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain('gradeTier=PSA_10');
+    expect(url).toContain('market=CARDMARKET_EU');
+  });
+
+  it('sends the Authorization header (authed endpoint)', async () => {
+    const { fetch, pricing } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PRINTING_CURRENT_PRICE) }),
+    );
+    await pricing.getPrintingCurrentPrice({ printingId: FIXTURE_IDS.printingId });
+    const init = fetch.mock.calls[0]?.[1];
+    expect(init?.headers?.authorization).toBe('Bearer jwt');
+  });
+
+  it('throws ApiNotFoundError when no mv_current_price row exists', async () => {
+    const { pricing } = makeResource(
+      mockFetch({
+        status: 404,
+        body: errEnvelope({ code: 'NOT_FOUND', message: 'no headline price' }),
+      }),
+    );
+    await expect(
+      pricing.getPrintingCurrentPrice({ printingId: FIXTURE_IDS.printingId }),
+    ).rejects.toBeInstanceOf(ApiNotFoundError);
+  });
+
+  it('throws ApiResponseDecodeError on a malformed payload', async () => {
+    const { pricing } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope({ ...VALID_PRINTING_CURRENT_PRICE, freshness: 'unknown-band' }),
+      }),
+    );
+    await expect(
+      pricing.getPrintingCurrentPrice({ printingId: FIXTURE_IDS.printingId }),
+    ).rejects.toBeInstanceOf(ApiResponseDecodeError);
   });
 });

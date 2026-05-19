@@ -247,3 +247,110 @@ export const VALID_PAGE = <T>(items: T[]): { items: T[]; nextCursor: string | nu
   items,
   nextCursor: null,
 });
+
+export const VALID_COMPLETION = {
+  global: {
+    allPokemonPct: 12.5,
+    masterPct: 4.0,
+    uniqueCardsOwned: 100,
+    uniqueCardsTotal: 800,
+    masterOwned: 40,
+    masterTotal: 1000,
+  },
+  perSet: [
+    {
+      setId: SET_ID,
+      setCode: 'swsh9',
+      setName: 'Brilliant Stars',
+      setPct: 42.5,
+      masterPct: 17.0,
+      ownedNumbered: 85,
+      totalNumbered: 200,
+      ownedMaster: 34,
+      totalMaster: 200,
+    },
+  ],
+  lastUpdatedAt: NOW,
+};
+
+export const VALID_PRINTING_CURRENT_PRICE = {
+  printingId: PRINTING_ID,
+  gradeTier: 'RAW_NM' as const,
+  market: 'EBAY_US' as const,
+  currency: 'USD',
+  periodStart: TODAY,
+  medianPrice: '120.00',
+  meanPrice: '125.00',
+  lowPrice: '90.00',
+  highPrice: '160.00',
+  sampleCount: 25,
+  computedAt: NOW,
+  freshness: 'fresh' as const,
+};
+
+export const VALID_PUBLIC_SHAREABLE_PAYLOAD = {
+  shareable: {
+    id: SHAREABLE_ID,
+    userId: USER_ID,
+    slug: 'my-binder',
+    target: { kind: 'full' as const },
+    theme: 'default' as const,
+    showValues: false,
+    showMissing: true,
+    showPhotos: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+  owner: {
+    handle: 'pablo',
+    displayName: 'Pablo',
+    avatarUrl: null,
+    bio: null,
+  },
+  collectionTitle: "Pablo's collection",
+  description: null,
+  counts: {
+    ownedUnique: 1,
+    ownedTotalQuantity: 1,
+    catalogTotal: 800,
+    completionPct: 0.125,
+  },
+  members: [
+    {
+      printingId: PRINTING_ID,
+      cardId: CARD_ID,
+      cardName: 'Charizard VSTAR',
+      cardNumber: '018',
+      setName: 'Brilliant Stars',
+      setCode: 'swsh9',
+      variantLabel: 'Holo',
+      imageUrl: null,
+      quantity: 1,
+    },
+  ],
+  lastUpdatedAt: NOW,
+};
+
+export const VALID_SMART_PREVIEW_REQUEST = {
+  expression: { type: 'eq' as const, field: 'card.name' as const, value: 'Charizard' },
+  limit: 50,
+  offset: 0,
+};
+
+export const VALID_SMART_PREVIEW_RESPONSE = {
+  items: [
+    {
+      printingId: PRINTING_ID,
+      cardId: CARD_ID,
+      setId: SET_ID,
+      cardName: 'Charizard VSTAR',
+      cardNumber: '018',
+      setName: 'Brilliant Stars',
+      setCode: 'swsh9',
+      variantLabel: 'Holo',
+      imageSmallUrl: null,
+    },
+  ],
+  totalCount: 1,
+  nextOffset: null,
+};

@@ -29,6 +29,10 @@ import { makeGradingResource, type GradingResource } from './resources/grading.j
 import { makePricingResource, type PricingResource } from './resources/pricing.js';
 import { makeProfileResource, type ProfileResource } from './resources/profile.js';
 import { makeShareablesResource, type ShareablesResource } from './resources/shareables.js';
+import {
+  makeSmartCollectionsResource,
+  type SmartCollectionsResource,
+} from './resources/smartCollections.js';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -77,6 +81,7 @@ export interface BinderlyClient {
   readonly shareables: ShareablesResource;
   readonly profile: ProfileResource;
   readonly auth: AuthResource;
+  readonly smartCollections: SmartCollectionsResource;
   /**
    * Escape hatch: the underlying `HttpClient` for callers that
    * need to issue ad-hoc requests against an endpoint this
@@ -119,6 +124,7 @@ export function createClient(config: CreateClientConfig): BinderlyClient {
     shareables: makeShareablesResource(http),
     profile: makeProfileResource(http),
     auth: authResource,
+    smartCollections: makeSmartCollectionsResource(http),
   });
 }
 
@@ -175,7 +181,9 @@ export type {
   GetCurrentPriceOptions,
   GetFxRateOptions,
   GetPriceHistoryOptions,
+  GetPrintingCurrentPriceOptions,
   PricingResource,
 } from './resources/pricing.js';
 export type { ProfileResource } from './resources/profile.js';
 export type { ShareablesResource } from './resources/shareables.js';
+export type { SmartCollectionsResource } from './resources/smartCollections.js';

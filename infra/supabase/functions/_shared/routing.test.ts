@@ -38,6 +38,20 @@ describe('normalizePathname', () => {
   it('adds a leading slash when missing', () => {
     expect(normalizePathname('me/collection')).toBe('/me/collection');
   });
+
+  it('strips /v1 from non-/me/ paths (public shareable)', () => {
+    expect(normalizePathname('/v1/c/pablo/my-binder')).toBe('/c/pablo/my-binder');
+  });
+
+  it('strips /v1 from /printings/ paths (current-price)', () => {
+    expect(normalizePathname('/v1/printings/abc/current-price')).toBe(
+      '/printings/abc/current-price',
+    );
+  });
+
+  it('strips /v1 from /smart-collections/ paths', () => {
+    expect(normalizePathname('/v1/smart-collections/preview')).toBe('/smart-collections/preview');
+  });
 });
 
 describe('matchPattern', () => {

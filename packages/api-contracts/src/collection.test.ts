@@ -9,12 +9,18 @@ import {
   addPrintingToCustomCollectionRequest,
   collectionItemDto,
   collectionItemSourceSchema,
+  completionDto,
   createCustomCollectionRequest,
   customCollectionDto,
   customCollectionItemDto,
   customCollectionKindSchema,
+  globalCompletionDto,
   gradeCompanySchema,
+  perSetCompletionEntryDto,
   smartCollectionRuleDto,
+  smartPreviewItemDto,
+  smartPreviewRequestDto,
+  smartPreviewResponseDto,
   updateCollectionItemRequest,
   updateCustomCollectionRequest,
   updateSmartCollectionExpressionRequest,
@@ -310,5 +316,256 @@ describe('updateSmartCollectionExpressionRequest', () => {
 
   it('rejects when expression key is missing', () => {
     expect(updateSmartCollectionExpressionRequest.safeParse({}).success).toBe(false);
+  });
+});
+
+// ============================================================
+// Completion DTOs
+// ============================================================
+
+const SET_ID = '99999999-9999-4999-8999-999999999999';
+
+describe('perSetCompletionEntryDto', () => {
+  const VALID = {
+    setId: SET_ID,
+    setCode: 'swsh9',
+    setName: 'Brilliant Stars',
+    setPct: 42.5,
+    masterPct: 17.0,
+    ownedNumbered: 85,
+    totalNumbered: 200,
+    ownedMaster: 34,
+    totalMaster: 200,
+  };
+
+  it('parses a populated row', () => {
+    expect(perSetCompletionEntryDto.parse(VALID).setCode).toBe('swsh9');
+  });
+
+  it('parses a zero-row entry (empty set or unowned)', () => {
+    expect(
+      perSetCompletionEntryDto.parse({
+        ...VALID,
+        setPct: 0,
+        masterPct: 0,
+        ownedNumbered: 0,
+        ownedMaster: 0,
+      }).setPct,
+    ).toBe(0);
+  });
+
+  it('rejects a percentage above 100', () => {
+    expect(perSetCompletionEntryDto.safeParse({ ...VALID, setPct: 101 }).success).toBe(false);
+  });
+
+  it('rejects an empty set code', () => {
+    expect(perSetCompletionEntryDto.safeParse({ ...VALID, setCode: '' }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys', () => {
+    expect(perSetCompletionEntryDto.safeParse({ ...VALID, surplus: 1 }).success).toBe(false);
+  });
+});
+
+describe('globalCompletionDto', () => {
+  const VALID = {
+    allPokemonPct: 12.5,
+    masterPct: 4.0,
+    uniqueCardsOwned: 100,
+    uniqueCardsTotal: 800,
+    masterOwned: 40,
+    masterTotal: 1000,
+  };
+
+  it('parses a populated global tally', () => {
+    expect(globalCompletionDto.parse(VALID).allPokemonPct).toBe(12.5);
+  });
+
+  it('parses an all-zeros (empty collection) tally', () => {
+    expect(
+      globalCompletionDto.parse({
+        allPokemonPct: 0,
+        masterPct: 0,
+        uniqueCardsOwned: 0,
+        uniqueCardsTotal: 0,
+        masterOwned: 0,
+        masterTotal: 0,
+      }).uniqueCardsOwned,
+    ).toBe(0);
+  });
+
+  it('rejects negative tallies', () => {
+    expect(globalCompletionDto.safeParse({ ...VALID, uniqueCardsOwned: -1 }).success).toBe(false);
+  });
+});
+
+describe('completionDto', () => {
+  it('parses a populated response with one per-set entry', () => {
+    const parsed = completionDto.parse({
+      global: {
+        allPokemonPct: 12.5,
+        masterPct: 4.0,
+        uniqueCardsOwned: 100,
+        uniqueCardsTotal: 800,
+        masterOwned: 40,
+        masterTotal: 1000,
+      },
+      perSet: [
+        {
+          setId: SET_ID,
+          setCode: 'swsh9',
+          setName: 'Brilliant Stars',
+          setPct: 42.5,
+          masterPct: 17.0,
+          ownedNumbered: 85,
+          totalNumbered: 200,
+          ownedMaster: 34,
+          totalMaster: 200,
+        },
+      ],
+      lastUpdatedAt: NOW,
+    });
+    expect(parsed.perSet).toHaveLength(1);
+    expect(parsed.lastUpdatedAt).toBe(NOW);
+  });
+
+  it('parses an empty perSet array', () => {
+    expect(
+      completionDto.parse({
+        global: {
+          allPokemonPct: 0,
+          masterPct: 0,
+          uniqueCardsOwned: 0,
+          uniqueCardsTotal: 0,
+          masterOwned: 0,
+          masterTotal: 0,
+        },
+        perSet: [],
+        lastUpdatedAt: null,
+      }).perSet,
+    ).toHaveLength(0);
+  });
+
+  it('rejects a missing global key', () => {
+    expect(
+      completionDto.safeParse({
+        perSet: [],
+        lastUpdatedAt: null,
+      }).success,
+    ).toBe(false);
+  });
+});
+
+// ============================================================
+// Smart-collection preview DTOs
+// ============================================================
+
+describe('smartPreviewRequestDto', () => {
+  it('parses a request with only the expression', () => {
+    expect(
+      smartPreviewRequestDto.parse({
+        expression: { type: 'eq', field: 'card.name', value: 'Charizard' },
+      }).expression,
+    ).toEqual({ type: 'eq', field: 'card.name', value: 'Charizard' });
+  });
+
+  it('parses a request with limit + offset', () => {
+    expect(
+      smartPreviewRequestDto.parse({
+        expression: { type: 'and', children: [] },
+        limit: 50,
+        offset: 100,
+      }).limit,
+    ).toBe(50);
+  });
+
+  it('rejects a missing expression', () => {
+    expect(smartPreviewRequestDto.safeParse({ limit: 10 }).success).toBe(false);
+  });
+
+  it('rejects a limit above the documented max', () => {
+    expect(
+      smartPreviewRequestDto.safeParse({ expression: {}, limit: 1000 }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a negative offset', () => {
+    expect(
+      smartPreviewRequestDto.safeParse({ expression: {}, offset: -1 }).success,
+    ).toBe(false);
+  });
+});
+
+describe('smartPreviewItemDto', () => {
+  const VALID = {
+    printingId: PRINTING_ID,
+    cardId: COLLECTION_ITEM_ID,
+    setId: SET_ID,
+    cardName: 'Charizard VSTAR',
+    cardNumber: '018',
+    setName: 'Brilliant Stars',
+    setCode: 'swsh9',
+    variantLabel: 'Holo',
+    imageSmallUrl: 'https://images.binderly.app/small.webp',
+  };
+
+  it('parses a populated item', () => {
+    expect(smartPreviewItemDto.parse(VALID).cardName).toBe('Charizard VSTAR');
+  });
+
+  it('parses an item with a null imageSmallUrl', () => {
+    expect(smartPreviewItemDto.parse({ ...VALID, imageSmallUrl: null }).imageSmallUrl).toBeNull();
+  });
+
+  it('parses an item with an empty variantLabel (untyped variant)', () => {
+    expect(smartPreviewItemDto.parse({ ...VALID, variantLabel: '' }).variantLabel).toBe('');
+  });
+
+  it('rejects an item with an empty cardName', () => {
+    expect(smartPreviewItemDto.safeParse({ ...VALID, cardName: '' }).success).toBe(false);
+  });
+});
+
+describe('smartPreviewResponseDto', () => {
+  it('parses an empty-results response', () => {
+    expect(
+      smartPreviewResponseDto.parse({
+        items: [],
+        totalCount: 0,
+        nextOffset: null,
+      }).totalCount,
+    ).toBe(0);
+  });
+
+  it('parses a populated response with paging', () => {
+    const parsed = smartPreviewResponseDto.parse({
+      items: [
+        {
+          printingId: PRINTING_ID,
+          cardId: COLLECTION_ITEM_ID,
+          setId: SET_ID,
+          cardName: 'Charizard VSTAR',
+          cardNumber: '018',
+          setName: 'Brilliant Stars',
+          setCode: 'swsh9',
+          variantLabel: 'Holo',
+          imageSmallUrl: null,
+        },
+      ],
+      totalCount: 500,
+      nextOffset: 50,
+    });
+    expect(parsed.nextOffset).toBe(50);
+    expect(parsed.items).toHaveLength(1);
+  });
+
+  it('rejects a negative totalCount', () => {
+    expect(
+      smartPreviewResponseDto.safeParse({ items: [], totalCount: -1, nextOffset: null }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a missing nextOffset key', () => {
+    expect(smartPreviewResponseDto.safeParse({ items: [], totalCount: 0 }).success).toBe(false);
   });
 });

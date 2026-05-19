@@ -454,6 +454,133 @@ runtime adapter swaps the degraded synthesis for a direct
 adapter + injectable test fake; backend follow-up flagged for the
 next backend iteration)_
 
+**Status:** ~~Open~~ **CLOSED — 2026-05-19** by
+T-BE-EDGE-FUNCTIONS-V2. Option 1 shipped:
+
+- Added `GET /v1/c/{handle}/{slug}` as an anonymous Edge route
+  (`infra/supabase/functions/_shared/handlers/publicShareable.ts`)
+  wired into `routes-table.ts`. Uses the service-role client to
+  bypass RLS on `collection_item` while projecting only public
+  columns (no `user_id`, `acquired_price`, `notes`, etc.).
+- Added `publicShareableDto` to `@binderly/api-contracts`
+  (`packages/api-contracts/src/shareables.ts`) plus
+  `publicShareOwnerDto`, `publicShareMemberDto`, `publicShareCountsDto`
+  — shape-for-shape match of `PublicSharePayload` in
+  `apps/web/lib/share/api.ts` so the web adapter swap is mechanical.
+- Added `shareables.getPublicShareablePayload(...)` to
+  `@binderly/api-client` (`packages/api-client/src/resources/shareables.ts`).
+  Single-URL coexistence with the existing `getPublicShareable` —
+  the new method opts into the richer payload via an
+  `Accept: application/vnd.binderly.share+json` header; the legacy
+  method continues to receive the bare `shareableDto`.
+- Tests: 16 handler tests
+  (`infra/supabase/functions/_shared/handlers/publicShareable.test.ts`)
+  cover both Accept-header branches, both target kinds (`full` and
+  `custom`), the dedup / sum / display-name fallback rules, and the
+  404 / 500 envelopes.
+
+The web runtime adapter (`apps/web/lib/share/api.ts`) is unchanged
+in this PR — swapping `apiToShareApi` to call
+`getPublicShareablePayload` is a one-line frontend follow-up
+tracked separately.
+
+---
+
+## Q-013 — T-BE-EDGE-FUNCTIONS-V2 divergences from the brief (deferred MVs + DSL → in-memory eval)
+
+**Raised:** 2026-05-19
+**Blocking:** None — the four endpoints ship behind correct contracts
+and the divergences are bounded.
+**Status:** Open — informational; flags the two implementation
+choices the orchestrator should know about before reading the PR
+and may want to schedule follow-ups for.
+
+**Context:**
+
+Implementing T-BE-EDGE-FUNCTIONS-V2 surfaced two places where the
+shipped handler diverges from the literal reading of the task brief.
+Both decisions are documented inline in the handlers and the
+elaborated task `.md`; logging them here so they aren't surprises in
+the next iteration.
+
+### 1. `GET /v1/me/collection/completion` reads tables, not MVs.
+
+The brief named two materialized views — `mv_user_set_completion` and
+`mv_user_global_completion` — as the data source. Neither view exists
+in the migrations (`packages/db/src/migrations/`). They're promised
+in `PROJECT.md` § 8 and referenced as "open" in Q-010 of this file,
+but the actual DDL was never written.
+
+Hard rule on this task: **no schema changes**. So the completion
+handler computes the same numbers on the fly from canonical tables
+(`collection_item`, `card`, `printing`, `set`) using a re-implementation
+of `@binderly/set-completion`'s `computeCompletion()` (the Edge bundle
+can't import the workspace package — the deno.jsonc import-map is
+`npm:` only). Algorithm: one Map per (cardId → setId), one pass over
+printings to tally per-set + global, one sort by `setName`. Complexity:
+O(P + C + I) where I is the user's `collection_item` count.
+
+At v1 catalog scale (~30k printings × ~25k cards × ~100 sets) this is
+well under 100ms per call — fine for the home-screen render path. If
+a future user crosses ~10k owned printings, or if the catalog grows
+past ~100k printings, the right fix is one of:
+
+1. Land the two MVs (a follow-up backend task with a hand-authored
+   migration) and swap the handler to read them.
+2. Cache the catalog projection per-process (TTL ~5 minutes) so the
+   per-call query reads only the user's `collection_item` rows.
+3. Move the computation into a Postgres function and call it via RPC.
+
+Option (1) is the canonical fix; the others are escape hatches if (1)
+is delayed.
+
+### 2. `POST /v1/smart-collections/preview` evaluates the AST in memory.
+
+The brief named `@binderly/smart-collection-dsl`'s `compileToSql()` (the
+function is actually `expressionToSql()` — name drift) as the
+compilation step. Two impediments to using it directly:
+
+- The Edge bundle can't import the workspace package (same
+  import-map constraint as above).
+- The result is a parameterized SQL fragment (`{ sql, params }`); the
+  supabase-js client surface is PostgREST, not raw SQL. There's no
+  clean way to execute the compiled SQL without either an RPC
+  function (schema change — forbidden) or a service-role backdoor
+  (security smell).
+
+The preview handler therefore validates the AST via a mirrored Zod
+schema (`previewExpressionSchema` in `infra/supabase/functions/_shared/contracts.ts`),
+loads the catalog projection (printing + card + set columns, ~30k
+rows), and evaluates the expression in JavaScript with a small
+re-implementation of `@binderly/smart-collection-dsl`'s `evaluate.ts`.
+Limitations versus the SQL compiler:
+
+- **`collection.*` fields are explicitly rejected** at the schema
+  layer — preview is catalog-wide; "is this in my collection?" is a
+  save-path concern. The save handler (a separate future task) can
+  reach the user's `collection_item` rows.
+- **Pagination is post-filter** — `totalCount` is exact, but the
+  catalog load + JS evaluation runs on every request. Adequate for
+  preview interactions (debounced editor calls); not adequate for
+  a hot-path read.
+
+The right long-term fix is the same as for completion: either land
+an RPC function that runs `expressionToSql()` server-side, or wire a
+bundle-step that pulls `@binderly/smart-collection-dsl` into the Edge
+function deploy artifact.
+
+**Recommendation:** Accept both divergences for this iteration. They
+are documented at the call sites, the contracts on the wire are
+correct, and the frontend follow-ups are unblocked. Schedule:
+
+- T-DL-MV-COMPLETION (backend): land the two missing materialized
+  views per `PROJECT.md` § 8 and swap the completion handler.
+- T-BE-SMART-PREVIEW-RPC (backend): land a Postgres function that
+  accepts the DSL AST as `jsonb` and returns matching printings;
+  swap the preview handler to call it.
+
+**Pablo's answer:** _(empty until answered)_
+
 ---
 
 _(no other open questions yet)_
