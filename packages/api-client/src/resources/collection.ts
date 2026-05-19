@@ -13,6 +13,7 @@ import {
   addCollectionItemRequest,
   addPrintingToCustomCollectionRequest,
   collectionItemDto,
+  completionDto,
   createCustomCollectionRequest,
   customCollectionDto,
   customCollectionItemDto,
@@ -24,6 +25,7 @@ import {
   type AddCollectionItemRequest,
   type AddPrintingToCustomCollectionRequest,
   type CollectionItemDto,
+  type CompletionDto,
   type CreateCustomCollectionRequest,
   type CustomCollectionDto,
   type CustomCollectionItemDto,
@@ -49,6 +51,13 @@ export interface CollectionResource {
   readonly listCollectionItems: (
     options?: ListCollectionItemsOptions,
   ) => Promise<PaginatedResponse<CollectionItemDto>>;
+  /**
+   * Authoritative server-side completion math — Set %, Master %,
+   * All Pokémon %. Replaces the iter-17/18 client-side fanout
+   * stop-gap (`apps/mobile/src/lib/collection/completion.ts` +
+   * `apps/web/lib/collection/*`) once consumers swap.
+   */
+  readonly getCompletion: (options?: { readonly signal?: AbortSignal }) => Promise<CompletionDto>;
   readonly addCollectionItem: (
     input: AddCollectionItemRequest,
     options?: { readonly signal?: AbortSignal },
@@ -128,6 +137,17 @@ export function makeCollectionResource(http: HttpClient): CollectionResource {
           ...(options.signal !== undefined ? { signal: options.signal } : {}),
         },
         collectionItemListSchema,
+      );
+    },
+
+    async getCompletion(options = {}): Promise<CompletionDto> {
+      return http.request(
+        {
+          path: '/v1/me/collection/completion',
+          method: 'GET',
+          ...(options.signal !== undefined ? { signal: options.signal } : {}),
+        },
+        completionDto,
       );
     },
 

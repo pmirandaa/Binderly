@@ -19,6 +19,7 @@ import { errEnvelope, mockFetch, mockFetchReject, okEnvelope } from '../test-hel
 import {
   FIXTURE_IDS,
   VALID_COLLECTION_ITEM,
+  VALID_COMPLETION,
   VALID_CUSTOM_COLLECTION,
   VALID_CUSTOM_COLLECTION_ITEM,
   VALID_PAGE,
@@ -430,6 +431,55 @@ describe('collection.updateSmartCollectionExpression', () => {
 // ============================================================
 // Cross-cutting
 // ============================================================
+
+// ============================================================
+// getCompletion (new — `/v1/me/collection/completion`)
+// ============================================================
+
+describe('collection.getCompletion', () => {
+  it('returns the typed completion payload on happy path', async () => {
+    const { collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_COMPLETION) }),
+    );
+    const result = await collection.getCompletion();
+    expect(result.perSet).toHaveLength(1);
+    expect(result.global.uniqueCardsOwned).toBe(100);
+  });
+
+  it('hits GET /v1/me/collection/completion', async () => {
+    const { fetch, collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_COMPLETION) }),
+    );
+    await collection.getCompletion();
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/v1/me/collection/completion');
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  it('sends the Authorization header (authed endpoint)', async () => {
+    const { fetch, collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_COMPLETION) }),
+    );
+    await collection.getCompletion();
+    const init = fetch.mock.calls[0]?.[1];
+    expect(init?.headers?.authorization).toBe('Bearer jwt-1');
+  });
+
+  it('throws ApiUnauthorizedError on 401', async () => {
+    const { collection } = makeResource(mockFetch({ status: 401 }));
+    await expect(collection.getCompletion()).rejects.toBeInstanceOf(ApiUnauthorizedError);
+  });
+
+  it('throws ApiResponseDecodeError when the payload is malformed', async () => {
+    const { collection } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope({ global: VALID_COMPLETION.global, perSet: 'not-an-array' }),
+      }),
+    );
+    await expect(collection.getCompletion()).rejects.toBeInstanceOf(ApiResponseDecodeError);
+  });
+});
 
 describe('collection — cross-cutting', () => {
   it('returns ApiResponseDecodeError on a bad shape', async () => {

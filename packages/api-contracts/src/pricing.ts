@@ -152,6 +152,52 @@ export const currentPriceDto = z
   .strict();
 export type CurrentPriceDto = z.infer<typeof currentPriceDto>;
 
+/**
+ * Freshness band emitted by `GET /v1/printings/:id/current-price`.
+ * The endpoint derives this from `computedAt`:
+ *
+ * - `'fresh'`  — `computedAt` ≤ 7 days ago.
+ * - `'stale'`  — `computedAt` 7 – 30 days ago.
+ * - `'stale_old'` — `computedAt` > 30 days ago.
+ *
+ * Pre-derived server-side so SSR + client + OG image agree on
+ * the rounded buckets without round-trip drift.
+ */
+export const PRINTING_CURRENT_PRICE_FRESHNESS = ['fresh', 'stale', 'stale_old'] as const;
+export const printingCurrentPriceFreshnessSchema = z.enum(PRINTING_CURRENT_PRICE_FRESHNESS);
+export type PrintingCurrentPriceFreshness = z.infer<typeof printingCurrentPriceFreshnessSchema>;
+
+/**
+ * Read-side wire shape for `GET /v1/printings/:id/current-price`.
+ *
+ * Strict subset of `currentPriceDto` (the existing all-grades /
+ * all-markets DTO) plus a derived `freshness` band — pre-bucketed
+ * by the server so the card-detail page renders the same
+ * "fresh / stale" badge SSR-side, client-side, and in the OG
+ * image without rounding drift. Carries only the columns
+ * `mv_current_price` actually has today; the richer trend
+ * columns from `context/data-model.md` § `mv_current_price`
+ * (`trend_7d`, `trend_30d`, `sample_count_30d`, …) are deferred
+ * — see Q-013 in `open-questions.md`.
+ */
+export const printingCurrentPriceDto = z
+  .object({
+    printingId: uuidSchema,
+    gradeTier: gradeTierSchema,
+    market: marketCodeSchema,
+    currency: currencyCodeSchema,
+    periodStart: isoDateSchema,
+    medianPrice: numericString2dpSchema.nullable(),
+    meanPrice: numericString2dpSchema.nullable(),
+    lowPrice: numericString2dpSchema.nullable(),
+    highPrice: numericString2dpSchema.nullable(),
+    sampleCount: z.number().int().nonnegative(),
+    computedAt: isoDateTimeSchema,
+    freshness: printingCurrentPriceFreshnessSchema,
+  })
+  .strict();
+export type PrintingCurrentPriceDto = z.infer<typeof printingCurrentPriceDto>;
+
 // ============================================================
 // fx_rate — daily exchange rate
 // ============================================================

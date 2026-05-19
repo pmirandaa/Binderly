@@ -31,6 +31,7 @@ describe('createClient', () => {
     expect(client.shareables).toBeDefined();
     expect(client.profile).toBeDefined();
     expect(client.auth).toBeDefined();
+    expect(client.smartCollections).toBeDefined();
     expect(client.http).toBeInstanceOf(HttpClient);
   });
 

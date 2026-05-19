@@ -135,3 +135,87 @@ export const updateShareableRequest = z
     message: 'updateShareableRequest body must include at least one field',
   });
 export type UpdateShareableRequest = z.infer<typeof updateShareableRequest>;
+
+// ============================================================
+// Public shareable payload — `GET /v1/c/{handle}/{slug}`
+// ============================================================
+
+/**
+ * Public-shareable owner subset. Mirrors the "anonymous reads
+ * receive only `{ handle, displayName, avatarUrl, bio }`"
+ * narrowing documented on `profileDto`. The fields are intentionally
+ * the same shape as `PublicShareOwner` in
+ * `apps/web/lib/share/api.ts` — the SSR page drops the
+ * synthesised payload for this DTO 1:1.
+ */
+export const publicShareOwnerDto = z
+  .object({
+    handle: z.string().min(3).max(40),
+    displayName: z.string().nullable(),
+    avatarUrl: z.string().url().nullable(),
+    bio: z.string().nullable(),
+  })
+  .strict();
+export type PublicShareOwnerDto = z.infer<typeof publicShareOwnerDto>;
+
+/**
+ * One member of the shared collection — a single printing the
+ * member grid renders. Shape matches `PublicShareMember` in
+ * `apps/web/lib/share/api.ts`.
+ */
+export const publicShareMemberDto = z
+  .object({
+    printingId: uuidSchema,
+    cardId: uuidSchema,
+    cardName: z.string().min(1),
+    cardNumber: z.string().min(1),
+    setName: z.string().min(1),
+    setCode: z.string().min(1),
+    variantLabel: z.string(),
+    imageUrl: z.string().url().nullable(),
+    quantity: z.number().int().nonnegative(),
+  })
+  .strict();
+export type PublicShareMemberDto = z.infer<typeof publicShareMemberDto>;
+
+/**
+ * Counts the page header and OG image render. Shape matches
+ * `PublicShareCounts` in `apps/web/lib/share/api.ts`. The server
+ * pre-computes `completionPct` so SSR HTML and OG-image
+ * rendering agree to the rounded percentage.
+ */
+export const publicShareCountsDto = z
+  .object({
+    ownedUnique: z.number().int().nonnegative(),
+    ownedTotalQuantity: z.number().int().nonnegative(),
+    catalogTotal: z.number().int().nonnegative(),
+    completionPct: z.number().min(0).max(100),
+  })
+  .strict();
+export type PublicShareCountsDto = z.infer<typeof publicShareCountsDto>;
+
+/**
+ * Public shareable DTO — the full envelope returned by
+ * `GET /v1/c/{handle}/{slug}`. Shape matches `PublicSharePayload`
+ * in `apps/web/lib/share/api.ts` so the runtime adapter
+ * (`apiToShareApi`) swaps its degraded-synthesis branch for a
+ * direct call with zero web-side churn.
+ *
+ * Anonymous endpoint — no JWT required, no auth header parsed.
+ * Resolves `(handle, slug)` → `(profile, shareable)` server-side
+ * via the service-role client; only public-shareable columns are
+ * surfaced on the wire (no `user_id` leak, no `collection_item`
+ * row internals).
+ */
+export const publicShareableDto = z
+  .object({
+    shareable: shareableDto,
+    owner: publicShareOwnerDto,
+    collectionTitle: z.string().min(1),
+    description: z.string().nullable(),
+    counts: publicShareCountsDto,
+    members: z.array(publicShareMemberDto),
+    lastUpdatedAt: isoDateTimeSchema,
+  })
+  .strict();
+export type PublicShareableDto = z.infer<typeof publicShareableDto>;

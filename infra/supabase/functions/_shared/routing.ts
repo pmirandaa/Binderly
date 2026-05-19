@@ -74,6 +74,21 @@ export function normalizePathname(pathname: string): string {
       path = path.slice('/v1'.length);
       continue;
     }
+    // Strip the `/v1/` prefix from any non-`/me/...` paths too. This
+    // covers the additive read endpoints (`/c/{handle}/{slug}`,
+    // `/printings/:id/current-price`, `/smart-collections/...`) added in
+    // T-BE-EDGE-FUNCTIONS-V2 that don't sit under `/me/`. The earlier
+    // proxy-rewrite branches above (`/functions/v1/v1`, `/v1/v1`) still
+    // win when present; this is the "user already canonicalized to
+    // `/v1/...` and we just need to drop the version segment" case.
+    if (path.startsWith('/v1/')) {
+      path = path.slice('/v1'.length);
+      continue;
+    }
+    if (path === '/v1') {
+      path = '/';
+      continue;
+    }
     break;
   }
   // Trim trailing slash unless the path is the root.

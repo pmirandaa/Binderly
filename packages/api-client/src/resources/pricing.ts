@@ -19,6 +19,7 @@ import {
   marketDto,
   paginatedResponseSchema,
   priceAggregateDto,
+  printingCurrentPriceDto,
   type CurrentPriceDto,
   type FxRateDto,
   type GradeTier,
@@ -27,6 +28,7 @@ import {
   type PaginatedResponse,
   type PriceAggregateDto,
   type PriceHistoryPeriod,
+  type PrintingCurrentPriceDto,
 } from '@binderly/api-contracts';
 
 import type { HttpClient } from '../client.js';
@@ -58,9 +60,30 @@ export interface GetFxRateOptions {
   readonly signal?: AbortSignal;
 }
 
+/**
+ * Options for the headline-price endpoint
+ * (`GET /v1/printings/:id/current-price`). `gradeTier` and
+ * `market` default server-side to `RAW_NM` and `EBAY_US`.
+ */
+export interface GetPrintingCurrentPriceOptions {
+  readonly printingId: string;
+  readonly gradeTier?: GradeTier;
+  readonly market?: MarketCode;
+  readonly signal?: AbortSignal;
+}
+
 export interface PricingResource {
   readonly listMarkets: (options?: { readonly signal?: AbortSignal }) => Promise<MarketDto[]>;
   readonly getCurrentPrice: (options: GetCurrentPriceOptions) => Promise<CurrentPriceDto>;
+  /**
+   * Headline price for a single printing. Reads
+   * `mv_current_price` for the default `(RAW_NM, EBAY_US)` slice
+   * unless overridden. Sibling to {@link getCurrentPrice}, which
+   * targets the all-tiers / all-markets `/prices/current` URL.
+   */
+  readonly getPrintingCurrentPrice: (
+    options: GetPrintingCurrentPriceOptions,
+  ) => Promise<PrintingCurrentPriceDto>;
   readonly getPriceHistory: (
     options: GetPriceHistoryOptions,
   ) => Promise<PaginatedResponse<PriceAggregateDto>>;
@@ -92,6 +115,23 @@ export function makePricingResource(http: HttpClient): PricingResource {
           ...(signal !== undefined ? { signal } : {}),
         },
         currentPriceDto,
+      );
+    },
+
+    async getPrintingCurrentPrice({
+      printingId,
+      gradeTier,
+      market,
+      signal,
+    }): Promise<PrintingCurrentPriceDto> {
+      return http.request(
+        {
+          path: `/v1/printings/${encodeURIComponent(printingId)}/current-price`,
+          method: 'GET',
+          query: { gradeTier, market },
+          ...(signal !== undefined ? { signal } : {}),
+        },
+        printingCurrentPriceDto,
       );
     },
 

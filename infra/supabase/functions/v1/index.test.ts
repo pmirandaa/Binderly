@@ -318,6 +318,7 @@ describe('v1 mux — does not autoboot Deno.serve in node', () => {
       ['POST', '/me/collection'],
       ['POST', '/me/collection/bulk'],
       ['POST', '/me/collection/recompute-set-completion'],
+      ['GET', '/me/collection/completion'],
       ['PATCH', '/me/collection/:id'],
       ['DELETE', '/me/collection/:id'],
       ['GET', '/me/custom-collections'],
@@ -330,6 +331,9 @@ describe('v1 mux — does not autoboot Deno.serve in node', () => {
       ['DELETE', '/me/custom-collections/:id/items/:printingId'],
       ['GET', '/me/custom-collections/:id/smart-rule'],
       ['PUT', '/me/custom-collections/:id/smart-rule'],
+      ['GET', '/printings/:id/current-price'],
+      ['GET', '/c/:handle/:slug'],
+      ['POST', '/smart-collections/preview'],
     ];
     for (const [method, pattern] of expectedPatterns) {
       const found = routes.find((r) => r.method === method && r.pattern === pattern);
