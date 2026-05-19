@@ -49,17 +49,16 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-**Iter 20 CLOSED 2026-05-15 ~23:30 UTC-4. Stage 04 web is now
-complete (8/8); Phases 0-5 are ALL complete. The entire frontend
-foundation is merged.** Pausing here per Pablo's "finish the
-current ones and the next batch and lets call it a night."
+**Iter 21 CLOSED 2026-05-19 ~14:30 UTC-4. Backend tidy-up
+shipped: 4 additive Edge endpoints (completion, current-price,
+public-shareable, smart-preview) landed in one PR. Q-012
+closed; Q-013 raised for two scope divergences (missing mvs;
+DSL eval in JS instead of SQL). Phases 0-5 still all complete;
+backend now has the surface area to drop the iter-17/18/20
+client-side stop-gaps.**
 
-When work resumes, the next dispatch is either a **backend
-tidy-up iter** (#FU-19 server-side completion endpoint, #FU-17
-pricing-display wiring, Q-012 public shareable endpoint —
-three additive Edge routes unblock four frontend follow-ups)
-or **open the scanner stage** (T-SC-CAMERA + T-SC-EMBED-MODEL
-in parallel).
+Iter 20 closed 2026-05-15 ~23:30 UTC-4 with Stage 04 web at
+8/8 and Phases 0-5 ALL complete (frontend foundation merged).
 
 Progression so far:
 
@@ -84,8 +83,13 @@ Stage 05 mobile; T-M-CUSTOM combines custom+smart per the spec
 while web splits into two tasks) →
 iter 20 (T-W-SHAREABLE-PUBLIC + T-W-AFFILIATE-LINKS — 2-worker
 parallel; public OG-imaged shareable pages + TCGplayer buy-CTAs;
-**closes Stage 04 web 8/8 → frontend foundation COMPLETE**;
-Q-011 + Q-012 raised, both non-blocking).
+closes Stage 04 web 8/8 → frontend foundation COMPLETE;
+Q-011 + Q-012 raised, both non-blocking) →
+iter 21 (T-BE-EDGE-FUNCTIONS-V2 — single worker, 4 additive
+read endpoints in one PR; **Q-012 closed**, Q-013 raised for
+two scope divergences: missing `mv_user_set_completion` /
+`mv_user_global_completion` mvs + Edge bundle can't import
+`@binderly/smart-collection-dsl`).
 
 Every Phase 0-5 task is merged: foundation (Phase 0), data layer
 (Phase 1), backend core (Phase 2), shared packages (Phase 3),
@@ -205,6 +209,102 @@ mobile vs packages) is reliably mergeable in parallel.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
+
+## Iter 21 close summary (backend tidy-up — 4 additive Edge endpoints; Q-012 closed; Q-013 raised)
+
+One worker, single coherent PR. Closed four frontend follow-ups
+that had been waiting since iters 17 / 18 / 20 by adding four
+additive read endpoints to the Supabase Edge Function + matching
+DTOs + api-client methods. **No schema changes; no migrations;
+no edits to existing endpoints.**
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-BE-EDGE-FUNCTIONS-V2 | merged | #68 (`472fdcf`) | +260+ across api-contracts (232 total) / api-client (253 total) / edge functions (293 total); workspace `pnpm test` 19/19 task-graph tasks green | One PR ships all 4 endpoints: `GET /v1/me/collection/completion`, `GET /v1/printings/:id/current-price`, `GET /v1/c/{handle}/{slug}` (anonymous, dual-Accept), `POST /v1/smart-collections/preview`. Worker self-elaborated the stub (`15107bf`), shipped the work (`2c16859`), closed Q-012 + raised Q-013 (`1c5a552`). |
+
+**Non-obvious decisions (worker self-decided; all flagged in PR
+body + Q-013):**
+
+- **Completion handler computes on-the-fly** instead of reading
+  `mv_user_set_completion` / `mv_user_global_completion`. Those
+  mvs were named in the brief + ratified Q-010 but they **don't
+  exist in migrations** — the hand-merged `0013_mv_current_price`
+  is the only mv on main. "No schema changes" rule prevents
+  creating them mid-task. Handler re-implements
+  `@binderly/set-completion`'s algorithm against canonical tables
+  (`collection_item ⨯ card ⨯ printing ⨯ set`); well under 100ms
+  at v1 catalog size. The brief got this wrong; Q-013 documents
+  the gap.
+- **Smart-preview evaluates AST in-memory** against a catalog
+  projection. The Edge bundle can't import
+  `@binderly/smart-collection-dsl` (Deno bundler doesn't resolve
+  the workspace package), and supabase-js is PostgREST-only — no
+  raw-SQL escape hatch. AST is validated via a Zod mirror in
+  `_shared/contracts.ts`; `collection.*` predicates rejected at
+  the preview boundary. `compileToSql()` only flows server-side
+  through an RPC follow-up (proposed `T-BE-SMART-PREVIEW-RPC`).
+- **Public shareable: single URL, dual response shape.**
+  `Accept: application/vnd.binderly.share+json` opts into the
+  richer `publicShareableDto`; the default `Accept` continues to
+  return the bare `shareableDto` so the existing
+  `getPublicShareable` client keeps working. Service-role bypass
+  on `collection_item` with column-level projection discipline
+  (anonymous read; no JWT parsed).
+- **`normalizePathname` widened** from `/v1/me/`-only to strip
+  `/v1/` from any path so the three non-`/me/` endpoints
+  (`/c/…`, `/printings/…`, `/smart-collections/…`) dispatch
+  correctly.
+- **`ZodEffects` interaction.** `z.discriminatedUnion` rejects
+  `ZodEffects` branches, so the smart-preview "range needs min
+  or max" cross-field rule lifted from per-branch `.refine()`
+  to a top-level `superRefine` on `smartPreviewRequest`. Worth
+  knowing for future contract authors.
+
+**Q-012 closed** at merge time (additive `publicShareableDto`
+landed; T-W-SHAREABLE-PUBLIC's runtime adapter can swap its
+degraded synthesis for `getPublicShareablePayload(...)` in a
+small follow-up PR — the data layer was designed as the seam
+exactly for this).
+
+**Q-013 raised** documenting the two scope divergences with
+bounded blast radius:
+
+1. **`mv_user_set_completion` + `mv_user_global_completion`
+   missing from migrations.** Proposed follow-up
+   **`T-DL-MV-COMPLETION`**: land the two mvs as hand-authored
+   migrations + indexes; swap the completion handler back to a
+   single `SELECT`. Strictly improves perf; no API surface
+   change.
+2. **DSL evaluation in JS instead of SQL.** Proposed follow-up
+   **`T-BE-SMART-PREVIEW-RPC`**: ship a Postgres RPC function
+   that accepts the DSL AST as JSON, compiles to SQL via the
+   server-side `compileToSql()` path, and runs as a single
+   query. Unlocks `collection.*` predicates + catalog-scale
+   eval (currently capped by in-memory projection size).
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 21). HEAD: `472fdcf`. Open questions: 3
+(Q-007 admin role, Q-011 TCGplayer URL, Q-013 mv/RPC gaps);
+all non-blocking.
+
+**Next iter candidates (ranked):**
+
+1. **Frontend wiring of the new endpoints (small but high
+   leverage).** Three short follow-ups: swap T-W-COLLECTION /
+   T-M-COLLECTION's client-side compute → `getCompletion()`;
+   wire pricing-display into Card{View,Screen} using the new
+   `getCurrentPrice()` (#FU-17 frontend half); swap
+   T-W-SHAREABLE-PUBLIC's degraded adapter → direct
+   `getPublicShareablePayload({ vendorAccept: true })`; swap
+   T-W-SMART preview → server preview. Could be a 2-worker
+   sibling dispatch (web + mobile) since owns_paths are
+   disjoint per platform.
+2. **Land the missing mvs (`T-DL-MV-COMPLETION`).** Small data-
+   layer task; unlocks the completion-handler swap from
+   on-the-fly compute to single-SELECT mv read.
+3. **Open the scanner stage** — T-SC-CAMERA + T-SC-EMBED-MODEL
+   parallel pair. Larger scope; standalone (no frontend
+   dependency).
 
 ## Iter 20 close summary (Stage 04 cap — frontend foundation COMPLETE)
 
@@ -471,23 +571,35 @@ close Stage 02.
   open; not blocking. Decide before the admin UI lands.**
 - **Q-011** (raised by T-W-AFFILIATE-LINKS, PR #66): exact TCGplayer
   affiliate URL format unconfirmed. `<BuyCta>` ships with a documented
-  placeholder URL (`/search/pokemon/product?productLineName=pokemon
-  &q=…&utm_source=binderly&utm_medium=affiliate&utm_campaign=binderly-
-  buy-cta&utm_id=<NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID>`). Real format +
-  Impact tracking param come once Pablo signs up. Non-blocking: env-
-  missing degraded path is production default until affiliate id lands.
-  **Logged as #FU-24.**
-- **Q-012** (raised by T-W-SHAREABLE-PUBLIC, PR #67; renumbered in-merge
-  from Q-011): public shareable read endpoint not implemented; richer
-  payload needed. `api-client.shareables.getPublicShareable` calls
-  `GET /v1/c/{handle}/{slug}` but Edge Function's `routes-table.ts` does
-  NOT carry that route, and `shareableDto` is metadata-only. Page ships
-  against richer injectable `PublicSharePayload` contract; runtime
-  adapter synthesises a degraded payload until backend lands additive
-  `publicShareableDto` + Edge route (Option 1).
+  placeholder URL. Real format + Impact tracking param come once
+  Pablo signs up. Non-blocking: env-missing degraded path is
+  production default until affiliate id lands. **Logged as #FU-24.**
+- **Q-013** (raised by T-BE-EDGE-FUNCTIONS-V2, PR #68): two scope
+  divergences shipped in iter 21:
+  1. `mv_user_set_completion` and `mv_user_global_completion`
+     materialised views (named in PROJECT.md § 8 + Q-010
+     ratification) **don't exist in migrations** — the completion
+     handler computes on-the-fly against canonical tables instead.
+     Performant at v1 catalog size; not at 100x v1 scale. Proposed
+     follow-up **`T-DL-MV-COMPLETION`** lands the mvs + swaps the
+     handler to a single SELECT. **Logged as #FU-26.**
+  2. The Edge bundle can't import `@binderly/smart-collection-dsl`
+     (Deno bundler) and supabase-js is PostgREST-only (no raw-SQL
+     escape hatch). Smart-preview evaluates the AST **in JS in
+     memory** against a catalog projection instead of via
+     `compileToSql()`. `collection.*` predicates rejected at the
+     preview boundary; can't evaluate at catalog scale (capped by
+     projection size). Proposed follow-up
+     **`T-BE-SMART-PREVIEW-RPC`** ships a Postgres RPC function
+     accepting the DSL AST as JSON, compiling server-side. Unlocks
+     `collection.*` predicates + catalog-scale eval. **Logged as
+     #FU-27.**
+
+**Q-012** closed at iter 21 merge time (additive `publicShareableDto`
++ `GET /v1/c/{handle}/{slug}` anonymous endpoint shipped in PR #68).
 
 All other open questions (Q-002 / Q-003 / Q-004 / Q-005 / Q-006 /
-Q-008 / Q-009 / Q-010) are closed.
+Q-008 / Q-009 / Q-010 / Q-012) are closed.
 **Q-010** (raised by T-M-COLLECTION worker, PR #62) ratified at
 merge time: both COLLECTION workers independently converged on
 client-side-compute as the v1 stop-gap for completion %, since
@@ -510,11 +622,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
-- T-W-SHAREABLE-PUBLIC — `79ad293` (public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` OG image; +67 tests; force-dynamic SSR + URL-params-only metadata; PublicSharePayload injectable contract + degraded runtime adapter; **Q-012 raised** (additive `publicShareableDto` Edge route follow-up); merge-time conflict resolution renumbered in-PR Q-011 → Q-012 to avoid collision with affiliate's Q-011) — **iter 20 cap / Stage 04 cap / frontend foundation COMPLETE**
-- T-W-AFFILIATE-LINKS — `d028681` (TCGplayer affiliate `<BuyCta>` on web + mobile card detail; +57 tests; documented placeholder URL; env-missing "Coming soon" degraded path is production default; mobile via `expo-web-browser.openBrowserAsync` for Impact attribution; **Q-011 / #FU-24** raised for URL format verification)
-- T-W-SMART — `b59c427` (web smart collections; +37 tests; client-side DSL eval; plan-gated save; reuses custom-collection persistence with kind='smart') — **iter 19 cap**
+- T-BE-EDGE-FUNCTIONS-V2 — `472fdcf` (4 additive read endpoints: `/v1/me/collection/completion` + `/v1/printings/:id/current-price` + `/v1/c/{handle}/{slug}` anon dual-Accept + `/v1/smart-collections/preview`; +260 tests; **Q-012 closed**, **Q-013 raised** for missing mvs + Edge can't import smart-collection-dsl; on-the-fly completion compute + in-JS DSL eval are documented stop-gaps with `T-DL-MV-COMPLETION` (#FU-26) + `T-BE-SMART-PREVIEW-RPC` (#FU-27) as proposed follow-ups; widened `normalizePathname` from `/v1/me/`-only to strip `/v1/` from any path) — **iter 21 cap**
+- T-W-SHAREABLE-PUBLIC — `79ad293` (public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` OG image; +67 tests; PublicSharePayload injectable contract + degraded runtime adapter ready to swap to `getPublicShareablePayload({ vendorAccept })` now that iter 21 landed) — **iter 20 cap / Stage 04 cap / frontend foundation COMPLETE**
+- T-W-AFFILIATE-LINKS — `d028681` (TCGplayer affiliate `<BuyCta>` on web + mobile card detail; +57 tests; documented placeholder URL; env-missing "Coming soon" degraded path is production default; **Q-011 / #FU-24** raised for URL format verification)
+- T-W-SMART — `b59c427` (web smart collections; +37 tests; client-side DSL eval; plan-gated save; reuses custom-collection persistence with kind='smart') — iter 19 cap
 - T-W-CUSTOM — `f796e2e` (web manual custom collections w/ 3-cap on free; +54 tests; in-tree Modal primitive; smart-kind 404 boundary)
-- T-M-CUSTOM — `487fef4` (mobile custom+smart combined; +107 tests; routes under /collections/... not bottom tab; closes Stage 05 mobile 5/5)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -562,7 +674,9 @@ placeholders untouched.
 22. **Catalog-wide PrintingPicker on mobile.** T-M-CUSTOM's `<PrintingPicker>` (manual collection "Add cards" flow) sources from the user's OWNED printings, not the full catalog. Tight v1 scope; product can lift this later if "browse-and-add" becomes a friction point. Same goes for T-M-CUSTOM's smart-editor Run preview (also owned-only). **Logged as #FU-22.**
 23. **Server-evaluated smart-collection preview.** Both T-W-SMART and T-M-CUSTOM evaluate smart-collection expressions client-side via `@binderly/smart-collection-dsl`'s `evaluate()` on a 200-printing preview window. For larger collections / future "run against entire catalog" semantics, the right shape is a server-side compile-to-SQL via an edge function (`@binderly/smart-collection-dsl`'s `compileToSql()` already supports this). **Logged as #FU-23.**
 24. **TCGplayer affiliate URL format verification (Q-011).** T-W-AFFILIATE-LINKS' `<BuyCta>` ships with a documented placeholder URL (`/search/pokemon/product?productLineName=pokemon&q=<name> <number> <set>&utm_source=binderly&utm_medium=affiliate&utm_campaign=binderly-buy-cta&utm_id=<id>`). The Impact partner program may expect a different storefront path (`/search/all/product?productLineName=pokemon` is also common in the wild) and a different tracking param (`clickref` / `irclickid` / `partner` vs `utm_id`). Fix: sign up for the TCGplayer affiliate program once the business entity is ready; receive exact wire format + tracking param spec from Impact; update both `apps/web/lib/affiliate/tcgplayer.ts` and `apps/mobile/src/components/buy-cta/tcgplayer.ts` in lockstep (~5 LOC each + tests). Non-blocking: env-missing "Coming soon" degraded path is production default until an affiliate id lands in `NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID` / `EXPO_PUBLIC_TCGPLAYER_AFFILIATE_ID`. **Logged as #FU-24.**
-25. **Server-side public shareable read endpoint (Q-012).** T-W-SHAREABLE-PUBLIC ships a richer `PublicSharePayload` contract (`{ shareable, owner, collectionTitle, description, counts, members, lastUpdatedAt }`) on the frontend, but `@binderly/api-client.shareables.getPublicShareable` only returns the bare `ShareableDto` (and the route isn't wired in `infra/supabase/functions/_shared/routes-table.ts` — every entry is `/me/...`). Runtime adapter synthesises a degraded payload (URL-derived handle + empty members + zero counts) so SSR + OG image render correctly with header-only data. Backend fix (Option 1): add `GET /v1/c/{handle}/{slug}` Edge route + additive `publicShareableDto` in `@binderly/api-contracts`; the Edge handler joins `shareable` ↔ `profile` ↔ `collection_item` (and optionally `custom_collection`) once and returns one anonymous envelope. Web data layer drops in unchanged — only the runtime adapter swaps degraded synthesis for a direct call. **Logged as the backend companion to Q-012; pairs naturally with #FU-19 + #FU-23 in a single backend tidy-up iter.**
+25. **Server-side public shareable read endpoint (Q-012).** ✅ **CLOSED iter 21** — `T-BE-EDGE-FUNCTIONS-V2` shipped `GET /v1/c/{handle}/{slug}` anonymous with `Accept: application/vnd.binderly.share+json` opting into the richer `publicShareableDto`. T-W-SHAREABLE-PUBLIC's runtime adapter can swap its degraded synthesis for `getPublicShareablePayload(...)` in a small follow-up; the data layer was designed as the seam for exactly this.
+26. **Land `mv_user_set_completion` + `mv_user_global_completion` materialised views (Q-013, half 1).** Both mvs are named in `PROJECT.md § 8` and were re-ratified at Q-010 close, but they **don't exist in any migration on main** (only `mv_current_price` does). T-BE-EDGE-FUNCTIONS-V2's completion handler re-implements `@binderly/set-completion`'s algorithm against canonical tables instead — fast at v1 size, breaks down at scale. Fix: hand-author a migration that ships both mvs + appropriate indexes + a refresh hook (or scheduled refresh; PostgREST + Supabase don't auto-refresh). Then swap the completion handler from on-the-fly compute to a single `SELECT` against the mv. Strictly improves perf; no API surface change. Proposed task: `T-DL-MV-COMPLETION`. **Logged as #FU-26.**
+27. **Smart-preview DSL-to-SQL via Postgres RPC (Q-013, half 2).** T-BE-EDGE-FUNCTIONS-V2's smart-preview handler evaluates the DSL AST **in JS in memory** because (a) the Edge bundle can't import `@binderly/smart-collection-dsl` (Deno bundler), and (b) supabase-js is PostgREST-only with no raw-SQL escape hatch. Side effect: `collection.*` predicates are rejected at the preview boundary, and eval is capped by the in-memory projection size (~few thousand printings). Fix: ship a Postgres RPC function (`smart_collection_preview(jsonb)`) that accepts the DSL AST as JSON, calls `compileToSql()` server-side, and runs as a single query. Edge handler then invokes the RPC via supabase-js's `.rpc(...)`. Unlocks `collection.*` predicates + catalog-scale eval. Proposed task: `T-BE-SMART-PREVIEW-RPC`. **Logged as #FU-27.**
 
 ## Phase 0 ledger (closed; 10/10 merged)
 

@@ -512,7 +512,7 @@ tasks:
     stage: 02-backend
     title: Edge Functions V2 — 4 additive read endpoints unblocking frontend follow-ups
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-BE-EDGE-FUNCTIONS, T-DL-PRICING-CURRENT-VIEW, T-SP-SET-COMPLETION, T-SP-SMART-DSL, T-W-SHAREABLE-PUBLIC]
     parallel_safe_with: []
     provides: [api:edge-v2]
