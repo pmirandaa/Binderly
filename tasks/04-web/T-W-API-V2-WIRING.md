@@ -345,4 +345,42 @@ Stop and surface to orchestrator if:
 
 ## Notes from execution
 
-_(filled in as the worker proceeds)_
+- **Test count.** Baseline at task start was 448 apps/web tests
+  (not the 411 quoted in the kickoff brief). Final count after
+  the four surface swaps is 499 passing — +51 net-new tests
+  distributed across:
+    - Surface 1 (completion): ~12 new (CollectionView,
+      CollectionSetView, CollectionApi).
+    - Surface 2 (pricing): ~22 new (CardPriceBlock,
+      BrowseApi.getCurrentPrice, freshness/computedAt
+      helpers).
+    - Surface 3 (shareable): ~9 new (apiToShareApi rewire).
+    - Surface 4 (smart preview): ~18 new (server-Run path,
+      `collection.*` fallback, truncated-page notice,
+      `runMatchToView`/`previewItemToView`/
+      `mapSmartPreviewResponse`, runtime adapter delegation
+      tests).
+- **Build with no env vars.** `next build` succeeds without
+  `NEXT_PUBLIC_SUPABASE_*` set (iter-14 rule preserved).
+- **No new open questions.** All escalation triggers stayed
+  unfired — every method matched the exported `@binderly/api-
+  client` surface, fixtures stayed backward-compatible, and the
+  `collection.*` predicate fallback fell out of
+  `ApiValidationError` cleanly.
+- **MatchGrid widened.** Surface 4 introduced
+  `SmartMatchView` as the narrow display tuple shared by the
+  local evaluator output and the server preview rows so the
+  grid component doesn't fork. Both runtimes project through
+  this seam (`runMatchToView`, `previewItemToView`).
+- **Smart preview fallback semantics.** When the server returns
+  `ApiValidationError` OR a message mentioning `collection.`,
+  the editor and detail viewer run the bounded local evaluator
+  and surface a small "Using local preview" caption. Any other
+  error renders the run-error block instead (editor:
+  `smart-editor-run-error`; detail:
+  `smart-detail-run-error`).
+- **`runServerPreview` mock default.** The fake API derives
+  its preview response from the in-memory fixture using
+  `evaluateExpression()` over each candidate, so existing
+  tests that didn't override get the same matched-printing
+  counts they did against the old client-side runner.
