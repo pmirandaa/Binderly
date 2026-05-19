@@ -521,6 +521,32 @@ tasks:
     est_effort: L
     stub: false
 
+  - id: T-W-API-V2-WIRING
+    stage: 04-web
+    title: Wire V2 read endpoints into web surfaces (completion, current-price, shareable, smart-preview)
+    agent_role: frontend-web
+    status: pending
+    depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-COLLECTION, T-W-BROWSE, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-SP-PRICING-DISPLAY]
+    parallel_safe_with: [T-M-API-V2-WIRING]
+    provides: [web:v2-wiring]
+    owns_paths: [apps/web/app/, apps/web/components/, apps/web/lib/]
+    task_file: tasks/04-web/T-W-API-V2-WIRING.md
+    est_effort: L
+    stub: true
+
+  - id: T-M-API-V2-WIRING
+    stage: 05-mobile
+    title: Wire V2 read endpoints into mobile surfaces (completion, current-price, smart-preview)
+    agent_role: frontend-mobile
+    status: pending
+    depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-M-COLLECTION, T-M-BROWSE, T-M-CUSTOM, T-SP-PRICING-DISPLAY]
+    parallel_safe_with: [T-W-API-V2-WIRING]
+    provides: [mobile:v2-wiring]
+    owns_paths: [apps/mobile/src/]
+    task_file: tasks/05-mobile/T-M-API-V2-WIRING.md
+    est_effort: M
+    stub: true
+
   # ============================================================
   # PHASE 3 — SHARED PACKAGES
   # ============================================================
