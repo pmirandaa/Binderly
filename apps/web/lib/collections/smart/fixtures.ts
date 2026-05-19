@@ -15,15 +15,21 @@ import type {
   PrintingDto,
   SetDto,
   SmartCollectionRuleDto,
+  SmartPreviewRequestDto,
+  SmartPreviewResponseDto,
   SubscriptionDto,
 } from '@binderly/api-contracts';
 import type { Expression } from '@binderly/smart-collection-dsl';
+import { evaluateExpression } from '@binderly/smart-collection-dsl';
 
 import {
+  indexOwnedItems,
+  projectCandidateItem,
   type CatalogPreview,
   type CreateSmartCollectionInput,
   type SmartCollectionsApi,
 } from './api';
+import { variantClassLabel } from './format';
 import {
   makeCard,
   makeCardWithPrintings,
@@ -309,6 +315,19 @@ export interface FakeSmartCollectionsApiOptions {
   rejectGetCollection?: Error;
   /** Optional reject for getSmartRule only. */
   rejectGetRule?: Error;
+  /** Optional reject for runServerPreview only. */
+  rejectServerPreview?: Error;
+  /**
+   * Optional override for the server-preview response. When omitted
+   * the fake derives a synthetic response by running the request's
+   * expression against the local `preview` fixture using the same
+   * `evaluateExpression()` the editor's typing-preview uses — so
+   * existing tests that didn't override get the same match counts
+   * they used to get from the in-browser `runExpression()` path.
+   */
+  runServerPreview?: (
+    input: SmartPreviewRequestDto,
+  ) => SmartPreviewResponseDto;
 }
 
 export interface FakeSmartCollectionsApi extends SmartCollectionsApi {
@@ -320,7 +339,53 @@ export interface FakeSmartCollectionsApi extends SmartCollectionsApi {
   deleteSmartCollection: ReturnType<typeof vi.fn>;
   listOwnedItems: ReturnType<typeof vi.fn>;
   previewCatalog: ReturnType<typeof vi.fn>;
+  runServerPreview: ReturnType<typeof vi.fn>;
   getSubscription: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Derive a synthetic `SmartPreviewResponseDto` from the in-memory
+ * fixture preview. Mirrors what the V2 worker would return: the
+ * matching printings projected to `SmartPreviewItemDto` rows. The
+ * server's pagination is collapsed to "return all matches up to
+ * `limit`" — sufficient for the editor + detail-view tests.
+ */
+export function deriveServerPreviewFromFixture(
+  input: SmartPreviewRequestDto,
+  preview: CatalogPreview,
+  ownedItems: ReadonlyArray<CollectionItemDto>,
+): SmartPreviewResponseDto {
+  const limit = input.limit ?? 200;
+  const offset = input.offset ?? 0;
+  const owned = indexOwnedItems(ownedItems);
+  const allMatches: SmartPreviewResponseDto['items'] = [];
+  for (const printing of preview.printings) {
+    const card = preview.cardsById.get(printing.cardId);
+    if (card === undefined) continue;
+    const set = preview.setsById.get(card.setId);
+    if (set === undefined) continue;
+    const candidate = projectCandidateItem(printing, preview.cardsById, preview.setsById, owned);
+    if (candidate === null) continue;
+    if (!evaluateExpression(input.expression as Expression, candidate)) continue;
+    allMatches.push({
+      printingId: printing.id,
+      cardId: card.id,
+      setId: set.id,
+      cardName: card.name,
+      cardNumber: card.number,
+      setName: set.name,
+      setCode: set.code,
+      variantLabel: variantClassLabel(printing.variantClass),
+      imageSmallUrl: printing.imageSmallUrl,
+    });
+  }
+  const page = allMatches.slice(offset, offset + limit);
+  const nextOffset = offset + page.length < allMatches.length ? offset + page.length : null;
+  return {
+    items: page,
+    totalCount: allMatches.length,
+    nextOffset,
+  };
 }
 
 export function createFakeSmartCollectionsApi(
@@ -401,6 +466,12 @@ export function createFakeSmartCollectionsApi(
     if (options.rejectPreview !== undefined) throw options.rejectPreview;
     return preview;
   });
+  const runServerPreview = vi.fn(async (input: SmartPreviewRequestDto) => {
+    if (options.rejectAll !== undefined) throw options.rejectAll;
+    if (options.rejectServerPreview !== undefined) throw options.rejectServerPreview;
+    if (options.runServerPreview !== undefined) return options.runServerPreview(input);
+    return deriveServerPreviewFromFixture(input, preview, ownedItems);
+  });
   const getSubscription = vi.fn(async () => {
     if (options.rejectAll !== undefined) throw options.rejectAll;
     return subscription;
@@ -415,6 +486,7 @@ export function createFakeSmartCollectionsApi(
     deleteSmartCollection,
     listOwnedItems,
     previewCatalog,
+    runServerPreview,
     getSubscription,
   };
 }

@@ -20,7 +20,9 @@ import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
 import { formatReleaseDate, languageLabel, rarityLabel } from '../../lib/browse/format';
 import { BuyCta } from '../buy-cta';
+import { CardPriceBlock } from './CardPriceBlock';
 import { PageLoading } from '../loading/PageLoading';
+
 
 import type { BrowseApi } from '../../lib/browse/api';
 
@@ -183,13 +185,7 @@ export function CardView({ api, printingId, onNotFound }: CardViewProps): React.
             <MetaRow label="Released" value={formatReleaseDate(set.releaseDate)} />
           </YStack>
 
-          <Card variant="outlined" padding="$4" gap="$2" data-testid="card-prices-placeholder">
-            <Text variant="subtitle">Prices</Text>
-            <Text variant="body" tone="muted">
-              Pricing graphs land with the pricing-display package. We&apos;ll surface current
-              market prices, grade-tier breakouts, and history here once that work merges.
-            </Text>
-          </Card>
+          <CardPriceBlock api={api} printingId={printingId} />
 
           <Card variant="outlined" padding="$4" gap="$3" data-testid="card-buy">
             <Text variant="subtitle">Buy</Text>

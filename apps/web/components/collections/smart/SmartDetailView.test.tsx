@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SmartDetailView } from './SmartDetailView';
 import {
   createFakeSmartCollectionsApi,
+  makeCollectionItem,
   makeSmartRule,
   makeSubscription,
 } from '../../../lib/collections/smart/fixtures';
@@ -16,7 +17,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('SmartDetailView — pro tier', () => {
-  it('renders the saved smart-collection name and re-runs the expression', async () => {
+  it('renders the saved smart-collection name and re-runs the expression via the server preview', async () => {
     const api = createFakeSmartCollectionsApi({
       subscription: makeSubscription({ tier: 'pro' }),
     });
@@ -34,11 +35,16 @@ describe('SmartDetailView — pro tier', () => {
     });
     // SMART_FIXTURE_EXPRESSION: card.name=Charizard AND
     // card.language=en → 4 of 7 scanned (JP card has a different
-    // localized name).
+    // localized name). The server-preview fake mirrors that count.
+    expect(api.runServerPreview).toHaveBeenCalledTimes(1);
+    expect(api.runServerPreview.mock.calls[0]?.[0]).toMatchObject({
+      expression: { type: 'and' },
+    });
     expect(screen.getByTestId('smart-detail-match-count').textContent).toContain(
       '4 matches',
     );
     expect(screen.getAllByTestId('smart-match-tile').length).toBe(4);
+    expect(screen.queryByTestId('smart-detail-local-fallback')).toBeNull();
   });
 
   it('renders the rule summary and an empty grid when nothing matches', async () => {
@@ -56,6 +62,57 @@ describe('SmartDetailView — pro tier', () => {
     await waitFor(() => {
       expect(screen.getByTestId('smart-detail-grid-empty')).toBeInTheDocument();
     });
+  });
+
+  it('falls back to the local evaluator when the server rejects a `collection.*` predicate', async () => {
+    const { ApiValidationError } = await import('@binderly/api-client');
+    const api = createFakeSmartCollectionsApi({
+      subscription: makeSubscription({ tier: 'pro' }),
+      rulesByCollectionId: {
+        'cc-smart-1': makeSmartRule({
+          expression: {
+            type: 'and',
+            children: [
+              { type: 'eq', field: 'card.name', value: 'Charizard' },
+              { type: 'eq', field: 'collection.isOwned', value: true },
+            ],
+          },
+        }),
+      },
+      ownedItems: [
+        makeCollectionItem({ printingId: 'p-base-charizard-holo', quantity: 1 }),
+      ],
+      rejectServerPreview: new ApiValidationError(
+        'collection.* predicates are not supported by the server preview yet',
+      ),
+    });
+    renderWithProviders(
+      <SmartDetailView api={api} collectionId="cc-smart-1" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-detail-local-fallback')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('smart-detail-match-count').textContent).toContain(
+      '1 match',
+    );
+    expect(screen.getAllByTestId('smart-match-tile').length).toBe(1);
+  });
+
+  it('renders the run-error state when a non-validation server preview fails', async () => {
+    const api = createFakeSmartCollectionsApi({
+      subscription: makeSubscription({ tier: 'pro' }),
+      rejectServerPreview: new Error('worker crashed'),
+    });
+    renderWithProviders(
+      <SmartDetailView api={api} collectionId="cc-smart-1" />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-detail-run-error')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('smart-detail-run-error').textContent).toContain(
+      'worker crashed',
+    );
+    expect(screen.queryByTestId('smart-detail-match-count')).toBeNull();
   });
 
   it('routes the back link to /collections/smart', async () => {

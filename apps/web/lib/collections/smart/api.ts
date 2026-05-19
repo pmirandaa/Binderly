@@ -45,6 +45,8 @@ import type {
   PrintingDto,
   SetDto,
   SmartCollectionRuleDto,
+  SmartPreviewRequestDto,
+  SmartPreviewResponseDto,
   SubscriptionDto,
   UpdateSmartCollectionExpressionRequest,
 } from '@binderly/api-contracts';
@@ -102,6 +104,19 @@ export interface SmartCollectionsApi {
   readonly previewCatalog: (
     options?: { readonly limit?: number; readonly signal?: AbortSignal },
   ) => Promise<CatalogPreview>;
+  /**
+   * Server-side canonical preview — compiles the smart-collection
+   * expression to SQL and returns the first page of matching
+   * printings. Used by the editor's Run button and the saved-
+   * collection detail viewer. `previewCatalog()` stays on the
+   * interface for the editor's debounced typing preview and as
+   * the local fallback path when the server rejects a
+   * `collection.*` predicate with 400 (see Q-013).
+   */
+  readonly runServerPreview: (
+    input: SmartPreviewRequestDto,
+    signal?: AbortSignal,
+  ) => Promise<SmartPreviewResponseDto>;
   readonly getSubscription: (signal?: AbortSignal) => Promise<SubscriptionDto>;
 }
 
@@ -240,6 +255,12 @@ export function apiToSmartCollectionsApi(
         }
       }
       return { printings, setsById, cardsById };
+    },
+
+    async runServerPreview(input, signal): Promise<SmartPreviewResponseDto> {
+      return client.smartCollections.preview(input, {
+        ...(signal !== undefined ? { signal } : {}),
+      });
     },
 
     async getSubscription(signal): Promise<SubscriptionDto> {

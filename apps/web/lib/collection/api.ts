@@ -27,6 +27,7 @@ import type { BinderlyClient } from '@binderly/api-client';
 import type {
   CardWithPrintingsDto,
   CollectionItemDto,
+  CompletionDto,
   PrintingDto,
   SetDto,
 } from '@binderly/api-contracts';
@@ -46,7 +47,22 @@ export interface CollectionApi {
     setId: string,
     signal?: AbortSignal,
   ) => Promise<SetContents>;
+  /**
+   * Catalog roster walk (O(sets × cards × printings)). Used by the
+   * per-set drill-down's Owned / Missing grids for per-printing
+   * resolution. The completion math previously routed through this
+   * fanout has moved to {@link getCompletion}. Kept here because
+   * no V2 endpoint serves the per-printing roster yet.
+   */
   readonly catalogRoster: (signal?: AbortSignal) => Promise<CatalogRoster>;
+  /**
+   * Authoritative server-side completion math. Returns the global
+   * tally + a per-set entry per set with at least one owned
+   * printing. Replaces the iter-17 `catalogRoster() +
+   * computeCompletion()` on-device fanout for both the home page
+   * and the per-set drill-down's header bars.
+   */
+  readonly getCompletion: (signal?: AbortSignal) => Promise<CompletionDto>;
 }
 
 export interface SetContents {
@@ -150,6 +166,12 @@ export function apiToCollectionApi(client: BinderlyClient): CollectionApi {
         cursor = res.nextCursor;
       }
       return { set, cards };
+    },
+
+    async getCompletion(signal): Promise<CompletionDto> {
+      return client.collection.getCompletion({
+        ...(signal !== undefined ? { signal } : {}),
+      });
     },
 
     async catalogRoster(signal): Promise<CatalogRoster> {
