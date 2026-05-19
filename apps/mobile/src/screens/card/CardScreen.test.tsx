@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { waitFor } from '@testing-library/react';
+import { act, fireEvent, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApiNotFoundError } from '@binderly/api-client';
 import type { BinderlyClient } from '@binderly/api-client';
-import type { CardWithPrintingsDto, PrintingDto } from '@binderly/api-contracts';
+import type {
+  CardWithPrintingsDto,
+  PrintingCurrentPriceDto,
+  PrintingDto,
+} from '@binderly/api-contracts';
 
 import { CardScreen } from './CardScreen';
 import { ApiClientProvider } from '../../lib/api-client';
@@ -121,6 +125,9 @@ interface FakeClient {
     listPrintingsForCard: ReturnType<typeof vi.fn>;
     getPrinting: ReturnType<typeof vi.fn>;
   };
+  pricing: {
+    getPrintingCurrentPrice: ReturnType<typeof vi.fn>;
+  };
 }
 
 function buildClient(): FakeClient {
@@ -133,6 +140,28 @@ function buildClient(): FakeClient {
       listPrintingsForCard: vi.fn(),
       getPrinting: vi.fn(),
     },
+    pricing: {
+      getPrintingCurrentPrice: vi.fn(),
+    },
+  };
+}
+
+function makePrintingCurrentPrice(
+  partial: Partial<PrintingCurrentPriceDto> & { printingId: string },
+): PrintingCurrentPriceDto {
+  return {
+    printingId: partial.printingId,
+    gradeTier: partial.gradeTier ?? 'RAW_NM',
+    market: partial.market ?? 'EBAY_US',
+    currency: partial.currency ?? 'USD',
+    periodStart: partial.periodStart ?? '2024-05-01',
+    medianPrice: 'medianPrice' in partial ? (partial.medianPrice ?? null) : '12.50',
+    meanPrice: 'meanPrice' in partial ? (partial.meanPrice ?? null) : '13.00',
+    lowPrice: 'lowPrice' in partial ? (partial.lowPrice ?? null) : '9.00',
+    highPrice: 'highPrice' in partial ? (partial.highPrice ?? null) : '18.00',
+    sampleCount: partial.sampleCount ?? 12,
+    computedAt: partial.computedAt ?? '2024-05-12T00:00:00Z',
+    freshness: partial.freshness ?? 'fresh',
   };
 }
 
@@ -176,7 +205,7 @@ describe('<CardScreen>', () => {
     expect(result.container.textContent).toContain('Card service down');
   });
 
-  it('renders the card detail page with name, metadata, and prices placeholder', async () => {
+  it('renders the card detail page with name, metadata, and the V2 PriceBlock', async () => {
     paramsHolder.current = { id: 'card-1' };
     const client = buildClient();
     client.cards.getCard.mockResolvedValue(
@@ -198,6 +227,9 @@ describe('<CardScreen>', () => {
         ],
       }),
     );
+    client.pricing.getPrintingCurrentPrice.mockResolvedValue(
+      makePrintingCurrentPrice({ printingId: 'p1' }),
+    );
     const result = renderScreen(client);
     await waitFor(() => expect(result.queryByTestId('card-screen')).not.toBeNull());
     const title = result.getByTestId('card-title');
@@ -209,6 +241,9 @@ describe('<CardScreen>', () => {
     expect(meta.textContent).toContain('Mitsuhiro Arita');
     expect(meta.textContent).toContain('120');
     expect(result.getByTestId('card-prices').textContent).toContain('Prices');
+    // No more "T-SP-PRICING-DISPLAY" placeholder copy.
+    expect(result.container.textContent).not.toContain('T-SP-PRICING-DISPLAY');
+    expect(result.container.textContent).not.toContain('Prices coming soon');
   });
 
   it('renders the BuyCta in a "card-buy" section', async () => {
@@ -290,5 +325,245 @@ describe('<CardScreen>', () => {
     const result = renderScreen(client);
     await waitFor(() => expect(result.queryByTestId('card-screen')).not.toBeNull());
     expect(client.cards.getCard).toHaveBeenCalledWith({ id: 'card-1' });
+  });
+});
+
+// ============================================================
+// <PriceBlock> behaviour (composed inside <CardScreen>)
+// ============================================================
+
+describe('<CardScreen> — <PriceBlock>', () => {
+  it('renders a formatted median + range + freshness badge on success', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1', variantClass: 'HOLO' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockResolvedValue(
+      makePrintingCurrentPrice({
+        printingId: 'p1',
+        medianPrice: '12.50',
+        lowPrice: '9.00',
+        highPrice: '18.00',
+        sampleCount: 12,
+        freshness: 'fresh',
+      }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-median')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-median').textContent).toContain('$12.50');
+    expect(result.getByTestId('card-prices-range').textContent).toContain('$9.00');
+    expect(result.getByTestId('card-prices-range').textContent).toContain('$18.00');
+    expect(result.getByTestId('card-prices-freshness').textContent).toContain('Fresh');
+    expect(result.getByTestId('card-prices-samples').textContent).toContain('12 samples');
+    expect(client.pricing.getPrintingCurrentPrice).toHaveBeenCalledWith({ printingId: 'p1' });
+  });
+
+  it('renders the loading state while the price query is in flight', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockReturnValue(new Promise(() => undefined));
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-loading')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-loading').textContent).toContain('Loading price');
+  });
+
+  it('renders the no-data state when the api-client throws ApiNotFoundError', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockRejectedValue(
+      new ApiNotFoundError('No price row', { status: 404 }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-no-data')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-no-data').textContent).toContain(
+      'No price data yet',
+    );
+  });
+
+  it('renders the error state for non-404 failures', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockRejectedValue(
+      new Error('Pricing service unreachable'),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-error')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-error').textContent).toContain(
+      'Pricing service unreachable',
+    );
+    expect(result.queryByTestId('card-prices-retry')).not.toBeNull();
+  });
+
+  it('renders the no-data state when medianPrice is null (rollup placeholder row)', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockResolvedValue(
+      makePrintingCurrentPrice({
+        printingId: 'p1',
+        medianPrice: null,
+        meanPrice: null,
+        lowPrice: null,
+        highPrice: null,
+        sampleCount: 0,
+      }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-no-data')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-no-data').textContent).toContain(
+      'No samples',
+    );
+  });
+
+  it('renders a stale freshness badge when the server reports `stale`', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockResolvedValue(
+      makePrintingCurrentPrice({ printingId: 'p1', freshness: 'stale' }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-freshness')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-freshness').textContent).toContain('Stale');
+  });
+
+  it('renders the stale_old freshness label when the server reports `stale_old`', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockResolvedValue(
+      makePrintingCurrentPrice({ printingId: 'p1', freshness: 'stale_old' }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-freshness')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-freshness').textContent).toContain('30d+');
+  });
+
+  it('prefers the HOLO printing id when scoping the price query', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [
+          makePrinting({ id: 'p-non-holo', cardId: 'card-1', variantClass: 'NON_HOLO' }),
+          makePrinting({ id: 'p-holo', cardId: 'card-1', variantClass: 'HOLO' }),
+        ],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice.mockResolvedValue(
+      makePrintingCurrentPrice({ printingId: 'p-holo' }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-median')).not.toBeNull(),
+    );
+    expect(client.pricing.getPrintingCurrentPrice).toHaveBeenCalledWith({
+      printingId: 'p-holo',
+    });
+  });
+
+  it('renders the no-printing copy when the card has zero printings', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({ id: 'card-1', setId: 'set-1', printings: [] }),
+    );
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-no-data')).not.toBeNull(),
+    );
+    expect(result.getByTestId('card-prices-no-data').textContent).toContain(
+      'No printing selected',
+    );
+    expect(client.pricing.getPrintingCurrentPrice).not.toHaveBeenCalled();
+  });
+
+  it('retries the price fetch when the retry affordance is tapped', async () => {
+    paramsHolder.current = { id: 'card-1' };
+    const client = buildClient();
+    client.cards.getCard.mockResolvedValue(
+      makeCardWithPrintings({
+        id: 'card-1',
+        setId: 'set-1',
+        printings: [makePrinting({ id: 'p1', cardId: 'card-1' })],
+      }),
+    );
+    client.pricing.getPrintingCurrentPrice
+      .mockRejectedValueOnce(new Error('Network blip'))
+      .mockResolvedValueOnce(makePrintingCurrentPrice({ printingId: 'p1' }));
+    const result = renderScreen(client);
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-retry')).not.toBeNull(),
+    );
+    expect(client.pricing.getPrintingCurrentPrice).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      fireEvent.click(result.getByTestId('card-prices-retry'));
+    });
+    await waitFor(() =>
+      expect(client.pricing.getPrintingCurrentPrice).toHaveBeenCalledTimes(2),
+    );
+    await waitFor(() =>
+      expect(result.queryByTestId('card-prices-median')).not.toBeNull(),
+    );
   });
 });
