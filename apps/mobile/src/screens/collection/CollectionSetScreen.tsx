@@ -12,9 +12,12 @@
 //     have. Tapping a tile pushes `/cards/{cardId}` so the
 //     existing card detail surface handles it.
 //
-// Set / Master percentages come from `computeCompletionForSet`
-// (which delegates to `@binderly/set-completion`) — accurate,
-// because we have the full per-set printing roster here.
+// Set / Master header percentages come from the V2
+// `/v1/me/collection/completion` endpoint (T-M-API-V2-WIRING),
+// joined to this set on `setId`. The drill-down roster from
+// `useSetDrillDownQuery` is still loaded for the Owned/Missing
+// partition (the completion DTO is set-rolled-up; it doesn't
+// carry per-printing ownership).
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
@@ -28,11 +31,11 @@ import { ProgressBar } from '../../components/collection/ProgressBar.js';
 import { useAuth } from '../../components/providers/AuthProvider.js';
 import { formatReleaseDate, languageLabel, useSetBySlugQuery } from '../../lib/browse/index.js';
 import {
-  computeCompletionForSet,
   formatCount,
   formatPercent,
   partitionPrintingsForDrillDown,
   useCollectionItemsQuery,
+  useCompletionQuery,
   useSetDrillDownQuery,
 } from '../../lib/collection/index.js';
 
@@ -57,6 +60,7 @@ export function CollectionSetScreen(): ReactNode {
   const setQuery = useSetBySlugQuery(slug);
   const drillDownQuery = useSetDrillDownQuery(setQuery.data?.id);
   const itemsQuery = useCollectionItemsQuery({ enabled: signedIn });
+  const completionQuery = useCompletionQuery({ enabled: signedIn });
 
   const [activeTab, setActiveTab] = useState<DrillDownTab>('owned');
 
@@ -74,17 +78,17 @@ export function CollectionSetScreen(): ReactNode {
     [drillDownQuery.data, ownedPrintingIds],
   );
 
+  // Server completion row for this set. The completion endpoint
+  // returns one entry per set the user owns ≥1 printing in; sets
+  // the user has zero presence in are absent from `perSet` —
+  // that's the explicit "all-zeros" rendering branch below.
   const completion = useMemo(() => {
     const setId = setQuery.data?.id;
-    const drillData = drillDownQuery.data;
-    if (setId === undefined || drillData === null) return null;
-    return computeCompletionForSet({
-      setId,
-      cards: drillData.cards,
-      printings: drillData.printings,
-      ownedPrintingIds: Array.from(ownedPrintingIds),
-    }).perSet[0];
-  }, [setQuery.data, drillDownQuery.data, ownedPrintingIds]);
+    if (setId === undefined) return null;
+    return (
+      completionQuery.data?.perSet.find((entry) => entry.setId === setId) ?? null
+    );
+  }, [setQuery.data, completionQuery.data]);
 
   const handleSelectPrinting = useCallback(
     (printing: PrintingDto) => {
@@ -137,14 +141,15 @@ export function CollectionSetScreen(): ReactNode {
     return <DrillDownNotFoundState reason="unknown-slug" slug={slug} />;
   }
 
-  if (drillDownQuery.isLoading || itemsQuery.isLoading) {
+  if (drillDownQuery.isLoading || itemsQuery.isLoading || completionQuery.isLoading) {
     return <DrillDownLoadingState />;
   }
 
-  if (drillDownQuery.isError || itemsQuery.isError) {
+  if (drillDownQuery.isError || itemsQuery.isError || completionQuery.isError) {
     const message =
       drillDownQuery.error?.message ??
       itemsQuery.error?.message ??
+      completionQuery.error?.message ??
       'Failed to load this set.';
     return <DrillDownErrorState message={message} />;
   }

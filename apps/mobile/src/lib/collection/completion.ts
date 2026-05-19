@@ -22,7 +22,13 @@
 // "what's missing right now" side panel. See
 // `open-questions.md` Q-010.
 
-import type { CardDto, PrintingDto, SetDto } from '@binderly/api-contracts';
+import type {
+  CardDto,
+  GlobalCompletionDto,
+  PerSetCompletionEntryDto,
+  PrintingDto,
+  SetDto,
+} from '@binderly/api-contracts';
 import {
   computeCompletion,
   type ComputeCompletionResult,
@@ -285,6 +291,64 @@ function safePct(numerator: number, denominator: number): number {
   if (!Number.isFinite(numerator) || !Number.isFinite(denominator)) return 0;
   if (denominator <= 0) return 0;
   return (numerator / denominator) * 100;
+}
+
+// ============================================================
+// V2 completion-endpoint adapters
+// ============================================================
+
+/**
+ * Adapt a `perSetCompletionEntryDto` row (from the V2 completion
+ * endpoint) into the existing `CollectionSetSummary` shape that
+ * `<CollectionSetRow>` consumes. Joins on `setId` against the
+ * supplied `SetDto`. Returns `null` if the join fails (the
+ * caller — `CollectionScreen` — filters those out before
+ * rendering; the join is bidirectional in practice because the
+ * server's perSet rows mirror the catalog).
+ */
+export function perSetEntryToSummary(
+  entry: PerSetCompletionEntryDto,
+  set: SetDto,
+): CollectionSetSummary {
+  return {
+    set,
+    setPct: entry.setPct,
+    ownedNumbered: entry.ownedNumbered,
+    totalNumbered: entry.totalNumbered,
+    masterPct: entry.masterPct,
+    ownedMaster: entry.ownedMaster,
+    totalMaster: entry.totalMaster,
+    hasAnyOwned: entry.ownedNumbered > 0 || entry.ownedMaster > 0,
+  };
+}
+
+/**
+ * Adapt the server's `global` block into the home-screen badge's
+ * `CollectionGlobalSummary` shape. `setsStarted` / `setsMastered`
+ * are derived from `perSet` because the server doesn't carry
+ * those rolled-up counts (they're cheap to compute client-side
+ * over `perSet.length`).
+ */
+export function globalDtoToSummary(input: {
+  readonly global: GlobalCompletionDto;
+  readonly perSet: ReadonlyArray<PerSetCompletionEntryDto>;
+}): CollectionGlobalSummary {
+  const setsStarted = input.perSet.filter(
+    (row) => row.ownedNumbered > 0 || row.ownedMaster > 0,
+  ).length;
+  const setsMastered = input.perSet.filter(
+    (row) => row.totalNumbered > 0 && row.ownedNumbered === row.totalNumbered,
+  ).length;
+  return {
+    allPokemonPct: input.global.allPokemonPct,
+    uniqueCardsOwned: input.global.uniqueCardsOwned,
+    uniqueCardsTotal: input.global.uniqueCardsTotal,
+    setsStarted,
+    setsMastered,
+    masterPct: input.global.masterPct,
+    masterOwned: input.global.masterOwned,
+    masterTotal: input.global.masterTotal,
+  };
 }
 
 /**

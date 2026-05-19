@@ -4,9 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BinderlyClient } from '@binderly/api-client';
 import type {
-  CollectionItemDto,
+  CompletionDto,
   PaginatedResponse,
-  PrintingWithContextDto,
+  PerSetCompletionEntryDto,
   SetDto,
 } from '@binderly/api-contracts';
 
@@ -81,79 +81,63 @@ function makeSet(partial: Partial<SetDto> & { id: string }): SetDto {
   };
 }
 
-function makeCollectionItem(partial: Partial<CollectionItemDto> & { id: string; printingId: string }): CollectionItemDto {
-  return {
-    id: partial.id,
-    userId: partial.userId ?? 'user-1',
-    printingId: partial.printingId,
-    quantity: partial.quantity ?? 1,
-    condition: partial.condition ?? 'NEAR_MINT',
-    gradeCompany: partial.gradeCompany ?? null,
-    grade: partial.grade ?? null,
-    acquiredAt: partial.acquiredAt ?? null,
-    acquiredPrice: partial.acquiredPrice ?? null,
-    acquiredCurrency: partial.acquiredCurrency ?? null,
-    notes: partial.notes ?? null,
-    photoUrls: partial.photoUrls ?? [],
-    source: partial.source ?? 'manual',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  };
-}
-
-function makePrintingContext(
-  partial: Omit<Partial<PrintingWithContextDto>, 'set'> & {
-    id: string;
-    cardId: string;
-    set: { id: string };
-  },
-): PrintingWithContextDto {
-  const set = makeSet({ id: partial.set.id });
-  return {
-    id: partial.id,
-    variantKey: partial.variantKey ?? `${partial.cardId}-${partial.id}`,
-    cardId: partial.cardId,
-    variantClass: partial.variantClass ?? 'NON_HOLO',
-    variantFlags: partial.variantFlags ?? [],
-    variantCode: partial.variantCode ?? 'std',
-    includeInMasterSet: partial.includeInMasterSet ?? true,
-    imageSmallUrl: partial.imageSmallUrl ?? null,
-    imageLargeUrl: partial.imageLargeUrl ?? null,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    card: {
-      id: partial.cardId,
-      canonicalKey: `en-card-${partial.cardId}`,
-      setId: partial.set.id,
-      language: 'en',
-      number: '1',
-      name: `Card ${partial.cardId}`,
-      nameLocalized: null,
-      type: null,
-      subtype: null,
-      hp: null,
-      illustrator: null,
-      flavorText: null,
-      attacks: null,
-      weakness: null,
-      resistance: null,
-      retreatCost: null,
-      rarity: null,
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-    },
-    set,
-  };
-}
-
-function listCollectionPage(
-  items: CollectionItemDto[],
-): PaginatedResponse<CollectionItemDto> {
-  return { items, nextCursor: null };
-}
-
 function listSetsPage(items: SetDto[]): PaginatedResponse<SetDto> {
   return { items, nextCursor: null };
+}
+
+function makePerSetEntry(
+  partial: Partial<PerSetCompletionEntryDto> & {
+    setId: string;
+    setCode: string;
+    setName: string;
+  },
+): PerSetCompletionEntryDto {
+  return {
+    setId: partial.setId,
+    setCode: partial.setCode,
+    setName: partial.setName,
+    setPct: partial.setPct ?? 0,
+    masterPct: partial.masterPct ?? 0,
+    ownedNumbered: partial.ownedNumbered ?? 0,
+    totalNumbered: partial.totalNumbered ?? 0,
+    ownedMaster: partial.ownedMaster ?? 0,
+    totalMaster: partial.totalMaster ?? 0,
+  };
+}
+
+function makeCompletion(
+  partial: Partial<CompletionDto> & { perSet: PerSetCompletionEntryDto[] },
+): CompletionDto {
+  const computedGlobal = partial.perSet.reduce(
+    (acc, row) => ({
+      ownedNumbered: acc.ownedNumbered + row.ownedNumbered,
+      totalNumbered: acc.totalNumbered + row.totalNumbered,
+      ownedMaster: acc.ownedMaster + row.ownedMaster,
+      totalMaster: acc.totalMaster + row.totalMaster,
+    }),
+    { ownedNumbered: 0, totalNumbered: 0, ownedMaster: 0, totalMaster: 0 },
+  );
+  const allPokemonPct =
+    computedGlobal.totalNumbered > 0
+      ? (computedGlobal.ownedNumbered / computedGlobal.totalNumbered) * 100
+      : 0;
+  const masterPct =
+    computedGlobal.totalMaster > 0
+      ? (computedGlobal.ownedMaster / computedGlobal.totalMaster) * 100
+      : 0;
+  return {
+    global: partial.global ?? {
+      allPokemonPct,
+      masterPct,
+      uniqueCardsOwned: computedGlobal.ownedNumbered,
+      uniqueCardsTotal: computedGlobal.totalNumbered,
+      masterOwned: computedGlobal.ownedMaster,
+      masterTotal: computedGlobal.totalMaster,
+    },
+    perSet: partial.perSet,
+    lastUpdatedAt:
+      partial.lastUpdatedAt !== undefined ? partial.lastUpdatedAt : '2024-02-01T00:00:00Z',
+  };
 }
 
 interface FakeClient {
@@ -166,6 +150,7 @@ interface FakeClient {
     getPrinting: ReturnType<typeof vi.fn>;
   };
   collection: {
+    getCompletion: ReturnType<typeof vi.fn>;
     listCollectionItems: ReturnType<typeof vi.fn>;
   };
 }
@@ -181,6 +166,7 @@ function buildClient(): FakeClient {
       getPrinting: vi.fn(),
     },
     collection: {
+      getCompletion: vi.fn(),
       listCollectionItems: vi.fn(),
     },
   };
@@ -244,7 +230,7 @@ describe('<CollectionScreen> — auth gate', () => {
       expect(result.queryByTestId('collection-sign-in-prompt')).not.toBeNull(),
     );
     expect(result.container.textContent).toContain('Sign in to see your collection');
-    expect(client.collection.listCollectionItems).not.toHaveBeenCalled();
+    expect(client.collection.getCompletion).not.toHaveBeenCalled();
   });
 
   it('navigates to /auth/sign-in when the sign-in CTA is tapped', async () => {
@@ -261,29 +247,82 @@ describe('<CollectionScreen> — auth gate', () => {
 });
 
 describe('<CollectionScreen> — signed in', () => {
-  it('renders the global completion badge with the correct All Pokémon %', async () => {
+  it('renders the global completion badge with the server-supplied All Pokémon %', async () => {
     const client = buildClient();
     const setA = makeSet({ id: 'set-a', name: 'Alpha', total: 10 });
     const setB = makeSet({ id: 'set-b', name: 'Beta', total: 4 });
     client.cards.listSets.mockResolvedValue(listSetsPage([setA, setB]));
-    client.collection.listCollectionItems.mockResolvedValue(
-      listCollectionPage([
-        makeCollectionItem({ id: 'i1', printingId: 'p1' }),
-        makeCollectionItem({ id: 'i2', printingId: 'p2' }),
-      ]),
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        global: {
+          allPokemonPct: 14,
+          masterPct: 10,
+          uniqueCardsOwned: 2,
+          uniqueCardsTotal: 14,
+          masterOwned: 1,
+          masterTotal: 10,
+        },
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 2,
+            totalNumbered: 10,
+            setPct: 20,
+            masterPct: 25,
+            ownedMaster: 1,
+            totalMaster: 4,
+          }),
+        ],
+      }),
     );
-    client.cards.getPrinting.mockImplementation(async ({ id }: { id: string }) => {
-      if (id === 'p1') return makePrintingContext({ id: 'p1', cardId: 'c1', set: { id: 'set-a' } });
-      return makePrintingContext({ id: 'p2', cardId: 'c2', set: { id: 'set-a' } });
-    });
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
       expect(result.queryByTestId('collection-global-badge')).not.toBeNull(),
     );
-    // 2 unique cards owned of 14 total (10 + 4) = 14% → rounds to 14%.
     const badge = result.getByTestId('collection-global-badge');
     expect(badge.textContent).toContain('14%');
     expect(badge.textContent).toContain('2/14');
+  });
+
+  it('renders the real Master % on the global badge (no more parked placeholder)', async () => {
+    const client = buildClient();
+    client.cards.listSets.mockResolvedValue(listSetsPage([makeSet({ id: 'set-a', total: 4 })]));
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        global: {
+          allPokemonPct: 50,
+          masterPct: 60,
+          uniqueCardsOwned: 2,
+          uniqueCardsTotal: 4,
+          masterOwned: 3,
+          masterTotal: 5,
+        },
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 2,
+            totalNumbered: 4,
+            setPct: 50,
+            masterPct: 60,
+            ownedMaster: 3,
+            totalMaster: 5,
+          }),
+        ],
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('collection-global-badge')).not.toBeNull(),
+    );
+    const counters = result.getByTestId('collection-global-badge-counters');
+    expect(counters.textContent).toContain('Master %');
+    expect(counters.textContent).toContain('60%');
+    expect(counters.textContent).toContain('3/5');
+    expect(counters.textContent).not.toContain('full math soon');
   });
 
   it('renders the per-set list ordered by completion % desc', async () => {
@@ -301,19 +340,28 @@ describe('<CollectionScreen> — signed in', () => {
       releaseDate: '2023-01-01',
     });
     client.cards.listSets.mockResolvedValue(listSetsPage([setLow, setHigh]));
-    client.collection.listCollectionItems.mockResolvedValue(
-      listCollectionPage([
-        // 2/2 in setHigh = 100%, 1/10 in setLow = 10%.
-        makeCollectionItem({ id: 'i1', printingId: 'p1' }),
-        makeCollectionItem({ id: 'i2', printingId: 'p2' }),
-        makeCollectionItem({ id: 'i3', printingId: 'p3' }),
-      ]),
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-low',
+            setCode: 'set-low',
+            setName: 'Low',
+            ownedNumbered: 1,
+            totalNumbered: 10,
+            setPct: 10,
+          }),
+          makePerSetEntry({
+            setId: 'set-high',
+            setCode: 'set-high',
+            setName: 'High',
+            ownedNumbered: 2,
+            totalNumbered: 2,
+            setPct: 100,
+          }),
+        ],
+      }),
     );
-    client.cards.getPrinting.mockImplementation(async ({ id }: { id: string }) => {
-      if (id === 'p1') return makePrintingContext({ id: 'p1', cardId: 'c1', set: { id: 'set-high' } });
-      if (id === 'p2') return makePrintingContext({ id: 'p2', cardId: 'c2', set: { id: 'set-high' } });
-      return makePrintingContext({ id: 'p3', cardId: 'c3', set: { id: 'set-low' } });
-    });
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
       expect(result.queryByTestId('collection-set-row-en-set-high')).not.toBeNull(),
@@ -324,10 +372,43 @@ describe('<CollectionScreen> — signed in', () => {
     expect(rows[1]?.textContent).toContain('Low');
   });
 
+  it('renders real Master % per row (no "Open set to compute" parked fallback)', async () => {
+    const client = buildClient();
+    const set = makeSet({ id: 'set-a', canonicalKey: 'en-set-a', total: 4 });
+    client.cards.listSets.mockResolvedValue(listSetsPage([set]));
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 2,
+            totalNumbered: 4,
+            setPct: 50,
+            masterPct: 40,
+            ownedMaster: 2,
+            totalMaster: 5,
+          }),
+        ],
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('collection-set-row-en-set-a-master-progress')).not.toBeNull(),
+    );
+    const masterRow = result.getByTestId('collection-set-row-en-set-a-master-progress');
+    expect(masterRow.textContent).toContain('40%');
+    expect(masterRow.textContent).toContain('2/5');
+    expect(masterRow.textContent).not.toContain('Open set to compute');
+  });
+
   it('shows an empty-collection state with a Browse CTA when nothing is owned', async () => {
     const client = buildClient();
     client.cards.listSets.mockResolvedValue(listSetsPage([makeSet({ id: 'set-a' })]));
-    client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({ perSet: [], lastUpdatedAt: null }),
+    );
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() => expect(result.queryByTestId('collection-empty')).not.toBeNull());
     expect(result.container.textContent).toContain('Your collection is empty');
@@ -336,7 +417,9 @@ describe('<CollectionScreen> — signed in', () => {
   it('navigates to /(tabs)/browse when the Browse CTA is tapped', async () => {
     const client = buildClient();
     client.cards.listSets.mockResolvedValue(listSetsPage([makeSet({ id: 'set-a' })]));
-    client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({ perSet: [], lastUpdatedAt: null }),
+    );
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
       expect(result.queryByTestId('collection-empty-browse')).not.toBeNull(),
@@ -350,15 +433,15 @@ describe('<CollectionScreen> — signed in', () => {
   it('shows the loading state while the queries are in flight', () => {
     const client = buildClient();
     client.cards.listSets.mockReturnValue(new Promise(() => undefined));
-    client.collection.listCollectionItems.mockReturnValue(new Promise(() => undefined));
+    client.collection.getCompletion.mockReturnValue(new Promise(() => undefined));
     const result = renderScreen({ client, session: SIGNED_IN });
     expect(result.getByTestId('collection-loading')).toBeDefined();
   });
 
-  it('shows an error state when the collection items query rejects', async () => {
+  it('shows an error state when the completion query rejects', async () => {
     const client = buildClient();
     client.cards.listSets.mockResolvedValue(listSetsPage([makeSet({ id: 'set-a' })]));
-    client.collection.listCollectionItems.mockRejectedValue(new Error('Network down'));
+    client.collection.getCompletion.mockRejectedValue(new Error('Network down'));
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() => expect(result.queryByTestId('collection-error')).not.toBeNull());
     expect(result.container.textContent).toContain('Network down');
@@ -367,31 +450,41 @@ describe('<CollectionScreen> — signed in', () => {
   it('shows an error state when the sets query rejects', async () => {
     const client = buildClient();
     client.cards.listSets.mockRejectedValue(new Error('Catalog unreachable'));
-    client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({ perSet: [], lastUpdatedAt: null }),
+    );
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() => expect(result.queryByTestId('collection-error')).not.toBeNull());
     expect(result.container.textContent).toContain('Catalog unreachable');
   });
 
-  it('triggers a refetch when pull-to-refresh fires', async () => {
+  it('triggers a refetch of the completion endpoint when pull-to-refresh fires', async () => {
     const client = buildClient();
     client.cards.listSets.mockResolvedValue(
       listSetsPage([makeSet({ id: 'set-a', total: 1 })]),
     );
-    client.collection.listCollectionItems.mockResolvedValue(
-      listCollectionPage([makeCollectionItem({ id: 'i1', printingId: 'p1' })]),
-    );
-    client.cards.getPrinting.mockResolvedValue(
-      makePrintingContext({ id: 'p1', cardId: 'c1', set: { id: 'set-a' } }),
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 1,
+            totalNumbered: 1,
+            setPct: 100,
+          }),
+        ],
+      }),
     );
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() => expect(result.queryByTestId('collection-refresh')).not.toBeNull());
-    expect(client.collection.listCollectionItems).toHaveBeenCalledTimes(1);
+    expect(client.collection.getCompletion).toHaveBeenCalledTimes(1);
     await act(async () => {
       fireEvent.click(result.getByTestId('collection-refresh'));
     });
     await waitFor(() =>
-      expect(client.collection.listCollectionItems).toHaveBeenCalledTimes(2),
+      expect(client.collection.getCompletion).toHaveBeenCalledTimes(2),
     );
   });
 
@@ -399,11 +492,19 @@ describe('<CollectionScreen> — signed in', () => {
     const client = buildClient();
     const set = makeSet({ id: 'set-a', canonicalKey: 'en-set-a', total: 1 });
     client.cards.listSets.mockResolvedValue(listSetsPage([set]));
-    client.collection.listCollectionItems.mockResolvedValue(
-      listCollectionPage([makeCollectionItem({ id: 'i1', printingId: 'p1' })]),
-    );
-    client.cards.getPrinting.mockResolvedValue(
-      makePrintingContext({ id: 'p1', cardId: 'c1', set: { id: 'set-a' } }),
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 1,
+            totalNumbered: 1,
+            setPct: 100,
+          }),
+        ],
+      }),
     );
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
@@ -415,22 +516,23 @@ describe('<CollectionScreen> — signed in', () => {
     expect(routerMocks.push).toHaveBeenCalledWith('/collection/sets/en-set-a');
   });
 
-  it('renders a per-set Set % bar reflecting owned cards over set.total', async () => {
+  it('renders a per-set Set % bar reflecting the server-supplied tallies', async () => {
     const client = buildClient();
     client.cards.listSets.mockResolvedValue(
       listSetsPage([makeSet({ id: 'set-a', canonicalKey: 'en-set-a', total: 4 })]),
     );
-    client.collection.listCollectionItems.mockResolvedValue(
-      listCollectionPage([
-        makeCollectionItem({ id: 'i1', printingId: 'p1' }),
-        makeCollectionItem({ id: 'i2', printingId: 'p2' }),
-      ]),
-    );
-    client.cards.getPrinting.mockImplementation(async ({ id }: { id: string }) =>
-      makePrintingContext({
-        id,
-        cardId: id === 'p1' ? 'c1' : 'c2',
-        set: { id: 'set-a' },
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 2,
+            totalNumbered: 4,
+            setPct: 50,
+          }),
+        ],
       }),
     );
     const result = renderScreen({ client, session: SIGNED_IN });
@@ -440,5 +542,71 @@ describe('<CollectionScreen> — signed in', () => {
     const setProgress = result.getByTestId('collection-set-row-en-set-a-set-progress');
     expect(setProgress.textContent).toContain('50%');
     expect(setProgress.textContent).toContain('2/4');
+  });
+
+  it('drops perSet rows whose setId is missing from the catalog (defensive join)', async () => {
+    const client = buildClient();
+    client.cards.listSets.mockResolvedValue(
+      listSetsPage([
+        makeSet({ id: 'set-a', canonicalKey: 'en-set-a', name: 'Alpha', total: 4 }),
+      ]),
+    );
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 1,
+            totalNumbered: 4,
+          }),
+          // setId is not in the catalog response → must be dropped.
+          makePerSetEntry({
+            setId: 'set-ghost',
+            setCode: 'set-ghost',
+            setName: 'Ghost',
+            ownedNumbered: 1,
+            totalNumbered: 4,
+          }),
+        ],
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('collection-set-row-en-set-a')).not.toBeNull(),
+    );
+    const list = result.getByTestId('collection-list');
+    const rows = Array.from(list.querySelectorAll('[data-testid^="collection-list-item-"]'));
+    expect(rows.length).toBe(1);
+    expect(rows[0]?.textContent).toContain('Alpha');
+    expect(rows[0]?.textContent).not.toContain('Ghost');
+  });
+
+  it('does not call the legacy per-printing fanout (`getPrinting`) — completion comes from the V2 endpoint', async () => {
+    const client = buildClient();
+    client.cards.listSets.mockResolvedValue(
+      listSetsPage([makeSet({ id: 'set-a', canonicalKey: 'en-set-a', total: 4 })]),
+    );
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion({
+        perSet: [
+          makePerSetEntry({
+            setId: 'set-a',
+            setCode: 'set-a',
+            setName: 'Alpha',
+            ownedNumbered: 2,
+            totalNumbered: 4,
+            setPct: 50,
+          }),
+        ],
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('collection-set-row-en-set-a')).not.toBeNull(),
+    );
+    expect(client.cards.getPrinting).not.toHaveBeenCalled();
+    expect(client.collection.listCollectionItems).not.toHaveBeenCalled();
   });
 });

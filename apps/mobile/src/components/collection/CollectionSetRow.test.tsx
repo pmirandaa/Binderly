@@ -72,7 +72,28 @@ describe('<CollectionSetRow>', () => {
     expect(result.container.textContent).toContain('33/100');
   });
 
-  it('renders the master placeholder when totalMaster is 0', () => {
+  it('renders the Master % progress bar with formatted owned/total (no parked placeholder)', () => {
+    // V2 swap (T-M-API-V2-WIRING): Master tallies are now real,
+    // so the row drops the "Open set to compute" parked copy and
+    // always renders `formatPercent · ownedMaster/totalMaster`.
+    const onPress = vi.fn();
+    const result = renderWithProvider(
+      <CollectionSetRow
+        summary={makeSummary({
+          set: makeSet({ id: 'a' }),
+          masterPct: 50,
+          ownedMaster: 2,
+          totalMaster: 4,
+        })}
+        onPress={onPress}
+      />,
+    );
+    expect(result.container.textContent).not.toContain('Open set to compute');
+    expect(result.container.textContent).toContain('50%');
+    expect(result.container.textContent).toContain('2/4');
+  });
+
+  it('renders all-zero Master row when totalMaster is 0 (set absent from completion perSet)', () => {
     const onPress = vi.fn();
     const result = renderWithProvider(
       <CollectionSetRow
@@ -83,7 +104,8 @@ describe('<CollectionSetRow>', () => {
         onPress={onPress}
       />,
     );
-    expect(result.container.textContent).toContain('Open set to compute');
+    expect(result.container.textContent).not.toContain('Open set to compute');
+    expect(result.container.textContent).toContain('0/0');
   });
 
   it('invokes onPress with the summary when the row is tapped', () => {
