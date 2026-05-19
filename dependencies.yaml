@@ -525,14 +525,14 @@ tasks:
     stage: 04-web
     title: Wire V2 read endpoints into web surfaces (completion, current-price, shareable, smart-preview)
     agent_role: frontend-web
-    status: pending
+    status: in_review
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-COLLECTION, T-W-BROWSE, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-SP-PRICING-DISPLAY]
     parallel_safe_with: [T-M-API-V2-WIRING]
     provides: [web:v2-wiring]
     owns_paths: [apps/web/app/, apps/web/components/, apps/web/lib/]
     task_file: tasks/04-web/T-W-API-V2-WIRING.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-M-API-V2-WIRING
     stage: 05-mobile
