@@ -16,8 +16,10 @@ import { vi } from 'vitest';
 import type {
   CardWithPrintingsDto,
   CollectionItemDto,
+  CompletionDto,
   SetDto,
 } from '@binderly/api-contracts';
+import { computeCompletion } from '@binderly/set-completion';
 
 import {
   rosterFromCardsWithPrintings,
@@ -258,6 +260,14 @@ export interface FakeCollectionApiOptions {
   setContents?: Record<string, SetContents>;
   ownedItems?: CollectionItemDto[];
   roster?: CatalogRoster;
+  /**
+   * Override the `CompletionDto` returned by the fake. When
+   * omitted, the fake derives one from the roster + ownedItems +
+   * sets via `@binderly/set-completion` so tests that didn't
+   * override see exactly the same numbers as the iter-17
+   * on-device math produced.
+   */
+  completion?: CompletionDto;
   rejectAll?: Error;
 }
 
@@ -267,6 +277,59 @@ export interface FakeCollectionApi extends CollectionApi {
   listOwnedItems: ReturnType<typeof vi.fn>;
   listSetContents: ReturnType<typeof vi.fn>;
   catalogRoster: ReturnType<typeof vi.fn>;
+  getCompletion: ReturnType<typeof vi.fn>;
+}
+
+/**
+ * Build a `CompletionDto` derived from the catalog roster + owned
+ * items + set metadata. Mirrors what the V2 backend computes; the
+ * fixture pipes through `@binderly/set-completion` (the math
+ * lives there) so tests get the same numbers as the previous
+ * on-device pipeline by default.
+ *
+ * Exposed so tests that want a CUSTOM completion shape can build
+ * one with the same defaults.
+ */
+export function deriveCompletionFromFixture(
+  sets: ReadonlyArray<SetDto>,
+  roster: CatalogRoster,
+  ownedItems: ReadonlyArray<CollectionItemDto>,
+): CompletionDto {
+  const ownedIds = ownedItems.map((it) => it.printingId);
+  const result = computeCompletion({
+    cards: roster.cards,
+    printings: roster.printings,
+    ownedPrintingIds: ownedIds,
+  });
+  const setMeta = new Map<string, SetDto>();
+  for (const s of sets) setMeta.set(s.id, s);
+  const perSet: CompletionDto['perSet'] = result.perSet
+    .map((row) => {
+      const meta = setMeta.get(row.setId);
+      const code = meta?.code ?? row.setId;
+      const name = meta?.name ?? row.setId;
+      return {
+        setId: row.setId,
+        setCode: code,
+        setName: name,
+        setPct: row.setPct,
+        masterPct: row.masterPct,
+        ownedNumbered: row.ownedNumbered,
+        totalNumbered: row.totalNumbered,
+        ownedMaster: row.ownedMaster,
+        totalMaster: row.totalMaster,
+      };
+    })
+    .sort((a, b) => a.setName.localeCompare(b.setName));
+  const lastUpdatedAt = ownedItems.reduce<string | null>((max, it) => {
+    if (max === null || it.updatedAt > max) return it.updatedAt;
+    return max;
+  }, null);
+  return {
+    global: result.global,
+    perSet,
+    lastUpdatedAt,
+  };
 }
 
 export function createFakeCollectionApi(
@@ -276,6 +339,8 @@ export function createFakeCollectionApi(
   const setContents = options.setContents ?? fixtureSetContents();
   const ownedItems = options.ownedItems ?? FIXTURE_OWNED_ITEMS;
   const roster = options.roster ?? fixtureRoster();
+  const completion =
+    options.completion ?? deriveCompletionFromFixture(sets, roster, ownedItems);
 
   const listAllSets = vi.fn(async () => {
     if (options.rejectAll !== undefined) throw options.rejectAll;
@@ -305,6 +370,17 @@ export function createFakeCollectionApi(
     if (options.rejectAll !== undefined) throw options.rejectAll;
     return roster;
   });
+  const getCompletion = vi.fn(async () => {
+    if (options.rejectAll !== undefined) throw options.rejectAll;
+    return completion;
+  });
 
-  return { listAllSets, getSet, listOwnedItems, listSetContents, catalogRoster };
+  return {
+    listAllSets,
+    getSet,
+    listOwnedItems,
+    listSetContents,
+    catalogRoster,
+    getCompletion,
+  };
 }

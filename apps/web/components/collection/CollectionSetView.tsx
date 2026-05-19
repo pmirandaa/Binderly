@@ -25,12 +25,10 @@ import { ApiNotFoundError } from '@binderly/api-client';
 import type {
   CardWithPrintingsDto,
   CollectionItemDto,
+  CompletionDto,
+  PerSetCompletionEntryDto,
   PrintingDto,
 } from '@binderly/api-contracts';
-import {
-  computeCompletion,
-  type ComputeCompletionResult,
-} from '@binderly/set-completion';
 import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
 import { ProgressBar } from './ProgressBar';
@@ -39,11 +37,7 @@ import {
   languageLabel,
   printingDisplayName,
 } from '../../lib/browse/format';
-import {
-  ownedPrintingIds,
-  type CollectionApi,
-  type SetContents,
-} from '../../lib/collection/api';
+import type { CollectionApi, SetContents } from '../../lib/collection/api';
 import {
   conditionLabel,
   formatOwnedCount,
@@ -75,7 +69,7 @@ type FetchState =
       kind: 'ready';
       data: SetContents;
       ownedItems: CollectionItemDto[];
-      completion: ComputeCompletionResult;
+      setRow: PerSetCompletionEntryDto;
       allPokemonPct: number;
     }
   | { kind: 'not-found' }
@@ -110,32 +104,29 @@ export function CollectionSetView(props: CollectionSetViewProps): React.ReactNod
   useEffect(() => {
     const controller = new AbortController();
     setState({ kind: 'loading' });
-    // Three reads in parallel: this set's contents, the user's
-    // owned items, and the catalog roster needed for the global
-    // All Pokémon % computation. The roster fetch is by far the
-    // most expensive call so the cheaper ones don't gate it.
+    // Three reads in parallel:
+    //   1. this set's contents (catalog — still no V2 endpoint
+    //      for per-set card+printing roster).
+    //   2. the user's owned items (auth-gated — drives the
+    //      Owned / Missing tab grids).
+    //   3. server completion (authed — global + per-set numbers).
+    // The catalog-roster fanout previously needed for the
+    // local completion math is GONE (T-W-API-V2-WIRING).
     Promise.all([
       api.listSetContents(setId, controller.signal),
       api.listOwnedItems(controller.signal),
-      api.catalogRoster(controller.signal),
+      api.getCompletion(controller.signal),
     ])
-      .then(([data, ownedItems, roster]) => {
+      .then(([data, ownedItems, completion]) => {
         if (controller.signal.aborted) return;
-        const ownedIds = ownedPrintingIds(ownedItems);
-        const completion = computeCompletion({
-          cards: roster.cards,
-          printings: roster.printings,
-          ownedPrintingIds: ownedIds,
-          sets: [setId],
-        });
-        // The global all-pokemon % is the same regardless of
-        // which set we asked for. We surface it alongside the per-
-        // set bars per the brief.
+        const setRow =
+          completion.perSet.find((r) => r.setId === setId) ??
+          synthesiseZeroSetRow(setId, data);
         setState({
           kind: 'ready',
           data,
           ownedItems,
-          completion,
+          setRow,
           allPokemonPct: completion.global.allPokemonPct,
         });
       })
@@ -247,15 +238,11 @@ export function CollectionSetView(props: CollectionSetViewProps): React.ReactNod
     );
   }
 
-  const { data, ownedItems, completion, allPokemonPct } = state;
+  const { data, ownedItems, setRow, allPokemonPct } = state;
   const { set, cards } = data;
 
   const ownedItemsByPrintingId = new Map<string, CollectionItemDto>();
   for (const item of ownedItems) ownedItemsByPrintingId.set(item.printingId, item);
-
-  // `completion.perSet` was pinned to this set id only, so it has
-  // exactly one entry. We render its math against the header bars.
-  const setRow = completion.perSet[0]!;
 
   const ownedPrintings: Array<{ printing: PrintingDto; card: CardWithPrintingsDto; item: CollectionItemDto }> = [];
   const missingPrintings: Array<{ printing: PrintingDto; card: CardWithPrintingsDto }> = [];
@@ -455,6 +442,35 @@ export function CollectionSetView(props: CollectionSetViewProps): React.ReactNod
       </YStack>
     </YStack>
   );
+}
+
+/**
+ * Build a zero-owned `PerSetCompletionEntryDto` from a freshly-
+ * loaded `SetContents`. Used when the server's completion payload
+ * doesn't carry an entry for this set — the API surfaces only
+ * sets where the user owns ≥1 printing, so a 0-owned drill-down
+ * gets synthesised here. The denominators come from the set's
+ * own catalog roster (one entry per card; master = printings
+ * with `includeInMasterSet=true`).
+ */
+function synthesiseZeroSetRow(setId: string, data: SetContents): PerSetCompletionEntryDto {
+  let totalMaster = 0;
+  for (const card of data.cards) {
+    for (const printing of card.printings) {
+      if (printing.includeInMasterSet) totalMaster += 1;
+    }
+  }
+  return {
+    setId,
+    setCode: data.set.code,
+    setName: data.set.name,
+    setPct: 0,
+    masterPct: 0,
+    ownedNumbered: 0,
+    totalNumbered: data.cards.length,
+    ownedMaster: 0,
+    totalMaster,
+  };
 }
 
 function parseTabOrNull(raw: string | null | undefined): CollectionSetTab | null {

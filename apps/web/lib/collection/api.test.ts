@@ -54,17 +54,19 @@ function makeFakeClient(): {
   client: BinderlyClient;
   listSets: ReturnType<typeof vi.fn>;
   listCollectionItems: ReturnType<typeof vi.fn>;
+  getCompletion: ReturnType<typeof vi.fn>;
 } {
   const listSets = vi.fn();
   const getSet = vi.fn();
   const listCardsInSet = vi.fn();
   const listPrintingsForCard = vi.fn();
   const listCollectionItems = vi.fn();
+  const getCompletion = vi.fn();
   const client = {
     cards: { listSets, getSet, listCardsInSet, listPrintingsForCard },
-    collection: { listCollectionItems },
+    collection: { listCollectionItems, getCompletion },
   } as unknown as BinderlyClient;
-  return { client, listSets, listCollectionItems };
+  return { client, listSets, listCollectionItems, getCompletion };
 }
 
 describe('apiToCollectionApi.listAllSets', () => {
@@ -128,6 +130,75 @@ describe('apiToCollectionApi.listSetContents', () => {
     expect(out.set.id).toBe('set-x');
     expect(out.cards).toHaveLength(1);
     expect(out.cards[0]!.printings[0]!.id).toBe('p1');
+  });
+});
+
+describe('apiToCollectionApi.getCompletion', () => {
+  it('delegates to client.collection.getCompletion and returns the DTO', async () => {
+    const { client, getCompletion } = makeFakeClient();
+    const dto = {
+      global: {
+        allPokemonPct: 12.5,
+        masterPct: 7.3,
+        uniqueCardsOwned: 42,
+        uniqueCardsTotal: 336,
+        masterOwned: 50,
+        masterTotal: 690,
+      },
+      perSet: [],
+      lastUpdatedAt: null,
+    };
+    getCompletion.mockResolvedValue(dto);
+    const api = apiToCollectionApi(client);
+    const out = await api.getCompletion();
+    expect(out).toBe(dto);
+    expect(getCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the abort signal through when provided', async () => {
+    const { client, getCompletion } = makeFakeClient();
+    getCompletion.mockResolvedValue({
+      global: {
+        allPokemonPct: 0,
+        masterPct: 0,
+        uniqueCardsOwned: 0,
+        uniqueCardsTotal: 0,
+        masterOwned: 0,
+        masterTotal: 0,
+      },
+      perSet: [],
+      lastUpdatedAt: null,
+    });
+    const controller = new AbortController();
+    const api = apiToCollectionApi(client);
+    await api.getCompletion(controller.signal);
+    expect(getCompletion).toHaveBeenCalledWith({ signal: controller.signal });
+  });
+
+  it('does NOT include the signal key when omitted', async () => {
+    const { client, getCompletion } = makeFakeClient();
+    getCompletion.mockResolvedValue({
+      global: {
+        allPokemonPct: 0,
+        masterPct: 0,
+        uniqueCardsOwned: 0,
+        uniqueCardsTotal: 0,
+        masterOwned: 0,
+        masterTotal: 0,
+      },
+      perSet: [],
+      lastUpdatedAt: null,
+    });
+    const api = apiToCollectionApi(client);
+    await api.getCompletion();
+    expect(getCompletion).toHaveBeenCalledWith({});
+  });
+
+  it('propagates errors from the api-client', async () => {
+    const { client, getCompletion } = makeFakeClient();
+    getCompletion.mockRejectedValue(new Error('boom'));
+    const api = apiToCollectionApi(client);
+    await expect(api.getCompletion()).rejects.toThrow('boom');
   });
 });
 

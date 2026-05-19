@@ -11,30 +11,23 @@
 // component (`CollectionRoute`) is responsible for wiring the real
 // api-client at runtime.
 //
-// Math: percentages come from `@binderly/set-completion` —
-// specifically the top-level `computeCompletion()` orchestrator,
-// which the brief mandates for global rollups. We hand it the full
-// catalog roster + the user's owned printing ids and read both
-// per-set + global results from a single call.
+// Math: completion numbers come from the server via
+// `client.collection.getCompletion()` (T-BE-EDGE-FUNCTIONS-V2,
+// PR #68). The iter-17 on-device `computeCompletion()` fanout
+// over `catalogRoster()` is gone — the server now returns the
+// global tally + per-set rows directly in O(1) client round
+// trips. See `open-questions.md` § Q-013 for the server-side
+// stop-gap that hides behind this contract.
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import type { SetDto } from '@binderly/api-contracts';
-import {
-  computeCompletion,
-  type ComputeCompletionResult,
-  type SetCompletionResult,
-} from '@binderly/set-completion';
+import type { CompletionDto, SetDto } from '@binderly/api-contracts';
 import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
 import { ProgressBar } from './ProgressBar';
 import { formatReleaseDate } from '../../lib/browse/format';
-import {
-  ownedPrintingIds,
-  type CatalogRoster,
-  type CollectionApi,
-} from '../../lib/collection/api';
+import type { CollectionApi } from '../../lib/collection/api';
 import {
   formatGlobalCount,
   formatOwnedCount,
@@ -51,9 +44,7 @@ type FetchState =
   | {
       kind: 'ready';
       sets: SetDto[];
-      ownedIds: string[];
-      roster: CatalogRoster;
-      completion: ComputeCompletionResult;
+      completion: CompletionDto;
     }
   | { kind: 'error'; message: string };
 
@@ -63,29 +54,18 @@ export function CollectionView({ api }: CollectionViewProps): React.ReactNode {
   useEffect(() => {
     const controller = new AbortController();
     setState({ kind: 'loading' });
-    // Three reads happen in parallel:
-    //   1. the user's owned items (auth-gated)
-    //   2. the set catalog (public — for set names / release dates
-    //      / cover urls)
-    //   3. the catalog roster (public — drives the completion
-    //      math denominators)
-    // The roster fetch is the most expensive call; we still kick
-    // them off together so the UI lights up as soon as everything
-    // resolves instead of serializing on the cheap calls first.
+    // Two parallel reads:
+    //   1. the set catalog (public — supplies releaseDate +
+    //      cover metadata the completion DTO doesn't carry)
+    //   2. server-side completion (authed — returns global +
+    //      per-set numbers directly)
     Promise.all([
-      api.listOwnedItems(controller.signal),
       api.listAllSets(controller.signal),
-      api.catalogRoster(controller.signal),
+      api.getCompletion(controller.signal),
     ])
-      .then(([items, sets, roster]) => {
+      .then(([sets, completion]) => {
         if (controller.signal.aborted) return;
-        const ownedIds = ownedPrintingIds(items);
-        const completion = computeCompletion({
-          cards: roster.cards,
-          printings: roster.printings,
-          ownedPrintingIds: ownedIds,
-        });
-        setState({ kind: 'ready', sets, ownedIds, roster, completion });
+        setState({ kind: 'ready', sets, completion });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -142,12 +122,13 @@ export function CollectionView({ api }: CollectionViewProps): React.ReactNode {
     );
   }
 
-  const { sets, ownedIds, completion } = state;
+  const { sets, completion } = state;
 
-  // Per-set rows are pre-computed once: any set the user has at
-  // least one owned printing in gets a row. `set-completion`'s
-  // `perSet` indexed by setId for cheap lookup.
-  const perSetById = new Map<string, SetCompletionResult>();
+  // Per-set rows: server returns one entry per set the user has at
+  // least one owned printing in. We re-filter defensively (the
+  // backend brief promises this filter; the client doesn't trust
+  // it blindly).
+  const perSetById = new Map<string, CompletionDto['perSet'][number]>();
   for (const row of completion.perSet) perSetById.set(row.setId, row);
 
   const setsWithOwned = sets.filter((s) => {
@@ -168,7 +149,7 @@ export function CollectionView({ api }: CollectionViewProps): React.ReactNode {
   const sortedRows = sortByCompletionThenRelease(rows);
 
   const global = completion.global;
-  const isEmpty = ownedIds.length === 0;
+  const isEmpty = global.uniqueCardsOwned === 0;
 
   return (
     <YStack

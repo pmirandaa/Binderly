@@ -1,10 +1,17 @@
 import { act, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { CompletionDto } from '@binderly/api-contracts';
 import { computeCompletion } from '@binderly/set-completion';
 
 import { CollectionView } from './CollectionView';
-import { createFakeCollectionApi, FIXTURE_OWNED_ITEMS, fixtureRoster } from '../../lib/collection/fixtures';
+import {
+  createFakeCollectionApi,
+  deriveCompletionFromFixture,
+  FIXTURE_OWNED_ITEMS,
+  FIXTURE_SETS,
+  fixtureRoster,
+} from '../../lib/collection/fixtures';
 import { renderWithProviders } from '../../test-utils/render';
 
 vi.mock('next/navigation', () => ({
@@ -19,18 +26,18 @@ function renderView(api: ReturnType<typeof createFakeCollectionApi>): void {
 
 describe('CollectionView — loading + error', () => {
   it('shows a loading state while reads resolve', async () => {
-    let resolveItems: ((v: typeof FIXTURE_OWNED_ITEMS) => void) | null = null;
+    let resolveCompletion: ((v: CompletionDto) => void) | null = null;
     const api = createFakeCollectionApi();
-    api.listOwnedItems.mockImplementation(
+    api.getCompletion.mockImplementation(
       () =>
         new Promise((r) => {
-          resolveItems = r as (v: typeof FIXTURE_OWNED_ITEMS) => void;
+          resolveCompletion = r as (v: CompletionDto) => void;
         }),
     );
     renderView(api);
     expect(screen.getByText(/loading your collection/i)).toBeInTheDocument();
     await act(async () => {
-      resolveItems?.(FIXTURE_OWNED_ITEMS);
+      resolveCompletion?.(deriveCompletionFromFixture(FIXTURE_SETS, fixtureRoster(), FIXTURE_OWNED_ITEMS));
     });
     await waitFor(() => {
       expect(screen.getByTestId('collection-set-list')).toBeInTheDocument();
@@ -44,6 +51,99 @@ describe('CollectionView — loading + error', () => {
       expect(screen.getByTestId('collection-error')).toBeInTheDocument();
     });
     expect(screen.getByTestId('collection-error')).toHaveTextContent('backend down');
+  });
+
+  it('renders the error state when only getCompletion rejects (catalog fetch ok)', async () => {
+    const api = createFakeCollectionApi();
+    api.getCompletion.mockRejectedValue(new Error('completion unavailable'));
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('collection-error')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('collection-error')).toHaveTextContent('completion unavailable');
+  });
+});
+
+describe('CollectionView — getCompletion wiring', () => {
+  it('calls api.getCompletion once on mount with the abort signal', async () => {
+    const api = createFakeCollectionApi();
+    renderView(api);
+    await waitFor(() => {
+      expect(api.getCompletion).toHaveBeenCalledTimes(1);
+    });
+    const callArg = api.getCompletion.mock.calls[0]?.[0];
+    expect(callArg).toBeInstanceOf(AbortSignal);
+  });
+
+  it('does NOT call catalogRoster (the iter-17 fanout is retired)', async () => {
+    const api = createFakeCollectionApi();
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('collection-set-list')).toBeInTheDocument();
+    });
+    expect(api.catalogRoster).not.toHaveBeenCalled();
+  });
+
+  it('renders the global bars from the server completion payload (custom values pass-through)', async () => {
+    const completion: CompletionDto = {
+      global: {
+        allPokemonPct: 12.5,
+        masterPct: 7.25,
+        uniqueCardsOwned: 42,
+        uniqueCardsTotal: 336,
+        masterOwned: 50,
+        masterTotal: 690,
+      },
+      perSet: [],
+      lastUpdatedAt: '2026-05-19T00:00:00.000Z',
+    };
+    const api = createFakeCollectionApi({ completion });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('collection-global-badge')).toBeInTheDocument();
+    });
+    const all = screen.getByTestId('global-all-pokemon-value');
+    expect(all.textContent).toContain('12.5%');
+    expect(all.textContent).toContain('42 / 336');
+    const master = screen.getByTestId('global-master-value');
+    expect(master.textContent).toContain('7.3%');
+    expect(master.textContent).toContain('50 / 690');
+  });
+
+  it('renders per-set rows from the server completion payload only', async () => {
+    const completion: CompletionDto = {
+      global: {
+        allPokemonPct: 33.3,
+        masterPct: 33.3,
+        uniqueCardsOwned: 1,
+        uniqueCardsTotal: 3,
+        masterOwned: 1,
+        masterTotal: 3,
+      },
+      perSet: [
+        {
+          setId: 'set-a',
+          setCode: 'base1',
+          setName: 'Base Set',
+          setPct: 50,
+          masterPct: 50,
+          ownedNumbered: 1,
+          totalNumbered: 2,
+          ownedMaster: 1,
+          totalMaster: 2,
+        },
+      ],
+      lastUpdatedAt: '2026-05-19T00:00:00.000Z',
+    };
+    const api = createFakeCollectionApi({ completion });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('collection-set-list')).toBeInTheDocument();
+    });
+    const rows = screen.getAllByTestId('collection-set-row');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('Base Set');
+    expect(rows[0]).toHaveTextContent('50.0%');
   });
 });
 
