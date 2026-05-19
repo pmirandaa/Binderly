@@ -525,7 +525,7 @@ tasks:
     stage: 04-web
     title: Wire V2 read endpoints into web surfaces (completion, current-price, shareable, smart-preview)
     agent_role: frontend-web
-    status: in_review
+    status: merged
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-COLLECTION, T-W-BROWSE, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-SP-PRICING-DISPLAY]
     parallel_safe_with: [T-M-API-V2-WIRING]
     provides: [web:v2-wiring]
@@ -538,7 +538,7 @@ tasks:
     stage: 05-mobile
     title: Wire V2 read endpoints into mobile surfaces (completion, current-price, smart-preview)
     agent_role: frontend-mobile
-    status: review
+    status: merged
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-M-COLLECTION, T-M-BROWSE, T-M-CUSTOM, T-SP-PRICING-DISPLAY]
     parallel_safe_with: [T-W-API-V2-WIRING]
     provides: [mobile:v2-wiring]

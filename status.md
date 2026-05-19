@@ -49,16 +49,25 @@ The data layer is **done end-to-end** on main:
 
 ## Dispatch loop status
 
-**Iter 21 CLOSED 2026-05-19 ~14:30 UTC-4. Backend tidy-up
-shipped: 4 additive Edge endpoints (completion, current-price,
-public-shareable, smart-preview) landed in one PR. Q-012
-closed; Q-013 raised for two scope divergences (missing mvs;
-DSL eval in JS instead of SQL). Phases 0-5 still all complete;
-backend now has the surface area to drop the iter-17/18/20
-client-side stop-gaps.**
+**Iter 22 CLOSED 2026-05-19 ~15:35 UTC-4. Frontend wiring of the
+4 V2 endpoints shipped on both platforms. Web (4 surfaces, +51
+tests) and mobile (3 surfaces, +28 tests) sibling workers both
+merged clean. #FU-22 closed as a side effect on mobile.**
 
-Iter 20 closed 2026-05-15 ~23:30 UTC-4 with Stage 04 web at
-8/8 and Phases 0-5 ALL complete (frontend foundation merged).
+The client-side stop-gaps from iters 17 / 18 / 20 are now gone:
+Master% on `CollectionScreen` reads from `getCompletion()` on
+first paint; CardView/CardScreen render real prices; the public
+shareable page reads the canonical `publicShareableDto`; smart-
+preview Run uses catalog-wide server eval. Only #FU-26 + #FU-27
+Q-013 perf cleanups remain, both server-side and transparent to
+the frontend.
+
+Iter 21 closed 2026-05-19 ~14:30 UTC-4: 4 additive Edge endpoints
+shipped (T-BE-EDGE-FUNCTIONS-V2 #68 → 472fdcf); Q-012 closed;
+Q-013 raised for two server-side scope divergences (now logged as
+#FU-26 + #FU-27). Iter 20 closed 2026-05-15 ~23:30 UTC-4 with
+Stage 04 web at 8/8 and Phases 0-5 ALL complete (frontend
+foundation merged).
 
 Progression so far:
 
@@ -86,10 +95,15 @@ parallel; public OG-imaged shareable pages + TCGplayer buy-CTAs;
 closes Stage 04 web 8/8 → frontend foundation COMPLETE;
 Q-011 + Q-012 raised, both non-blocking) →
 iter 21 (T-BE-EDGE-FUNCTIONS-V2 — single worker, 4 additive
-read endpoints in one PR; **Q-012 closed**, Q-013 raised for
+read endpoints in one PR; Q-012 closed, Q-013 raised for
 two scope divergences: missing `mv_user_set_completion` /
 `mv_user_global_completion` mvs + Edge bundle can't import
-`@binderly/smart-collection-dsl`).
+`@binderly/smart-collection-dsl`) →
+iter 22 (T-W-API-V2-WIRING + T-M-API-V2-WIRING — 2-worker
+sibling; wires the 4 V2 endpoints through every web + mobile
+surface that had a client-side stop-gap; **closes #FU-22 as
+side effect on mobile**; no new open questions raised; Q-013
+implicitly answered client-side).
 
 Every Phase 0-5 task is merged: foundation (Phase 0), data layer
 (Phase 1), backend core (Phase 2), shared packages (Phase 3),
@@ -209,6 +223,63 @@ mobile vs packages) is reliably mergeable in parallel.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
+
+## Iter 22 close summary (frontend wiring of V2 endpoints — cross-platform; #FU-22 closed as side effect)
+
+Two sibling workers, cleanly disjoint owns_paths per platform,
+both green CI, both squash-merged. Closes the loop opened by
+iter 21: every client-side stop-gap shipped in iters 17 / 18 / 20
+that the V2 endpoints unblocked is now wired through to the real
+server data.
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-M-API-V2-WIRING | merged | #69 (`6186ef3`) | +28 (target 25-40; total apps/mobile 460 / 48 files) | 3 surface swaps: `CollectionScreen` + `CollectionSetScreen` → `getCompletion()` (Master% real on first paint, no more parked fallback); `CardScreen` → `pricing-display` + `getPrintingCurrentPrice()` with loading/404/error/retry/freshness; smart-editor Run → `smartCollections.preview()` catalog-wide (closes #FU-22 owned-only PrintingPicker quirk as side effect — pinned by regression test rendering an unowned printing). `useMutation` not `useQuery` for smart preview (Run is imperative). 404 → `data: null` sentinel pattern. |
+| T-W-API-V2-WIRING | merged | #70 (`d45b9d4`) | +51 (target 30-50; total apps/web 499 files) | 4 surface swaps: `CollectionView` / `CollectionSetView` → `getCompletion()`; `CardView` → new `CardPriceBlock` rendering `pricing-display` + `getPrintingCurrentPrice()`; `apiToShareApi` → `getPublicShareablePayload()` (Q-012 fully closed end-to-end; degraded synthesis deleted); `SmartEditorView` Run + `SmartDetailView` re-run → `smartCollections.preview()`. Local `evaluate()` retained for typing/explainer + as canonical `collection.*` predicate fallback when V2 rejects with `ApiValidationError` (Q-013). `MatchGrid` widened to a `SmartMatchView` shape via `runMatchToView` / `previewItemToView` pure projections. 5xx-propagates posture on shareable (half-broken page is strictly worse UX than honest error). `catalogRoster()` stays for per-set Owned/Missing grids (no V2 endpoint covers that yet — would need a backend follow-up if we want to drop it). |
+
+**No new open questions raised by either worker.** Every V2 endpoint
+shape was sufficient for its surface; Q-013 is implicitly answered
+client-side (the `collection.*` predicate fallback in smart-preview
+falls out of `ApiValidationError` cleanly, no escalation needed).
+
+**Frontend foundation now reads exclusively from server-side
+endpoints for completion, current-price, public-shareable, and
+smart-preview.** The O(catalog) client-side fanout that's been
+sitting in T-W/M-COLLECTION since iter 18 is gone. The "Prices
+coming soon" placeholder on Card{View,Screen} since iter 17 is
+gone. The "owned-only PrintingPicker" quirk on mobile smart-editor
+since iter 19 is gone.
+
+**Remaining Q-013 perf concerns** are entirely server-side and
+non-blocking at v1 scale:
+
+- **#FU-26 (`T-DL-MV-COMPLETION`):** completion handler still
+  computes on-the-fly because the mvs don't exist. Frontend is
+  unaware; swap from on-the-fly compute → mv SELECT is transparent.
+- **#FU-27 (`T-BE-SMART-PREVIEW-RPC`):** smart-preview server
+  handler still evaluates AST in JS in-memory. Frontend unaware;
+  swap to Postgres RPC is transparent.
+
+Final migration sequence on main: monotonic 0000-0017 (no new
+migrations in iter 22). HEAD: `d45b9d4`. Open questions: 3
+(Q-007 admin role, Q-011 TCGplayer URL, Q-013 mv/RPC gaps); all
+non-blocking.
+
+**Next iter candidates (ranked) when work resumes:**
+
+1. **Land the missing mvs (#FU-26 / T-DL-MV-COMPLETION).** Small
+   data-layer task; ship the two hand-authored migrations + indexes
+   + refresh strategy, then swap the completion handler from
+   on-the-fly compute to a single `SELECT`. Strictly improves perf;
+   no API surface change; no frontend touch needed.
+2. **Pair: #FU-26 + #FU-27 backend perf cleanup iter.** Bundles
+   the mv-completion swap with the smart-preview RPC migration —
+   both are Q-013 backend follow-ups; both transparent to the
+   frontend.
+3. **Open the scanner stage** — T-SC-CAMERA + T-SC-EMBED-MODEL
+   parallel pair. Standalone; no frontend dependency; larger
+   scope (T-SC-EMBED-MODEL is genuinely ML work, not pure
+   software engineering).
 
 ## Iter 21 close summary (backend tidy-up — 4 additive Edge endpoints; Q-012 closed; Q-013 raised)
 
@@ -622,11 +693,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
-- T-BE-EDGE-FUNCTIONS-V2 — `472fdcf` (4 additive read endpoints: `/v1/me/collection/completion` + `/v1/printings/:id/current-price` + `/v1/c/{handle}/{slug}` anon dual-Accept + `/v1/smart-collections/preview`; +260 tests; **Q-012 closed**, **Q-013 raised** for missing mvs + Edge can't import smart-collection-dsl; on-the-fly completion compute + in-JS DSL eval are documented stop-gaps with `T-DL-MV-COMPLETION` (#FU-26) + `T-BE-SMART-PREVIEW-RPC` (#FU-27) as proposed follow-ups; widened `normalizePathname` from `/v1/me/`-only to strip `/v1/` from any path) — **iter 21 cap**
-- T-W-SHAREABLE-PUBLIC — `79ad293` (public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` OG image; +67 tests; PublicSharePayload injectable contract + degraded runtime adapter ready to swap to `getPublicShareablePayload({ vendorAccept })` now that iter 21 landed) — **iter 20 cap / Stage 04 cap / frontend foundation COMPLETE**
-- T-W-AFFILIATE-LINKS — `d028681` (TCGplayer affiliate `<BuyCta>` on web + mobile card detail; +57 tests; documented placeholder URL; env-missing "Coming soon" degraded path is production default; **Q-011 / #FU-24** raised for URL format verification)
-- T-W-SMART — `b59c427` (web smart collections; +37 tests; client-side DSL eval; plan-gated save; reuses custom-collection persistence with kind='smart') — iter 19 cap
-- T-W-CUSTOM — `f796e2e` (web manual custom collections w/ 3-cap on free; +54 tests; in-tree Modal primitive; smart-kind 404 boundary)
+- T-W-API-V2-WIRING — `d45b9d4` (web wires 4 V2 endpoints into Collection/Card/Shareable/Smart-Editor surfaces; +51 tests → 499 total; `CardPriceBlock` new component; `apiToShareApi` swaps degraded synthesis → `getPublicShareablePayload()` (Q-012 fully closed end-to-end); `MatchGrid` widened via `runMatchToView` / `previewItemToView`; local DSL `evaluate()` kept as `collection.*` fallback + typing/explainer preview; 5xx-propagates posture on shareable; `catalogRoster()` retained for per-set Owned/Missing grids) — **iter 22 cap**
+- T-M-API-V2-WIRING — `6186ef3` (mobile wires 3 V2 endpoints into Collection/Card/SmartEditor surfaces; +28 tests → 460 / 48 files; Master% real on first paint; `useMutation` not `useQuery` for smart preview; 404 → `data: null` sentinel; **#FU-22 closed as side effect** pinned by regression test rendering unowned printing tile)
+- T-BE-EDGE-FUNCTIONS-V2 — `472fdcf` (4 additive read endpoints: `/v1/me/collection/completion` + `/v1/printings/:id/current-price` + `/v1/c/{handle}/{slug}` anon dual-Accept + `/v1/smart-collections/preview`; +260 tests; Q-012 closed, Q-013 raised for missing mvs + Edge can't import smart-collection-dsl; on-the-fly completion compute + in-JS DSL eval are documented stop-gaps with #FU-26 + #FU-27 follow-ups) — iter 21 cap
+- T-W-SHAREABLE-PUBLIC — `79ad293` (public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` OG image; +67 tests; PublicSharePayload contract now reads canonical publicShareableDto after iter 22 wiring) — iter 20 cap / Stage 04 cap / frontend foundation COMPLETE
+- T-W-AFFILIATE-LINKS — `d028681` (TCGplayer affiliate `<BuyCta>` on web + mobile card detail; +57 tests; documented placeholder URL; **Q-011 / #FU-24** raised for URL format verification)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -665,14 +736,14 @@ placeholders untouched.
 13. **Mobile router-asserting tests need a local `vi.hoisted({ routerMocks })` mock** because M-SHELL's global `setup.ts` returns a fresh `useRouter()` per call (breaks `mockReturnValueOnce` and observable `.mock.calls`). T-M-AUTH worked around it locally; M-SHELL cleanup pass could lift the stable mock into the global setup. Worth a short follow-up task for whoever next touches `apps/mobile/src/test-utils/`.
 14. **Dead M-SHELL placeholder screens** at `apps/mobile/src/screens/SignInScreen.tsx` and `AuthCallbackScreen.tsx` (legacy duplicates from before T-M-AUTH repointed the route shells). Outside any current task's owns_paths; flag for an M-SHELL cleanup follow-up.
 15. **`apps/web/components/providers/AuthProvider.tsx` not prettier-compliant** — `pnpm --filter @binderly/web format:write` reformats it. T-W-SHELL committed it in this state and `format:check` isn't a CI gate, so workers can't safely re-run format on the file. Worth a one-shot cleanup commit.
-16. **Iter-17 pre-rendered placeholders waiting on pricing-display.** T-W-BROWSE's `CardView` and T-M-BROWSE's `CardScreen` both render an explicit "Prices coming soon" placeholder section. Now that `@binderly/pricing-display` is merged in iter 17, an iter-18+ pass should wire it into both `Card*` views. May also need a new `/v1/printings/:id/prices` (or `/v1/printings/:id/current-price`) endpoint exposed by edge functions to expose the `mv_current_price` row to clients — currently the read API doesn't surface prices. Could be a tiny T-BE-EDGE-FUNCTIONS-V2 follow-up, or fold into the iter-18 collection-detail work if natural. **Logged as #FU-17.**
+16. **Iter-17 pre-rendered placeholders waiting on pricing-display.** ✅ **CLOSED iter 22** — T-BE-EDGE-FUNCTIONS-V2 shipped `getPrintingCurrentPrice()` in iter 21; T-W-API-V2-WIRING + T-M-API-V2-WIRING wired `pricing-display` into both CardView (via new `CardPriceBlock`) and CardScreen with loading / 404 / error states in iter 22. The "Prices coming soon" placeholder is gone on both platforms. **Closed as #FU-17.**
 17. **(Reserved — duplicate slot; see #FU-17 above.)**
 18. **URL convention divergence between web and mobile browse routes.** T-W-BROWSE uses raw UUIDs for `/sets/[id]` and `/cards/[id]` (api-client only exposes by-id). T-M-BROWSE uses slug-based `/sets/[slug]` resolving against the `/v1/sets` list cache (e.g. `en-base1`). Both work; both shipped green. T-W-COLLECTION inherited UUID; T-M-COLLECTION inherited slug — divergence persists in iter 18. Future cross-platform consolidation: pick one convention (probably slug, after a `getSetBySlug` endpoint lands) and migrate the other. Low priority — neither is user-visible while routes are SSR-hidden. **Logged as #FU-18.**
-19. **Server-side `/v1/me/collection/completion` endpoint (Q-010 ratified).** Both T-W-COLLECTION and T-M-COLLECTION ship a client-side-compute v1 stop-gap: fan out catalog reads, pre-project `{cards, printings}` + owned-ids, hand to `computeCompletion()`. Works for v1 sizes, but is O(catalog) per page-load. The fix is a backend endpoint exposing the existing `mv_user_set_completion` and `mv_user_global_completion` materialised views directly, so both screens read O(1) rows instead. Spec is in `PROJECT.md § 8`; the mv definitions already exist in the data layer (Phase 1) but lack a read-side wrapper. Likely a `T-BE-EDGE-FUNCTIONS-V2` follow-up or a small new edge-function task. **Logged as #FU-19.**
+19. **Server-side `/v1/me/collection/completion` endpoint (Q-010 ratified).** ✅ **CLOSED iter 21-22** — T-BE-EDGE-FUNCTIONS-V2 shipped the endpoint in iter 21 (PR #68); T-W/M-API-V2-WIRING wired both T-W-COLLECTION and T-M-COLLECTION to read from it in iter 22. The on-device fanout is gone on both platforms. **Note**: the underlying mvs `mv_user_set_completion` / `mv_user_global_completion` turned out to not exist in any migration (named in PROJECT.md § 8 but never landed), so the handler computes on-the-fly against canonical tables — this is fast at v1 scale and transparent to the client. Landing the mvs + swapping to a single SELECT is now tracked as **#FU-26** (T-DL-MV-COMPLETION). **Closed as #FU-19; perf follow-up moved to #FU-26.**
 20. **`@binderly/ui` `<Modal>` primitive missing.** T-W-CUSTOM rolled a modal in-tree at `apps/web/components/collections/custom/Modal.tsx` (Esc + backdrop close, ARIA dialog, no focus trap). T-W-SMART likely makes the same trade-off; iter-20+ tasks will too. Proposed `T-SP-UI-MODAL` follow-up to hoist a shared cross-platform modal into `@binderly/ui` once 2+ consumers are in main. **Logged as #FU-20.**
 21. **`@binderly/ui` `<Input>` doesn't expose `onBlur` / `onEndEditing`.** T-W-CUSTOM's detail screen uses raw `<input>`/`<textarea>` for inline-edit name/description because the shared `<Input>` wrapper doesn't surface blur events. Future T-SP-UI-INPUT-BLUR adds the prop pass-through (additive). **Logged as #FU-21.**
-22. **Catalog-wide PrintingPicker on mobile.** T-M-CUSTOM's `<PrintingPicker>` (manual collection "Add cards" flow) sources from the user's OWNED printings, not the full catalog. Tight v1 scope; product can lift this later if "browse-and-add" becomes a friction point. Same goes for T-M-CUSTOM's smart-editor Run preview (also owned-only). **Logged as #FU-22.**
-23. **Server-evaluated smart-collection preview.** Both T-W-SMART and T-M-CUSTOM evaluate smart-collection expressions client-side via `@binderly/smart-collection-dsl`'s `evaluate()` on a 200-printing preview window. For larger collections / future "run against entire catalog" semantics, the right shape is a server-side compile-to-SQL via an edge function (`@binderly/smart-collection-dsl`'s `compileToSql()` already supports this). **Logged as #FU-23.**
+22. **Catalog-wide PrintingPicker on mobile.** ✅ **CLOSED iter 22 (smart-editor half)** — T-M-API-V2-WIRING swapped the smart-editor Run preview to `client.smartCollections.preview()` which is catalog-wide; the unowned-tile regression is pinned by test. The `<PrintingPicker>` in the *add-card* flow is intentionally still owned-only (correct UX there — you can only add cards you have, not cards from the global catalog). Effectively closed at its meaningful scope. **Closed as #FU-22.**
+23. **Server-evaluated smart-collection preview.** ✅ **CLOSED iter 21-22 (functionally)** — T-BE-EDGE-FUNCTIONS-V2 shipped `/v1/smart-collections/preview` in iter 21; T-W/M-API-V2-WIRING swapped the Run / re-run paths to call it in iter 22 on both platforms. Local `evaluate()` is retained only as (a) typing/explainer preview during DSL editing and (b) `collection.*` predicate fallback when the server returns `ApiValidationError`. **Note**: the server-side handler also evaluates the AST in JS in-memory (the Edge bundle can't import `@binderly/smart-collection-dsl`), not via `compileToSql()`. Lifting eval to Postgres RPC is now tracked as **#FU-27** (T-BE-SMART-PREVIEW-RPC). **Closed as #FU-23; backend eval cleanup moved to #FU-27.**
 24. **TCGplayer affiliate URL format verification (Q-011).** T-W-AFFILIATE-LINKS' `<BuyCta>` ships with a documented placeholder URL (`/search/pokemon/product?productLineName=pokemon&q=<name> <number> <set>&utm_source=binderly&utm_medium=affiliate&utm_campaign=binderly-buy-cta&utm_id=<id>`). The Impact partner program may expect a different storefront path (`/search/all/product?productLineName=pokemon` is also common in the wild) and a different tracking param (`clickref` / `irclickid` / `partner` vs `utm_id`). Fix: sign up for the TCGplayer affiliate program once the business entity is ready; receive exact wire format + tracking param spec from Impact; update both `apps/web/lib/affiliate/tcgplayer.ts` and `apps/mobile/src/components/buy-cta/tcgplayer.ts` in lockstep (~5 LOC each + tests). Non-blocking: env-missing "Coming soon" degraded path is production default until an affiliate id lands in `NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID` / `EXPO_PUBLIC_TCGPLAYER_AFFILIATE_ID`. **Logged as #FU-24.**
 25. **Server-side public shareable read endpoint (Q-012).** ✅ **CLOSED iter 21** — `T-BE-EDGE-FUNCTIONS-V2` shipped `GET /v1/c/{handle}/{slug}` anonymous with `Accept: application/vnd.binderly.share+json` opting into the richer `publicShareableDto`. T-W-SHAREABLE-PUBLIC's runtime adapter can swap its degraded synthesis for `getPublicShareablePayload(...)` in a small follow-up; the data layer was designed as the seam for exactly this.
 26. **Land `mv_user_set_completion` + `mv_user_global_completion` materialised views (Q-013, half 1).** Both mvs are named in `PROJECT.md § 8` and were re-ratified at Q-010 close, but they **don't exist in any migration on main** (only `mv_current_price` does). T-BE-EDGE-FUNCTIONS-V2's completion handler re-implements `@binderly/set-completion`'s algorithm against canonical tables instead — fast at v1 size, breaks down at scale. Fix: hand-author a migration that ships both mvs + appropriate indexes + a refresh hook (or scheduled refresh; PostgREST + Supabase don't auto-refresh). Then swap the completion handler from on-the-fly compute to a single `SELECT` against the mv. Strictly improves perf; no API surface change. Proposed task: `T-DL-MV-COMPLETION`. **Logged as #FU-26.**
