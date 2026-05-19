@@ -13,6 +13,7 @@ export {
   useDeleteCustomCollectionMutation,
   useRemovePrintingFromCustomCollectionMutation,
   useSmartCollectionRuleQuery,
+  useSmartPreviewMutation,
   useSubscriptionQuery,
   useUpdateCustomCollectionMutation,
 } from './hooks.js';
@@ -25,6 +26,7 @@ export type {
   UseCustomCollectionsQueryResult,
   UseCustomCollectionOptions,
   UseSmartCollectionRuleQueryResult,
+  UseSmartPreviewMutationResult,
   UseSubscriptionQueryResult,
 } from './hooks.js';
 

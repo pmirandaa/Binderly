@@ -3,10 +3,10 @@
 // supporting counts (sets started, sets mastered, total cards
 // owned). Uses the larger global progress bar tone.
 //
-// Master % stays as a placeholder until the per-set drill-downs
-// have hydrated their printing rosters (see
-// `lib/collection/completion.ts` for the partial-roster caveat
-// and Q-010 in `open-questions.md`).
+// Master % is sourced authoritatively from the V2
+// `/v1/me/collection/completion` endpoint (T-M-API-V2-WIRING);
+// the parked "full math soon" placeholder was retired with that
+// swap.
 
 import { Card, Text, XStack, YStack } from '@binderly/ui';
 
@@ -53,9 +53,9 @@ export function CompletionBadge(props: CompletionBadgeProps): ReactNode {
         <Counter label="Sets started" value={String(summary.setsStarted)} />
         <Counter label="Sets mastered" value={String(summary.setsMastered)} />
         <Counter
-          label="Master cards"
-          value={`${summary.masterOwned}`}
-          subtitle="full math soon"
+          label="Master %"
+          value={formatPercent(summary.masterPct)}
+          subtitle={formatCount(summary.masterOwned, summary.masterTotal)}
         />
       </XStack>
     </Card>

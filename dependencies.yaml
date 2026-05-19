@@ -538,14 +538,14 @@ tasks:
     stage: 05-mobile
     title: Wire V2 read endpoints into mobile surfaces (completion, current-price, smart-preview)
     agent_role: frontend-mobile
-    status: pending
+    status: review
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-M-COLLECTION, T-M-BROWSE, T-M-CUSTOM, T-SP-PRICING-DISPLAY]
     parallel_safe_with: [T-W-API-V2-WIRING]
     provides: [mobile:v2-wiring]
     owns_paths: [apps/mobile/src/]
     task_file: tasks/05-mobile/T-M-API-V2-WIRING.md
     est_effort: M
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 3 — SHARED PACKAGES

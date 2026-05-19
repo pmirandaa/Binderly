@@ -36,13 +36,21 @@
 // invocation argument so screens can keep a single hook handy and
 // dispatch with the right resource on press.
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 
 import type {
   CreateCustomCollectionRequest,
   CustomCollectionDto,
   CustomCollectionItemDto,
   SmartCollectionRuleDto,
+  SmartPreviewRequestDto,
+  SmartPreviewResponseDto,
   SubscriptionDto,
   UpdateCustomCollectionRequest,
 } from '@binderly/api-contracts';
@@ -322,5 +330,32 @@ export function useRemovePrintingFromCustomCollectionMutation() {
         queryKey: COLLECTIONS_QUERY_KEYS.customCollectionItems(variables.customCollectionId),
       });
     },
+  });
+}
+
+export type UseSmartPreviewMutationResult = UseMutationResult<
+  SmartPreviewResponseDto,
+  Error,
+  SmartPreviewRequestDto
+>;
+
+/**
+ * Compile + execute a smart-collection expression against the
+ * catalog server-side via the V2 `/v1/smart-collections/preview`
+ * endpoint (T-M-API-V2-WIRING). Replaces the iter-19 in-app
+ * `evaluateAgainstCatalog(...)` Run preview (#FU-23 frontend
+ * half).
+ *
+ * `useMutation` semantics rather than `useQuery` because the
+ * preview is imperative — the user presses Run, the expression
+ * is the body, and there's no natural cache key (every parse
+ * iteration produces a different AST). The smart editor pulls
+ * the result into local state on success so the match grid
+ * survives subsequent edits to the input until the next Run.
+ */
+export function useSmartPreviewMutation(): UseSmartPreviewMutationResult {
+  const client = useApiClient();
+  return useMutation<SmartPreviewResponseDto, Error, SmartPreviewRequestDto>({
+    mutationFn: async (input) => client.smartCollections.preview(input),
   });
 }

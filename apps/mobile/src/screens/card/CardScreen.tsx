@@ -6,8 +6,9 @@
 //     falls back to `imageSmallUrl`).
 //   - Metadata block: set id, number, rarity, illustrator,
 //     language.
-//   - Prices placeholder (clearly labeled — wired up by
-//     T-SP-PRICING-DISPLAY).
+//   - `<PriceBlock>` — V2 `/v1/printings/:id/current-price`
+//     wired via `@binderly/pricing-display` (T-M-API-V2-WIRING).
+//     The hero printing's id drives the headline price.
 //   - Disabled "Add to collection" CTA with copy explaining that
 //     sign-in is required (collection mutations land in
 //     T-M-COLLECTION).
@@ -23,6 +24,7 @@ import type { CardWithPrintingsDto, PrintingDto } from '@binderly/api-contracts'
 import { Button, Card, Spinner, Text, XStack, YStack } from '@binderly/ui';
 
 import { BuyCta } from '../../components/buy-cta/index.js';
+import { PriceBlock } from '../../components/card/PriceBlock.js';
 import { languageLabel, useCardQuery, variantClassLabel } from '../../lib/browse/index.js';
 
 const styles = StyleSheet.create({
@@ -125,14 +127,7 @@ function CardDetailView({ card }: { card: CardWithPrintingsDto }): ReactNode {
           </Card>
         ) : null}
 
-        <Card variant="outlined" gap="$2" testID="card-prices">
-          <Text variant="label" tone="default">
-            Prices
-          </Text>
-          <Text variant="caption" tone="muted">
-            Prices land here once pricing display ships (T-SP-PRICING-DISPLAY).
-          </Text>
-        </Card>
+        <PriceBlock printingId={heroPrinting?.id} testID="card-prices" />
 
         <Card variant="outlined" gap="$2" testID="card-buy">
           <Text variant="label" tone="default">

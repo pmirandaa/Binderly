@@ -11,7 +11,9 @@ export {
 export {
   compareSummariesForHome,
   computeCompletionForSet,
+  globalDtoToSummary,
   partitionPrintingsForDrillDown,
+  perSetEntryToSummary,
   summarizeCollection,
   summaryFromResult,
 } from './completion.js';
@@ -27,6 +29,7 @@ export type {
 export {
   COLLECTION_QUERY_KEYS,
   useCollectionItemsQuery,
+  useCompletionQuery,
   useOwnedPrintingsContextQuery,
   useSetDrillDownQuery,
 } from './hooks.js';
@@ -36,4 +39,6 @@ export type {
   SetDrillDownQueryState,
   UseCollectionItemsOptions,
   UseCollectionItemsQueryResult,
+  UseCompletionQueryOptions,
+  UseCompletionQueryResult,
 } from './hooks.js';

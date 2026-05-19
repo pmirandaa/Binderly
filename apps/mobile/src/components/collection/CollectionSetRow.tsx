@@ -4,9 +4,10 @@
 //   - small set logo / fallback initials,
 //   - set name + release date / language footnote,
 //   - Set % progress bar with `owned/total` count,
-//   - Master % progress bar with the same shape (the home-screen
-//     summary leaves master at 0 until the per-set drill-down is
-//     visited — see `lib/collection/completion.ts`).
+//   - Master % progress bar with the same shape — both numbers
+//     come from the V2 `/v1/me/collection/completion` endpoint
+//     (T-M-API-V2-WIRING), so the parked "Open set to compute"
+//     fallback has been retired.
 //
 // Tap target: the entire row is a `<Pressable>` so a tap routes to
 // the per-set drill-down (`/collection/sets/{canonicalKey}`). The
@@ -101,12 +102,8 @@ export function CollectionSetRow(props: CollectionSetRowProps): ReactNode {
                 Master
               </Text>
               <Text variant="caption" tone="muted">
-                {summary.totalMaster > 0
-                  ? `${formatPercent(summary.masterPct)} · ${formatCount(
-                      summary.ownedMaster,
-                      summary.totalMaster,
-                    )}`
-                  : 'Open set to compute'}
+                {formatPercent(summary.masterPct)} ·{' '}
+                {formatCount(summary.ownedMaster, summary.totalMaster)}
               </Text>
             </XStack>
             <ProgressBar

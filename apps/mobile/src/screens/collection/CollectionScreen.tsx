@@ -7,29 +7,28 @@
 //     dispatches an authenticated query without a session — the
 //     hooks gate on `enabled` so we don't leak 401s.
 //   - Above-the-fold: `<CompletionBadge>` showing the user's
-//     global All Pokémon % + supporting counts.
+//     global All Pokémon % + Master % + supporting counts.
 //   - Below: virtualized FlatList of per-set rows, sorted by
 //     completion % descending then release_date descending. Each
 //     row is a `<CollectionSetRow>` with Set / Master progress
 //     bars.
-//   - Pull-to-refresh wired to TanStack Query's refetch (both the
-//     items query and the catalog sets query).
+//   - Pull-to-refresh wired to TanStack Query's refetch (the
+//     completion query + the catalog sets query).
 //   - Empty state: "Your collection is empty. Browse the catalog →"
 //     deep-links into `(tabs)/browse`.
 //   - Error / loading skeleton states.
 //
-// Data flow:
+// Data flow (T-M-API-V2-WIRING):
 //
 //   - `useAuth()` for the gate.
-//   - `useCollectionItemsQuery({ enabled: signedIn })` from
-//     `lib/collection` — owned printingIds.
-//   - `useOwnedPrintingsContextQuery(printingIds)` — fans out
-//     `getPrinting(id)` to enrich with cardId / setId /
-//     includeInMasterSet (the math needs that mapping).
-//   - `useSetsQuery()` from `lib/browse` — the full set catalog
-//     for denominators + display.
-//   - `summarizeCollection({ sets, owned })` from `lib/collection`
-//     produces per-set + global summary in a memoized pass.
+//   - `useCompletionQuery({ enabled: signedIn })` — authoritative
+//     server-side `getCompletion()`. Returns global + perSet
+//     tallies in one shot; replaces the iter-17/18 on-device
+//     `useCollectionItemsQuery` + `useOwnedPrintingsContextQuery`
+//     + `summarizeCollection` triplet.
+//   - `useSetsQuery()` from `lib/browse` — full set catalog,
+//     joined to the perSet entries on `setId` to recover the
+//     `SetDto` (logo / language / canonicalKey) the row UI needs.
 //
 // Navigation: tap a row → push
 // `/collection/sets/{set.canonicalKey}` (slug-based, mirroring
@@ -47,9 +46,9 @@ import { useAuth } from '../../components/providers/AuthProvider.js';
 import { useSetsQuery } from '../../lib/browse/index.js';
 import {
   compareSummariesForHome,
-  summarizeCollection,
-  useCollectionItemsQuery,
-  useOwnedPrintingsContextQuery,
+  globalDtoToSummary,
+  perSetEntryToSummary,
+  useCompletionQuery,
   type CollectionSetSummary,
 } from '../../lib/collection/index.js';
 
@@ -58,38 +57,40 @@ export function CollectionScreen(): ReactNode {
   const { session, loading: authLoading } = useAuth();
   const signedIn = session !== null;
 
-  const itemsQuery = useCollectionItemsQuery({ enabled: signedIn });
-  const itemPrintingIds = useMemo(
-    () => (itemsQuery.data ?? []).map((item) => item.printingId),
-    [itemsQuery.data],
-  );
-  const contextQuery = useOwnedPrintingsContextQuery(itemPrintingIds);
+  const completionQuery = useCompletionQuery({ enabled: signedIn });
   const setsQuery = useSetsQuery();
 
   const sets = useMemo(() => setsQuery.data?.items ?? [], [setsQuery.data]);
-  const ownedContexts = useMemo(
-    () =>
-      contextQuery.data.map((ctx) => ({
-        printingId: ctx.id,
-        cardId: ctx.cardId,
-        setId: ctx.set.id,
-        includeInMasterSet: ctx.includeInMasterSet,
-      })),
-    [contextQuery.data],
-  );
-  const summary = useMemo(
-    () => summarizeCollection({ sets, owned: ownedContexts }),
-    [sets, ownedContexts],
-  );
-  const sortedRows = useMemo(
-    () => [...summary.perSet].sort(compareSummariesForHome),
-    [summary],
-  );
+  const setsById = useMemo(() => {
+    const map = new Map<string, (typeof sets)[number]>();
+    for (const set of sets) map.set(set.id, set);
+    return map;
+  }, [sets]);
+
+  const globalSummary = useMemo(() => {
+    if (completionQuery.data === undefined) return null;
+    return globalDtoToSummary({
+      global: completionQuery.data.global,
+      perSet: completionQuery.data.perSet,
+    });
+  }, [completionQuery.data]);
+
+  const sortedRows = useMemo<CollectionSetSummary[]>(() => {
+    const entries = completionQuery.data?.perSet ?? [];
+    const summaries: CollectionSetSummary[] = [];
+    for (const entry of entries) {
+      const set = setsById.get(entry.setId);
+      if (set === undefined) continue;
+      summaries.push(perSetEntryToSummary(entry, set));
+    }
+    summaries.sort(compareSummariesForHome);
+    return summaries;
+  }, [completionQuery.data, setsById]);
 
   const handleRefresh = useCallback(() => {
-    void itemsQuery.refetch();
+    void completionQuery.refetch();
     void setsQuery.refetch();
-  }, [itemsQuery, setsQuery]);
+  }, [completionQuery, setsQuery]);
 
   const handleSelectRow = useCallback(
     (row: CollectionSetSummary) => {
@@ -122,16 +123,15 @@ export function CollectionScreen(): ReactNode {
   }
 
   // ---- Loading / error states -----------------------------------
-  const isInitialLoad =
-    itemsQuery.isLoading || setsQuery.isLoading || (contextQuery.isLoading && itemPrintingIds.length > 0);
-  const queryError = itemsQuery.error ?? setsQuery.error ?? contextQuery.error;
-  const hasError = itemsQuery.isError || setsQuery.isError || contextQuery.isError;
+  const isInitialLoad = completionQuery.isLoading || setsQuery.isLoading;
+  const queryError = completionQuery.error ?? setsQuery.error;
+  const hasError = completionQuery.isError || setsQuery.isError;
 
   if (isInitialLoad) {
     return <CollectionLoadingState />;
   }
 
-  if (hasError && queryError !== null) {
+  if (hasError && queryError !== null && queryError !== undefined) {
     return (
       <CollectionErrorState
         message={queryError.message ?? 'Failed to load your collection.'}
@@ -140,7 +140,11 @@ export function CollectionScreen(): ReactNode {
     );
   }
 
-  const ownedCount = itemsQuery.data?.length ?? 0;
+  if (globalSummary === null) {
+    return <CollectionLoadingState />;
+  }
+
+  const ownedCount = globalSummary.uniqueCardsOwned;
   // When the user owns nothing, show the empty surface above the
   // catalog list. Showing both keeps the global-completion-badge
   // anchor stable AND surfaces the "browse the catalog" CTA the
@@ -166,7 +170,7 @@ export function CollectionScreen(): ReactNode {
         refreshControl={
           <RefreshControl
             refreshing={
-              (itemsQuery.isFetching && !itemsQuery.isLoading) ||
+              (completionQuery.isFetching && !completionQuery.isLoading) ||
               (setsQuery.isFetching && !setsQuery.isLoading)
             }
             onRefresh={handleRefresh}
@@ -175,7 +179,7 @@ export function CollectionScreen(): ReactNode {
         }
         ListHeaderComponent={
           <YStack gap="$3" paddingHorizontal="$4" paddingBottom="$2">
-            <CompletionBadge summary={summary.global} />
+            <CompletionBadge summary={globalSummary} />
           </YStack>
         }
         ListEmptyComponent={

@@ -6,7 +6,9 @@ import type { BinderlyClient } from '@binderly/api-client';
 import type {
   CardDto,
   CollectionItemDto,
+  CompletionDto,
   PaginatedResponse,
+  PerSetCompletionEntryDto,
   PrintingDto,
   SetDto,
 } from '@binderly/api-contracts';
@@ -180,6 +182,7 @@ interface FakeClient {
     getPrinting: ReturnType<typeof vi.fn>;
   };
   collection: {
+    getCompletion: ReturnType<typeof vi.fn>;
     listCollectionItems: ReturnType<typeof vi.fn>;
   };
 }
@@ -195,8 +198,61 @@ function buildClient(): FakeClient {
       getPrinting: vi.fn(),
     },
     collection: {
+      getCompletion: vi.fn(),
       listCollectionItems: vi.fn(),
     },
+  };
+}
+
+function makePerSetEntry(
+  partial: Partial<PerSetCompletionEntryDto> & {
+    setId: string;
+    setCode: string;
+    setName: string;
+  },
+): PerSetCompletionEntryDto {
+  return {
+    setId: partial.setId,
+    setCode: partial.setCode,
+    setName: partial.setName,
+    setPct: partial.setPct ?? 0,
+    masterPct: partial.masterPct ?? 0,
+    ownedNumbered: partial.ownedNumbered ?? 0,
+    totalNumbered: partial.totalNumbered ?? 0,
+    ownedMaster: partial.ownedMaster ?? 0,
+    totalMaster: partial.totalMaster ?? 0,
+  };
+}
+
+function makeCompletion(perSet: PerSetCompletionEntryDto[]): CompletionDto {
+  const computedGlobal = perSet.reduce(
+    (acc, row) => ({
+      ownedNumbered: acc.ownedNumbered + row.ownedNumbered,
+      totalNumbered: acc.totalNumbered + row.totalNumbered,
+      ownedMaster: acc.ownedMaster + row.ownedMaster,
+      totalMaster: acc.totalMaster + row.totalMaster,
+    }),
+    { ownedNumbered: 0, totalNumbered: 0, ownedMaster: 0, totalMaster: 0 },
+  );
+  const allPokemonPct =
+    computedGlobal.totalNumbered > 0
+      ? (computedGlobal.ownedNumbered / computedGlobal.totalNumbered) * 100
+      : 0;
+  const masterPct =
+    computedGlobal.totalMaster > 0
+      ? (computedGlobal.ownedMaster / computedGlobal.totalMaster) * 100
+      : 0;
+  return {
+    global: {
+      allPokemonPct,
+      masterPct,
+      uniqueCardsOwned: computedGlobal.ownedNumbered,
+      uniqueCardsTotal: computedGlobal.totalNumbered,
+      masterOwned: computedGlobal.ownedMaster,
+      masterTotal: computedGlobal.totalMaster,
+    },
+    perSet,
+    lastUpdatedAt: '2024-02-01T00:00:00Z',
   };
 }
 
@@ -276,6 +332,23 @@ function seedHappyPath(client: FakeClient): void {
       makeCollectionItem({ id: 'i2', printingId: 'p3' }),
     ]),
   );
+  // Server completion math: 2/2 numbered cards, 2/3 master printings
+  // (p1, p3 owned out of master-included p1/p2/p3 — p4 excluded).
+  client.collection.getCompletion.mockResolvedValue(
+    makeCompletion([
+      makePerSetEntry({
+        setId: 'set-1',
+        setCode: 'set-1',
+        setName: 'Base Set',
+        ownedNumbered: 2,
+        totalNumbered: 2,
+        setPct: 100,
+        masterPct: (2 / 3) * 100,
+        ownedMaster: 2,
+        totalMaster: 3,
+      }),
+    ]),
+  );
 }
 
 // ============================================================
@@ -313,6 +386,8 @@ describe('<CollectionSetScreen> — slug routing', () => {
   it('renders the not-found surface when no slug is supplied', async () => {
     paramsHolder.current = {};
     const client = buildClient();
+    client.collection.getCompletion.mockResolvedValue(makeCompletion([]));
+    client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
       expect(result.queryByTestId('collection-set-not-found')).not.toBeNull(),
@@ -324,6 +399,7 @@ describe('<CollectionSetScreen> — slug routing', () => {
     paramsHolder.current = { slug: 'en-unknown' };
     const client = buildClient();
     client.cards.listSets.mockResolvedValue(listSetsPage([SET]));
+    client.collection.getCompletion.mockResolvedValue(makeCompletion([]));
     client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
@@ -434,6 +510,7 @@ describe('<CollectionSetScreen> — render', () => {
     const client = buildClient();
     seedHappyPath(client);
     client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
+    client.collection.getCompletion.mockResolvedValue(makeCompletion([]));
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
       expect(result.queryByTestId('collection-set-owned-empty')).not.toBeNull(),
@@ -484,8 +561,72 @@ describe('<CollectionSetScreen> — render', () => {
     client.cards.listCardsInSet.mockRejectedValue(new Error('Catalog gone'));
     client.cards.listPrintingsForCard.mockResolvedValue([]);
     client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
+    client.collection.getCompletion.mockResolvedValue(makeCompletion([]));
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() => expect(result.queryByTestId('collection-set-error')).not.toBeNull());
     expect(result.container.textContent).toContain('Catalog gone');
+  });
+
+  it('shows an error state when the V2 completion query rejects', async () => {
+    paramsHolder.current = { slug: 'en-base1' };
+    const client = buildClient();
+    seedHappyPath(client);
+    client.collection.getCompletion.mockRejectedValue(new Error('Completion service down'));
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() => expect(result.queryByTestId('collection-set-error')).not.toBeNull());
+    expect(result.container.textContent).toContain('Completion service down');
+  });
+
+  it('renders all-zero header progress when the set is absent from the completion perSet', async () => {
+    paramsHolder.current = { slug: 'en-base1' };
+    const client = buildClient();
+    seedHappyPath(client);
+    // The server omits sets the user has no presence in. The
+    // screen must render the header as all-zeros (not crash).
+    client.collection.getCompletion.mockResolvedValue(makeCompletion([]));
+    client.collection.listCollectionItems.mockResolvedValue(listCollectionPage([]));
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('collection-set-screen')).not.toBeNull(),
+    );
+    const setProgress = result.getByTestId('collection-set-set-progress');
+    expect(setProgress.textContent).toContain('0%');
+    expect(setProgress.textContent).toContain('0/0');
+    const masterProgress = result.getByTestId('collection-set-master-progress');
+    expect(masterProgress.textContent).toContain('0%');
+  });
+
+  it('reads the header tallies from the V2 completion endpoint, not the on-device set-completion math', async () => {
+    paramsHolder.current = { slug: 'en-base1' };
+    const client = buildClient();
+    seedHappyPath(client);
+    // Override the server response with values that disagree with
+    // what `computeCompletionForSet` would compute on-device — the
+    // screen must trust the server.
+    client.collection.getCompletion.mockResolvedValue(
+      makeCompletion([
+        makePerSetEntry({
+          setId: 'set-1',
+          setCode: 'set-1',
+          setName: 'Base Set',
+          ownedNumbered: 7,
+          totalNumbered: 12,
+          setPct: 58.333,
+          masterPct: 25,
+          ownedMaster: 1,
+          totalMaster: 4,
+        }),
+      ]),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('collection-set-set-progress')).not.toBeNull(),
+    );
+    const setProgress = result.getByTestId('collection-set-set-progress');
+    expect(setProgress.textContent).toContain('58%');
+    expect(setProgress.textContent).toContain('7/12');
+    const masterProgress = result.getByTestId('collection-set-master-progress');
+    expect(masterProgress.textContent).toContain('25%');
+    expect(masterProgress.textContent).toContain('1/4');
   });
 });

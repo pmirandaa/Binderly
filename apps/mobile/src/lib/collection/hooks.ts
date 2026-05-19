@@ -36,6 +36,7 @@ import type { BinderlyClient } from '@binderly/api-client';
 import type {
   CardDto,
   CollectionItemDto,
+  CompletionDto,
   PrintingDto,
   PrintingWithContextDto,
 } from '@binderly/api-contracts';
@@ -49,6 +50,7 @@ const COLLECTION_PAGE_LIMIT = 200;
 /** Cache keys exposed for tests + invalidation. */
 export const COLLECTION_QUERY_KEYS = {
   items: () => ['collection', 'items'] as const,
+  completion: () => ['collection', 'completion'] as const,
   ownedContext: (printingId: string) =>
     ['collection', 'owned-context', printingId] as const,
   cardsInSet: (setId: string) => ['collection', 'cards-in-set', setId] as const,
@@ -84,6 +86,38 @@ export function useCollectionItemsQuery(
     queryFn: async () => {
       return fetchAllCollectionItems(client);
     },
+  });
+}
+
+// ============================================================
+// useCompletionQuery
+// ============================================================
+
+export type UseCompletionQueryResult = UseQueryResult<CompletionDto, Error>;
+
+export interface UseCompletionQueryOptions {
+  /** Toggle off when there is no signed-in user (suppresses 401s). */
+  readonly enabled?: boolean;
+}
+
+/**
+ * Authoritative server-side completion math — the V2 read endpoint
+ * `GET /v1/me/collection/completion`. Returns global + perSet
+ * tallies in one shot, replacing the iter-17/18 client-side
+ * fanout (`useCollectionItemsQuery` + `useOwnedPrintingsContextQuery`
+ * + `summarizeCollection`) the home screen relied on while the
+ * backend caught up. See `tasks/02-backend/T-BE-EDGE-FUNCTIONS-V2.md`
+ * for the endpoint contract.
+ */
+export function useCompletionQuery(
+  options: UseCompletionQueryOptions = {},
+): UseCompletionQueryResult {
+  const client = useApiClient();
+  const enabled = options.enabled ?? true;
+  return useQuery<CompletionDto, Error>({
+    queryKey: COLLECTION_QUERY_KEYS.completion(),
+    enabled,
+    queryFn: async () => client.collection.getCompletion(),
   });
 }
 
