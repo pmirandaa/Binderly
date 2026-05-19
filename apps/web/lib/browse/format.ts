@@ -5,7 +5,12 @@
 // future surface that wants the same release-date / language /
 // rarity copy can reuse it.
 
-import type { Language, Rarity, SetDto } from '@binderly/api-contracts';
+import type {
+  Language,
+  PrintingCurrentPriceFreshness,
+  Rarity,
+  SetDto,
+} from '@binderly/api-contracts';
 
 const RELEASE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   year: 'numeric',
@@ -83,6 +88,34 @@ const RARITY_LABELS: Record<Rarity, string> = {
 export function rarityLabel(rarity: Rarity | null): string {
   if (rarity === null) return 'Unknown rarity';
   return RARITY_LABELS[rarity];
+}
+
+/**
+ * Render the freshness band emitted by `printingCurrentPriceDto`
+ * (T-BE-EDGE-FUNCTIONS-V2). Pre-bucketed server-side so SSR +
+ * client + OG image render the same label.
+ */
+const FRESHNESS_LABELS: Record<PrintingCurrentPriceFreshness, string> = {
+  fresh: 'Fresh',
+  stale: 'Stale',
+  stale_old: 'Outdated',
+};
+
+export function freshnessLabel(freshness: PrintingCurrentPriceFreshness): string {
+  return FRESHNESS_LABELS[freshness];
+}
+
+/**
+ * Format the `computedAt` ISO timestamp from
+ * `printingCurrentPriceDto` as a short "Apr 5, 2026" date — the
+ * card-detail block surfaces this as supporting metadata under
+ * the freshness badge. Reuses `RELEASE_DATE_FORMAT` so the same
+ * locale rules apply.
+ */
+export function formatCurrentPriceComputedAt(iso: string, locale = 'en-US'): string {
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return iso;
+  return new Intl.DateTimeFormat(locale, RELEASE_DATE_FORMAT).format(new Date(ms));
 }
 
 /**

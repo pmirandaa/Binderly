@@ -10,6 +10,7 @@ import { vi } from 'vitest';
 import type {
   CardDto,
   CardWithPrintingsDto,
+  PrintingCurrentPriceDto,
   PrintingDto,
   PrintingWithContextDto,
   SetDto,
@@ -91,6 +92,31 @@ export function makeCardWithPrintings(
   };
 }
 
+/**
+ * Build a `PrintingCurrentPriceDto` test fixture. Default values
+ * mirror the V2 endpoint's `(RAW_NM, EBAY_US)` default slice with
+ * a representative fresh USD row (median $42.50, range $30–$70).
+ */
+export function makePrintingCurrentPrice(
+  overrides: Partial<PrintingCurrentPriceDto> = {},
+): PrintingCurrentPriceDto {
+  return {
+    printingId: '33333333-3333-3333-3333-333333333333',
+    gradeTier: 'RAW_NM',
+    market: 'EBAY_US',
+    currency: 'USD',
+    periodStart: '2026-05-12',
+    medianPrice: '42.50',
+    meanPrice: '45.10',
+    lowPrice: '30.00',
+    highPrice: '70.00',
+    sampleCount: 18,
+    computedAt: '2026-05-18T12:00:00.000Z',
+    freshness: 'fresh',
+    ...overrides,
+  };
+}
+
 export function makePrintingWithContext(
   overrides: Partial<PrintingWithContextDto> = {},
 ): PrintingWithContextDto {
@@ -161,6 +187,12 @@ export interface FakeBrowseApiOptions {
   sets?: SetDto[];
   setsBySetId?: Record<string, PrintingsForSet>;
   printingsById?: Record<string, PrintingWithContextDto>;
+  /**
+   * Map printing id → `PrintingCurrentPriceDto` for the new V2
+   * pricing read. Missing entries resolve to `null` (the 404
+   * sentinel — see `BrowseApi.getCurrentPrice` docstring).
+   */
+  currentPricesByPrintingId?: Record<string, PrintingCurrentPriceDto>;
   rejectAll?: Error;
 }
 
@@ -169,12 +201,14 @@ export interface FakeBrowseApi extends BrowseApi {
   getSet: ReturnType<typeof vi.fn>;
   listPrintingsInSet: ReturnType<typeof vi.fn>;
   getPrintingDetail: ReturnType<typeof vi.fn>;
+  getCurrentPrice: ReturnType<typeof vi.fn>;
 }
 
 export function createFakeBrowseApi(options: FakeBrowseApiOptions = {}): FakeBrowseApi {
   const sets = options.sets ?? [];
   const setsBySetId = options.setsBySetId ?? {};
   const printingsById = options.printingsById ?? {};
+  const currentPricesByPrintingId = options.currentPricesByPrintingId ?? {};
 
   const listAllSets = vi.fn(async () => {
     if (options.rejectAll !== undefined) throw options.rejectAll;
@@ -204,6 +238,10 @@ export function createFakeBrowseApi(options: FakeBrowseApiOptions = {}): FakeBro
     }
     return data;
   });
+  const getCurrentPrice = vi.fn(async (printingId: string) => {
+    if (options.rejectAll !== undefined) throw options.rejectAll;
+    return currentPricesByPrintingId[printingId] ?? null;
+  });
 
-  return { listAllSets, getSet, listPrintingsInSet, getPrintingDetail };
+  return { listAllSets, getSet, listPrintingsInSet, getPrintingDetail, getCurrentPrice };
 }

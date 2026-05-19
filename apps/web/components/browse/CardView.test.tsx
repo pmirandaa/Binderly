@@ -73,14 +73,14 @@ describe('CardView — success path', () => {
     expect(screen.getByTestId('card-meta-row-released').textContent ?? '').toMatch(/1999/);
   });
 
-  it('renders the prices placeholder section', async () => {
+  it('renders the prices block container with the section heading', async () => {
     const fixture = makeStandardPrintingFixture();
     const api = createFakeBrowseApi({ printingsById: { [PRINTING_ID]: fixture } });
     renderWithProviders(<CardView api={api} printingId={PRINTING_ID} />);
     await waitFor(() => {
-      expect(screen.getByTestId('card-prices-placeholder')).toBeInTheDocument();
+      expect(screen.getByTestId('card-prices')).toBeInTheDocument();
     });
-    expect(screen.getByTestId('card-prices-placeholder')).toHaveTextContent('Prices');
+    expect(screen.getByTestId('card-prices')).toHaveTextContent('Prices');
   });
 
   it('renders the BuyCta inside a "card-buy" section using card name + set + number', async () => {

@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import { makeSet } from './fixtures';
 import {
+  formatCurrentPriceComputedAt,
   formatReleaseDate,
+  freshnessLabel,
   languageLabel,
   printingDisplayName,
   rarityLabel,
@@ -83,5 +85,25 @@ describe('sortSetsByReleaseDateDesc', () => {
     const ids = sets.map((s) => s.id);
     sortSetsByReleaseDateDesc(sets);
     expect(sets.map((s) => s.id)).toEqual(ids);
+  });
+});
+
+describe('freshnessLabel', () => {
+  it('maps each band to a UI-friendly word', () => {
+    expect(freshnessLabel('fresh')).toBe('Fresh');
+    expect(freshnessLabel('stale')).toBe('Stale');
+    expect(freshnessLabel('stale_old')).toBe('Outdated');
+  });
+});
+
+describe('formatCurrentPriceComputedAt', () => {
+  it('renders an ISO timestamp as a short date', () => {
+    expect(
+      formatCurrentPriceComputedAt('2026-05-18T12:00:00.000Z', 'en-US'),
+    ).toMatch(/May 18, 2026/);
+  });
+
+  it('returns the raw string when the input is unparseable', () => {
+    expect(formatCurrentPriceComputedAt('not-a-date')).toBe('not-a-date');
   });
 });

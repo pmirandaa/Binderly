@@ -10,9 +10,11 @@
 // `context/data-model.md` "RLS policies (summary)"), so these
 // helpers don't need the AuthProvider's session.
 
+import { ApiNotFoundError } from '@binderly/api-client';
 import type { BinderlyClient } from '@binderly/api-client';
 import type {
   CardWithPrintingsDto,
+  PrintingCurrentPriceDto,
   PrintingWithContextDto,
   SetDto,
 } from '@binderly/api-contracts';
@@ -34,6 +36,20 @@ export interface BrowseApi {
     id: string,
     signal?: AbortSignal,
   ) => Promise<PrintingWithContextDto>;
+  /**
+   * Fetch the headline current-price row for a printing. Resolves
+   * to `null` if the server responds 404 (no `mv_current_price`
+   * row for this printing × default `(RAW_NM, EBAY_US)` slice),
+   * so the view can render an empty "no pricing data" state
+   * distinctly from a real error. Other errors propagate.
+   *
+   * V2 endpoint shipped with T-BE-EDGE-FUNCTIONS-V2 / PR #68;
+   * see `printingCurrentPriceDto` in `@binderly/api-contracts`.
+   */
+  readonly getCurrentPrice: (
+    printingId: string,
+    signal?: AbortSignal,
+  ) => Promise<PrintingCurrentPriceDto | null>;
 }
 
 export interface PrintingsForSet {
@@ -120,6 +136,21 @@ export function apiToBrowseApi(client: BinderlyClient): BrowseApi {
         id,
         ...(signal !== undefined ? { signal } : {}),
       });
+    },
+
+    async getCurrentPrice(printingId, signal): Promise<PrintingCurrentPriceDto | null> {
+      try {
+        return await client.pricing.getPrintingCurrentPrice({
+          printingId,
+          ...(signal !== undefined ? { signal } : {}),
+        });
+      } catch (error) {
+        // 404 → no row in `mv_current_price` for this slice yet.
+        // Resolve to `null` so the view can branch on "no data"
+        // distinctly from a real error state.
+        if (error instanceof ApiNotFoundError) return null;
+        throw error;
+      }
     },
   };
 }
