@@ -18,7 +18,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import { ApiNotFoundError } from '@binderly/api-client';
+import { ApiNotFoundError, ApiValidationError } from '@binderly/api-client';
 import type {
   CollectionItemDto,
   CustomCollectionDto,
@@ -38,7 +38,12 @@ import {
   formatTimestamp,
   truncateExpression,
 } from '../../../lib/collections/smart/format';
-import { runExpression, type SmartRunResult } from '../../../lib/collections/smart/run';
+import {
+  mapSmartPreviewResponse,
+  runExpression,
+  runMatchToView,
+  type SmartMatchView,
+} from '../../../lib/collections/smart/run';
 import { PageLoading } from '../../loading/PageLoading';
 
 import type {
@@ -70,6 +75,21 @@ type FetchState =
   | { kind: 'not-found' }
   | { kind: 'error'; message: string };
 
+type ServerRunResult =
+  | { kind: 'pending' }
+  | {
+      kind: 'server';
+      matches: SmartMatchView[];
+      totalCount: number;
+      truncated: boolean;
+    }
+  | {
+      kind: 'local-fallback';
+      matches: SmartMatchView[];
+      reason: string;
+    }
+  | { kind: 'error'; message: string };
+
 export function SmartDetailView({
   api,
   collectionId,
@@ -77,12 +97,12 @@ export function SmartDetailView({
   onDelete,
 }: SmartDetailViewProps): React.ReactNode {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
-  const [runResult, setRunResult] = useState<SmartRunResult | null>(null);
+  const [runResult, setRunResult] = useState<ServerRunResult>({ kind: 'pending' });
 
   useEffect(() => {
     const controller = new AbortController();
     setState({ kind: 'loading' });
-    setRunResult(null);
+    setRunResult({ kind: 'pending' });
     void Promise.all([
       api.getSmartCollection(collectionId, controller.signal),
       api.getSmartRule(collectionId, controller.signal),
@@ -138,16 +158,51 @@ export function SmartDetailView({
     };
   }, [api, collectionId]);
 
-  // Once the data is ready, run the expression. Separate effect so
-  // a re-render that doesn't change collectionId doesn't re-fetch
-  // the catalog.
+  // Once the data is ready, fire the canonical server preview.
+  // Separate effect so a re-render that doesn't change collectionId
+  // doesn't re-fetch the catalog. The V2 worker rejects
+  // `collection.*` predicates with 400 — when that happens we
+  // fall back to the local evaluator over the bounded preview
+  // (D4 in T-W-API-V2-WIRING.md).
   useEffect(() => {
     if (state.kind !== 'ready') return;
     if (state.expression === null) return;
     if (state.subscription.tier !== 'pro') return;
-    const result = runExpression(state.expression, state.preview, state.ownedItems);
-    setRunResult(result);
-  }, [state]);
+    const controller = new AbortController();
+    setRunResult({ kind: 'pending' });
+    const expression = state.expression;
+    const preview = state.preview;
+    const ownedItems = state.ownedItems;
+    void api
+      .runServerPreview({ expression }, controller.signal)
+      .then((response) => {
+        if (controller.signal.aborted) return;
+        const mapped = mapSmartPreviewResponse(response);
+        setRunResult({
+          kind: 'server',
+          matches: mapped.matches,
+          totalCount: mapped.totalCount,
+          truncated: mapped.nextOffset !== null,
+        });
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        const fallback = tryLocalFallback(err, expression, preview, ownedItems);
+        if (fallback !== null) {
+          setRunResult(fallback);
+          return;
+        }
+        const message =
+          err instanceof Error && err.message.length > 0
+            ? err.message
+            : 'Failed to evaluate this smart collection.';
+        setRunResult({ kind: 'error', message });
+      });
+    return (): void => {
+      controller.abort();
+    };
+  }, [api, state]);
 
   if (state.kind === 'not-found') {
     if (onNotFound !== undefined) onNotFound();
@@ -271,13 +326,54 @@ export function SmartDetailView({
             ) : null}
           </Card>
 
-          {expression !== null && runResult !== null ? (
+          {expression !== null ? (
             <YStack gap="$3" data-testid="smart-detail-results">
-              <Text variant="subtitle" data-testid="smart-detail-match-count">
-                {runResult.matches.length} match
-                {runResult.matches.length === 1 ? '' : 'es'}
-              </Text>
-              <MatchGrid matches={runResult.matches} testId="smart-detail-grid" />
+              {runResult.kind === 'pending' ? (
+                <PageLoading label="Re-running smart rule…" />
+              ) : runResult.kind === 'error' ? (
+                <YStack
+                  padding="$5"
+                  gap="$2"
+                  backgroundColor="$surfaceMuted"
+                  borderRadius={12}
+                  role="alert"
+                  data-testid="smart-detail-run-error"
+                >
+                  <Text variant="subtitle">Could not re-run this smart collection</Text>
+                  <Text variant="body" tone="muted">
+                    {runResult.message}
+                  </Text>
+                </YStack>
+              ) : (
+                <>
+                  <Text variant="subtitle" data-testid="smart-detail-match-count">
+                    {runResult.matches.length} match
+                    {runResult.matches.length === 1 ? '' : 'es'}
+                    {runResult.kind === 'server' && runResult.totalCount > runResult.matches.length
+                      ? ` of ${runResult.totalCount}`
+                      : ''}
+                  </Text>
+                  {runResult.kind === 'server' && runResult.truncated ? (
+                    <Text
+                      variant="caption"
+                      tone="muted"
+                      data-testid="smart-detail-truncated"
+                    >
+                      Showing the first page of matches.
+                    </Text>
+                  ) : null}
+                  {runResult.kind === 'local-fallback' ? (
+                    <Text
+                      variant="caption"
+                      tone="muted"
+                      data-testid="smart-detail-local-fallback"
+                    >
+                      Using local preview — {runResult.reason}
+                    </Text>
+                  ) : null}
+                  <MatchGrid matches={runResult.matches} testId="smart-detail-grid" />
+                </>
+              )}
             </YStack>
           ) : null}
         </>
@@ -294,6 +390,37 @@ export function SmartDetailView({
       </XStack>
     </YStack>
   );
+}
+
+/**
+ * Server-preview error → local fallback decision. Mirrors the
+ * editor's helper exactly: the V2 worker rejects `collection.*`
+ * predicates with `400 VALIDATION` today (Q-013); we detect that
+ * and re-run the saved expression against the bounded local
+ * preview so paid users still see usable results.
+ */
+function tryLocalFallback(
+  err: unknown,
+  expression: Expression,
+  preview: CatalogPreview,
+  ownedItems: ReadonlyArray<CollectionItemDto>,
+): { kind: 'local-fallback'; matches: SmartMatchView[]; reason: string } | null {
+  const isValidationError = err instanceof ApiValidationError;
+  const message = err instanceof Error ? err.message : '';
+  const mentionsCollection = /collection\./i.test(message);
+  if (!isValidationError && !mentionsCollection) return null;
+  try {
+    const local = runExpression(expression, preview, ownedItems);
+    return {
+      kind: 'local-fallback',
+      matches: local.matches.map(runMatchToView),
+      reason: isValidationError
+        ? 'the server cannot evaluate this expression yet (likely a `collection.*` predicate).'
+        : message,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function BackLink(): React.ReactNode {

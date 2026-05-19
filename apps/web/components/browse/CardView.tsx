@@ -20,9 +20,9 @@ import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
 import { formatReleaseDate, languageLabel, rarityLabel } from '../../lib/browse/format';
 import { BuyCta } from '../buy-cta';
+import { CardPriceBlock } from './CardPriceBlock';
 import { PageLoading } from '../loading/PageLoading';
 
-import { CardPriceBlock } from './CardPriceBlock';
 
 import type { BrowseApi } from '../../lib/browse/api';
 

@@ -27,13 +27,14 @@ import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
 import { ProgressBar } from './ProgressBar';
 import { formatReleaseDate } from '../../lib/browse/format';
-import type { CollectionApi } from '../../lib/collection/api';
 import {
   formatGlobalCount,
   formatOwnedCount,
   sortByCompletionThenRelease,
 } from '../../lib/collection/format';
 import { PageLoading } from '../loading/PageLoading';
+
+import type { CollectionApi } from '../../lib/collection/api';
 
 export interface CollectionViewProps {
   api: CollectionApi;

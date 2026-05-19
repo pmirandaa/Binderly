@@ -20,6 +20,8 @@ import type {
   CollectionItemDto,
   PrintingDto,
   SetDto,
+  SmartPreviewItemDto,
+  SmartPreviewResponseDto,
 } from '@binderly/api-contracts';
 import {
   evaluateExpression,
@@ -35,6 +37,7 @@ import {
   projectCandidateItem,
   type CatalogPreview,
 } from './api';
+import { variantClassLabel } from './format';
 
 
 /**
@@ -155,5 +158,84 @@ export function runExpression(
     previewLimit,
     explanation: explainExpression(expression),
     evaluatedAt: now(),
+  };
+}
+
+// ============================================================
+// Display view shape — bridges client-eval matches and server-
+// preview rows so <MatchGrid> can render both without forking.
+// ============================================================
+
+/**
+ * Narrow display tuple <MatchGrid> reads off each match row.
+ * Both the local `SmartRunMatch` (from `runExpression()`) and the
+ * server's `SmartPreviewItemDto` project into this shape — the
+ * grid stays a single component shared by both code paths.
+ */
+export interface SmartMatchView {
+  readonly printingId: string;
+  readonly cardId: string;
+  readonly setId: string;
+  readonly cardName: string;
+  readonly cardNumber: string;
+  readonly setName: string;
+  readonly variantLabel: string;
+  readonly imageSmallUrl: string | null;
+}
+
+/**
+ * Project a local `SmartRunMatch` (from `runExpression()`) into
+ * the shared display shape. `variantClass` is mapped to a human
+ * label via `variantClassLabel()`.
+ */
+export function runMatchToView(match: SmartRunMatch): SmartMatchView {
+  return {
+    printingId: match.printing.id,
+    cardId: match.card.id,
+    setId: match.set.id,
+    cardName: match.card.name,
+    cardNumber: match.card.number,
+    setName: match.set.name,
+    variantLabel: variantClassLabel(match.printing.variantClass),
+    imageSmallUrl: match.printing.imageSmallUrl,
+  };
+}
+
+/**
+ * Project a server `SmartPreviewItemDto` into the shared display
+ * shape. The server already formats `variantLabel`, so no
+ * conversion is needed.
+ */
+export function previewItemToView(item: SmartPreviewItemDto): SmartMatchView {
+  return {
+    printingId: item.printingId,
+    cardId: item.cardId,
+    setId: item.setId,
+    cardName: item.cardName,
+    cardNumber: item.cardNumber,
+    setName: item.setName,
+    variantLabel: item.variantLabel,
+    imageSmallUrl: item.imageSmallUrl,
+  };
+}
+
+/**
+ * Convenience: project an entire server preview response into
+ * display rows. Pure projection — `totalCount` / `nextOffset` are
+ * carried alongside for the result-summary copy.
+ */
+export interface SmartServerPreviewView {
+  readonly matches: SmartMatchView[];
+  readonly totalCount: number;
+  readonly nextOffset: number | null;
+}
+
+export function mapSmartPreviewResponse(
+  response: SmartPreviewResponseDto,
+): SmartServerPreviewView {
+  return {
+    matches: response.items.map(previewItemToView),
+    totalCount: response.totalCount,
+    nextOffset: response.nextOffset,
   };
 }

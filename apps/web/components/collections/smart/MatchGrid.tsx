@@ -10,12 +10,10 @@ import Link from 'next/link';
 
 import { Card, Text, XStack, YStack } from '@binderly/ui';
 
-import { variantClassLabel } from '../../../lib/collections/smart/format';
-
-import type { SmartRunMatch } from '../../../lib/collections/smart/run';
+import type { SmartMatchView } from '../../../lib/collections/smart/run';
 
 export interface MatchGridProps {
-  matches: ReadonlyArray<SmartRunMatch>;
+  matches: ReadonlyArray<SmartMatchView>;
   /**
    * Optional empty-state copy override. Defaults to a generic
    * "no matches" message; the saved-collection viewer can pass a
@@ -53,7 +51,7 @@ export function MatchGrid({
   return (
     <XStack flexWrap="wrap" gap="$4" data-testid={testId}>
       {matches.map((match) => (
-        <YStack key={match.printing.id} width={180} flexBasis={180}>
+        <YStack key={match.printingId} width={180} flexBasis={180}>
           <MatchTile match={match} />
         </YStack>
       ))}
@@ -62,13 +60,13 @@ export function MatchGrid({
 }
 
 interface MatchTileProps {
-  match: SmartRunMatch;
+  match: SmartMatchView;
 }
 
 function MatchTile({ match }: MatchTileProps): React.ReactNode {
-  const { printing, card, set } = match;
-  const href = `/cards/${encodeURIComponent(printing.id)}`;
-  const altText = `${card.name} #${card.number} (${variantClassLabel(printing.variantClass)})`;
+  const { printingId, cardName, cardNumber, setName, variantLabel, imageSmallUrl } = match;
+  const href = `/cards/${encodeURIComponent(printingId)}`;
+  const altText = `${cardName} #${cardNumber} (${variantLabel})`;
   return (
     <Link
       href={href}
@@ -92,10 +90,10 @@ function MatchTile({ match }: MatchTileProps): React.ReactNode {
           justifyContent="center"
           overflow="hidden"
         >
-          {printing.imageSmallUrl !== null ? (
+          {imageSmallUrl !== null ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
-              src={printing.imageSmallUrl}
+              src={imageSmallUrl}
               alt={altText}
               style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               data-testid="smart-match-image"
@@ -108,10 +106,10 @@ function MatchTile({ match }: MatchTileProps): React.ReactNode {
         </YStack>
         <YStack gap="$1">
           <Text variant="bodySmall" data-testid="smart-match-name">
-            #{card.number} · {card.name}
+            #{cardNumber} · {cardName}
           </Text>
           <Text variant="caption" tone="muted" data-testid="smart-match-meta">
-            {set.name} · {variantClassLabel(printing.variantClass)}
+            {setName} · {variantLabel}
           </Text>
         </YStack>
       </Card>

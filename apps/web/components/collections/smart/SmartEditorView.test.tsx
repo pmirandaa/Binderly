@@ -82,7 +82,7 @@ describe('SmartEditorView — parse feedback', () => {
 });
 
 describe('SmartEditorView — Run', () => {
-  it('runs the expression against the catalog preview and renders the match grid', async () => {
+  it('calls the server preview and renders the returned matches', async () => {
     const api = createFakeSmartCollectionsApi();
     renderWithProviders(<SmartEditorView api={api} initialText={VALID_EXPRESSION} />);
     await waitFor(() => {
@@ -93,12 +93,86 @@ describe('SmartEditorView — Run', () => {
       expect(screen.getByTestId('smart-editor-results-summary')).toBeInTheDocument();
     });
     // Fixture has three "Charizard" cards — base (en, 2 printings),
-    // swsh (en, 2 printings); JP card name is "リザードン" so it
-    // does NOT match `card.name === 'Charizard'`. 4 of 7 scanned.
+    // swsh (en, 2 printings); JP card name is "リザードン" so the
+    // VALID_EXPRESSION (card.name === 'Charizard') matches all 4
+    // English printings + the JP card's `name` is different so it
+    // does not match. 4 matches total.
+    expect(api.runServerPreview).toHaveBeenCalledTimes(1);
+    expect(api.runServerPreview.mock.calls[0]?.[0]).toMatchObject({
+      expression: { type: 'eq', field: 'card.name', value: 'Charizard' },
+    });
     expect(screen.getByTestId('smart-editor-results-summary').textContent).toContain(
-      '4 matches of 7 scanned',
+      '4 matches of 4 total',
     );
     expect(screen.getAllByTestId('smart-match-tile').length).toBe(4);
+  });
+
+  it('does NOT call the local evaluator when the server preview succeeds', async () => {
+    const api = createFakeSmartCollectionsApi();
+    renderWithProviders(<SmartEditorView api={api} initialText={VALID_EXPRESSION} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-run')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('smart-editor-run'));
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-results-summary')).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByTestId('smart-editor-results-local-fallback'),
+    ).toBeNull();
+  });
+
+  it('surfaces a Run failure inline without crashing the page', async () => {
+    const api = createFakeSmartCollectionsApi({
+      rejectServerPreview: new Error('worker timed out'),
+    });
+    renderWithProviders(<SmartEditorView api={api} initialText={VALID_EXPRESSION} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-run')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('smart-editor-run'));
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-run-error')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('smart-editor-run-error').textContent).toContain(
+      'worker timed out',
+    );
+    expect(screen.queryByTestId('smart-editor-results-summary')).toBeNull();
+  });
+
+  it('falls back to the local evaluator when the server rejects a `collection.*` predicate', async () => {
+    const { ApiValidationError } = await import('@binderly/api-client');
+    const api = createFakeSmartCollectionsApi({
+      rejectServerPreview: new ApiValidationError(
+        'collection.* predicates are not supported by the server preview yet',
+      ),
+    });
+    const COLLECTION_EXPRESSION = JSON.stringify({
+      type: 'and',
+      children: [
+        { type: 'eq', field: 'card.name', value: 'Charizard' },
+        { type: 'eq', field: 'collection.isOwned', value: true },
+      ],
+    });
+    renderWithProviders(
+      <SmartEditorView api={api} initialText={COLLECTION_EXPRESSION} />,
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-run')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('smart-editor-run'));
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-results-local-fallback')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByTestId('smart-editor-results-local-fallback').textContent,
+    ).toContain('Using local preview');
+    // 0 matches because the editor's local fallback runs with an
+    // empty owned-items array (the editor only fetches ownedItems
+    // count for stats, not the full list).
+    expect(screen.getByTestId('smart-editor-results-summary').textContent).toContain(
+      '0 matches',
+    );
   });
 
   it('Run is disabled while the textarea has a parse error', async () => {
@@ -109,6 +183,41 @@ describe('SmartEditorView — Run', () => {
     });
     expect(screen.getByTestId('smart-editor-run').getAttribute('aria-disabled')).toBe(
       'true',
+    );
+    expect(api.runServerPreview).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the truncation note when the server reports more matches than the current page', async () => {
+    const api = createFakeSmartCollectionsApi();
+    // Override the server preview to return a single match while
+    // signalling that more pages exist via a non-null nextOffset.
+    api.runServerPreview.mockResolvedValueOnce({
+      items: [
+        {
+          printingId: 'p-base-charizard-holo',
+          cardId: 'card-base-charizard',
+          setId: 'set-base',
+          cardName: 'Charizard',
+          cardNumber: '4',
+          setName: 'Base Set',
+          setCode: 'base1',
+          variantLabel: 'holo',
+          imageSmallUrl: null,
+        },
+      ],
+      totalCount: 12,
+      nextOffset: 1,
+    });
+    renderWithProviders(<SmartEditorView api={api} initialText={VALID_EXPRESSION} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-run')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByTestId('smart-editor-run'));
+    await waitFor(() => {
+      expect(screen.getByTestId('smart-editor-results-truncated')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('smart-editor-results-summary').textContent).toContain(
+      '1 match of 12 total',
     );
   });
 });

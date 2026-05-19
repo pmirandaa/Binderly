@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
+import type { SmartPreviewItemDto, SmartPreviewResponseDto } from '@binderly/api-contracts';
+
 import {
   fixtureCatalogPreview,
   makeCollectionItem,
   SMART_FIXTURE_EXPRESSION,
 } from './fixtures';
-import { parseSmartExpressionInput, runExpression } from './run';
+import {
+  mapSmartPreviewResponse,
+  parseSmartExpressionInput,
+  previewItemToView,
+  runExpression,
+  runMatchToView,
+} from './run';
 
 describe('parseSmartExpressionInput', () => {
   it('returns kind=empty for whitespace-only input', () => {
@@ -96,5 +104,82 @@ describe('runExpression', () => {
       now: () => '2099-12-31T23:59:59.000Z',
     });
     expect(result.evaluatedAt).toBe('2099-12-31T23:59:59.000Z');
+  });
+});
+
+describe('runMatchToView', () => {
+  it('projects a SmartRunMatch to the narrow display shape', () => {
+    const preview = fixtureCatalogPreview();
+    const result = runExpression(SMART_FIXTURE_EXPRESSION, preview, []);
+    const view = runMatchToView(result.matches[0]!);
+    expect(view.printingId).toBe(result.matches[0]!.printing.id);
+    expect(view.cardName).toBe(result.matches[0]!.card.name);
+    expect(view.cardNumber).toBe(result.matches[0]!.card.number);
+    expect(view.setName).toBe(result.matches[0]!.set.name);
+    expect(view.variantLabel.length).toBeGreaterThan(0);
+    expect(view.imageSmallUrl).toBe(result.matches[0]!.printing.imageSmallUrl);
+  });
+
+  it('humanises the variant class label', () => {
+    const preview = fixtureCatalogPreview();
+    const result = runExpression(SMART_FIXTURE_EXPRESSION, preview, []);
+    const view = runMatchToView(result.matches[0]!);
+    expect(view.variantLabel).not.toContain('_');
+    expect(view.variantLabel).toBe(view.variantLabel.toLowerCase());
+  });
+});
+
+describe('previewItemToView', () => {
+  it('projects a SmartPreviewItemDto verbatim into the display shape', () => {
+    const item: SmartPreviewItemDto = {
+      printingId: '11111111-1111-1111-1111-111111111111',
+      cardId: '22222222-2222-2222-2222-222222222222',
+      setId: '33333333-3333-3333-3333-333333333333',
+      cardName: 'Charizard',
+      cardNumber: '4',
+      setName: 'Base Set',
+      setCode: 'base1',
+      variantLabel: 'Holo',
+      imageSmallUrl: null,
+    };
+    const view = previewItemToView(item);
+    expect(view.printingId).toBe(item.printingId);
+    expect(view.cardName).toBe(item.cardName);
+    expect(view.variantLabel).toBe('Holo');
+    expect(view.imageSmallUrl).toBeNull();
+  });
+});
+
+describe('mapSmartPreviewResponse', () => {
+  it('maps items into views and forwards totalCount / nextOffset', () => {
+    const response: SmartPreviewResponseDto = {
+      items: [
+        {
+          printingId: '11111111-1111-1111-1111-111111111111',
+          cardId: '22222222-2222-2222-2222-222222222222',
+          setId: '33333333-3333-3333-3333-333333333333',
+          cardName: 'Charizard',
+          cardNumber: '4',
+          setName: 'Base Set',
+          setCode: 'base1',
+          variantLabel: 'Holo',
+          imageSmallUrl: null,
+        },
+      ],
+      totalCount: 42,
+      nextOffset: 1,
+    };
+    const out = mapSmartPreviewResponse(response);
+    expect(out.matches).toHaveLength(1);
+    expect(out.matches[0]?.printingId).toBe(response.items[0]?.printingId);
+    expect(out.totalCount).toBe(42);
+    expect(out.nextOffset).toBe(1);
+  });
+
+  it('returns an empty view for an empty response', () => {
+    const out = mapSmartPreviewResponse({ items: [], totalCount: 0, nextOffset: null });
+    expect(out.matches).toEqual([]);
+    expect(out.totalCount).toBe(0);
+    expect(out.nextOffset).toBeNull();
   });
 });

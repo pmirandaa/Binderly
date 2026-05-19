@@ -25,7 +25,6 @@ import { ApiNotFoundError } from '@binderly/api-client';
 import type {
   CardWithPrintingsDto,
   CollectionItemDto,
-  CompletionDto,
   PerSetCompletionEntryDto,
   PrintingDto,
 } from '@binderly/api-contracts';
@@ -37,7 +36,6 @@ import {
   languageLabel,
   printingDisplayName,
 } from '../../lib/browse/format';
-import type { CollectionApi, SetContents } from '../../lib/collection/api';
 import {
   conditionLabel,
   formatOwnedCount,
@@ -45,6 +43,8 @@ import {
 } from '../../lib/collection/format';
 import { PrintingThumbnail } from '../browse/PrintingThumbnail';
 import { PageLoading } from '../loading/PageLoading';
+
+import type { CollectionApi, SetContents } from '../../lib/collection/api';
 
 export type CollectionSetTab = 'owned' | 'missing';
 

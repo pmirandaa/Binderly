@@ -22,15 +22,18 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
+import { ApiValidationError } from '@binderly/api-client';
 import type { SubscriptionDto } from '@binderly/api-contracts';
 import { Button, Card, Input, Text, XStack, YStack } from '@binderly/ui';
 
 import { MatchGrid } from './MatchGrid';
 import { prettyPrintJson, slugify } from '../../../lib/collections/smart/format';
 import {
+  mapSmartPreviewResponse,
   parseSmartExpressionInput,
   runExpression,
-  type SmartRunResult,
+  runMatchToView,
+  type SmartMatchView,
 } from '../../../lib/collections/smart/run';
 import { PageLoading } from '../../loading/PageLoading';
 
@@ -75,6 +78,26 @@ type FetchState =
     }
   | { kind: 'error'; message: string };
 
+/**
+ * Result of a Run click. `kind` distinguishes the canonical
+ * server preview from the local-eval fallback used when the
+ * server rejects a `collection.*` predicate with 400.
+ */
+type RunResultView =
+  | {
+      kind: 'server';
+      matches: SmartMatchView[];
+      totalCount: number;
+      truncated: boolean;
+    }
+  | {
+      kind: 'local-fallback';
+      matches: SmartMatchView[];
+      scanned: number;
+      capped: boolean;
+      reason: string;
+    };
+
 export function SmartEditorView({
   api,
   onSaved,
@@ -82,8 +105,9 @@ export function SmartEditorView({
 }: SmartEditorViewProps): React.ReactNode {
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
   const [text, setText] = useState(initialText);
-  const [runResult, setRunResult] = useState<SmartRunResult | null>(null);
+  const [runResult, setRunResult] = useState<RunResultView | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
   const [saveOpen, setSaveOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -166,19 +190,35 @@ export function SmartEditorView({
 
   const { preview, subscription } = state;
   const isPro = subscription.tier === 'pro';
-  const canRun = parseResult.kind === 'parsed';
-  const canSave = isPro && canRun;
+  const canRun = parseResult.kind === 'parsed' && !running;
+  const canSave = isPro && parseResult.kind === 'parsed';
 
-  const handleRun = (): void => {
+  const handleRun = async (): Promise<void> => {
     if (parseResult.kind !== 'parsed') return;
+    setRunning(true);
+    setRunError(null);
+    setRunResult(null);
     try {
-      const result = runExpression(parseResult.expression, preview, []);
-      setRunResult(result);
-      setRunError(null);
+      const response = await api.runServerPreview({
+        expression: parseResult.expression,
+      });
+      const mapped = mapSmartPreviewResponse(response);
+      setRunResult({
+        kind: 'server',
+        matches: mapped.matches,
+        totalCount: mapped.totalCount,
+        truncated: mapped.nextOffset !== null,
+      });
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Run failed.';
-      setRunError(message);
-      setRunResult(null);
+      const fallback = tryLocalFallback(err, parseResult.expression, preview);
+      if (fallback !== null) {
+        setRunResult(fallback);
+      } else {
+        const message = err instanceof Error ? err.message : 'Run failed.';
+        setRunError(message);
+      }
+    } finally {
+      setRunning(false);
     }
   };
 
@@ -263,8 +303,9 @@ export function SmartEditorView({
 
         <XStack gap="$3" flexWrap="wrap" alignItems="center" data-testid="smart-editor-actions">
           <Button
-            label="Run"
+            label={running ? 'Running…' : 'Run'}
             disabled={!canRun}
+            loading={running}
             onPress={handleRun}
             data-testid="smart-editor-run"
             aria-label="Run expression"
@@ -312,17 +353,45 @@ export function SmartEditorView({
       {runResult !== null ? (
         <YStack gap="$3" data-testid="smart-editor-results">
           <YStack gap="$1">
-            <Text variant="subtitle" data-testid="smart-editor-results-summary">
-              {runResult.matches.length} match
-              {runResult.matches.length === 1 ? '' : 'es'} of {runResult.scanned}{' '}
-              scanned printing{runResult.scanned === 1 ? '' : 's'}
-            </Text>
-            {runResult.capped ? (
-              <Text variant="caption" tone="muted" data-testid="smart-editor-results-capped">
-                Preview capped at {runResult.previewLimit} printings — saving and
-                re-running on the server gives the full match list.
-              </Text>
-            ) : null}
+            {runResult.kind === 'server' ? (
+              <>
+                <Text variant="subtitle" data-testid="smart-editor-results-summary">
+                  {runResult.matches.length} match
+                  {runResult.matches.length === 1 ? '' : 'es'} of {runResult.totalCount}{' '}
+                  total
+                </Text>
+                {runResult.truncated ? (
+                  <Text
+                    variant="caption"
+                    tone="muted"
+                    data-testid="smart-editor-results-truncated"
+                  >
+                    Showing the first page — refine the expression or open the
+                    saved collection to scroll the remaining matches.
+                  </Text>
+                ) : null}
+              </>
+            ) : (
+              <>
+                <Text variant="subtitle" data-testid="smart-editor-results-summary">
+                  {runResult.matches.length} match
+                  {runResult.matches.length === 1 ? '' : 'es'} of {runResult.scanned}{' '}
+                  scanned printing{runResult.scanned === 1 ? '' : 's'}
+                </Text>
+                <Text
+                  variant="caption"
+                  tone="muted"
+                  data-testid="smart-editor-results-local-fallback"
+                >
+                  Using local preview — {runResult.reason}
+                </Text>
+                {runResult.capped ? (
+                  <Text variant="caption" tone="muted" data-testid="smart-editor-results-capped">
+                    Local preview capped at {state.preview.printings.length} printings.
+                  </Text>
+                ) : null}
+              </>
+            )}
           </YStack>
           <MatchGrid matches={runResult.matches} testId="smart-editor-grid" />
         </YStack>
@@ -342,6 +411,39 @@ export function SmartEditorView({
       ) : null}
     </YStack>
   );
+}
+
+/**
+ * Decide whether a Run server-preview error should fall back to
+ * the local in-browser evaluator. The V2 worker rejects
+ * `collection.*` predicates with `400 VALIDATION` (Q-013); we
+ * detect by either the typed error class or a substring match on
+ * the message and re-run locally so power users can still preview
+ * those rules. Other errors propagate to the run-error state.
+ */
+function tryLocalFallback(
+  err: unknown,
+  expression: Parameters<typeof runExpression>[0],
+  preview: CatalogPreview,
+): { kind: 'local-fallback'; matches: SmartMatchView[]; scanned: number; capped: boolean; reason: string } | null {
+  const isValidationError = err instanceof ApiValidationError;
+  const message = err instanceof Error ? err.message : '';
+  const mentionsCollection = /collection\./i.test(message);
+  if (!isValidationError && !mentionsCollection) return null;
+  try {
+    const local = runExpression(expression, preview, []);
+    return {
+      kind: 'local-fallback',
+      matches: local.matches.map(runMatchToView),
+      scanned: local.scanned,
+      capped: local.capped,
+      reason: isValidationError
+        ? 'the server cannot evaluate this expression yet (likely a `collection.*` predicate).'
+        : message,
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface ParseFeedbackProps {
