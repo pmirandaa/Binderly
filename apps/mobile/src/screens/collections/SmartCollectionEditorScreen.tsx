@@ -1,12 +1,11 @@
 // `<SmartCollectionEditorScreen>` — Smart Collection DSL editor.
 //
-// v1 preview design choice (documented in the PR + open-questions):
-// the Run preview evaluates the rule against the user's OWNED
-// printings — `useCollectionItemsQuery` + `useOwnedPrintingsContextQuery`
-// from `lib/collection`. This avoids fanning out hundreds of catalog
-// fetches just to populate a preview, and it answers the question
-// users actually ask first ("which of my cards match this rule?").
-// The catalog-wide preview is a follow-up tracked in the PR body.
+// v2 preview (T-M-API-V2-WIRING): the Run preview shells out to the
+// server-side `/v1/smart-collections/preview` endpoint (PR #68 /
+// T-BE-EDGE-FUNCTIONS-V2) via
+// `client.smartCollections.preview(...)`. Catalog-wide evaluation;
+// the iter-19 "owned printings only" quirk (#FU-22) goes away as
+// a side effect because the server walks the full catalog.
 //
 // Surface:
 //
@@ -16,8 +15,10 @@
 //     compact and points at JSON examples).
 //   - Live parse status: error message, or human explanation, below
 //     the input as the user types.
-//   - "Run" button: parses + evaluates + shows the matching grid +
-//     match count.
+//   - "Run" button: parses + posts the AST to the server preview +
+//     renders the matching grid + match count. The total-matches
+//     line surfaces `totalCount` (may exceed the page) so the user
+//     knows the preview is the first page.
 //   - "Save" button: paid-only. Free users see the button disabled
 //     with the upsell banner above it. Paid users tap → submit a
 //     create-smart request → navigate to /collections/smart/{id}.
@@ -27,27 +28,22 @@ import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet } from 'react-native';
 
+import type { SmartPreviewItemDto, SmartPreviewResponseDto } from '@binderly/api-contracts';
 import { Button, Card, Input, Spinner, Text, XStack, YStack } from '@binderly/ui';
 
 import { UpgradeBanner } from '../../components/collections/index.js';
 import { useAuth } from '../../components/providers/AuthProvider.js';
 import {
-  useCollectionItemsQuery,
-  useOwnedPrintingsContextQuery,
-} from '../../lib/collection/index.js';
-import {
-  evaluateAgainstCatalog,
   isPaidTier,
   parseDslText,
   slugify,
   useCreateCustomCollectionMutation,
+  useSmartPreviewMutation,
   useSubscriptionQuery,
-  type CatalogPrintingRow,
-  type EvaluateMatch,
   type ParseDslResult,
 } from '../../lib/collections/index.js';
 
-const PREVIEW_CAP = 200;
+const PREVIEW_LIMIT = 200;
 
 const styles = StyleSheet.create({
   gridContent: { padding: 12, gap: 12 },
@@ -62,16 +58,11 @@ export function SmartCollectionEditorScreen(): ReactNode {
   const signedIn = session !== null;
 
   const subscriptionQuery = useSubscriptionQuery({ enabled: signedIn });
-  const itemsQuery = useCollectionItemsQuery({ enabled: signedIn });
-  const printingIds = useMemo(
-    () => (itemsQuery.data ?? []).map((item) => item.printingId).slice(0, PREVIEW_CAP),
-    [itemsQuery.data],
-  );
-  const contextQuery = useOwnedPrintingsContextQuery(printingIds);
   const createMutation = useCreateCustomCollectionMutation();
+  const previewMutation = useSmartPreviewMutation();
 
   const [text, setText] = useState('');
-  const [matches, setMatches] = useState<EvaluateMatch[] | null>(null);
+  const [matches, setMatches] = useState<SmartPreviewResponseDto | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
 
   const [saveOpen, setSaveOpen] = useState(false);
@@ -81,22 +72,6 @@ export function SmartCollectionEditorScreen(): ReactNode {
 
   const parseResult = useMemo<ParseDslResult>(() => parseDslText(text), [text]);
   const paid = isPaidTier(subscriptionQuery);
-
-  const catalog = useMemo<CatalogPrintingRow[]>(() => {
-    // `PrintingWithContextDto` extends `PrintingDto` with `card` and
-    // `set`, so the printing portion is just the same row minus the
-    // two embedded join fields. Spread + delete keeps the projection
-    // honest without enumerating every printing field.
-    return contextQuery.data.map((ctx) => {
-      const { card, set, ...printing } = ctx;
-      return { card, set, printing };
-    });
-  }, [contextQuery.data]);
-
-  const ownedSet = useMemo(
-    () => new Set(printingIds),
-    [printingIds],
-  );
 
   const handleSignIn = useCallback(() => router.push('/auth/sign-in'), [router]);
   const handleCancel = useCallback(() => router.back(), [router]);
@@ -108,15 +83,20 @@ export function SmartCollectionEditorScreen(): ReactNode {
       return;
     }
     setRunError(null);
-    try {
-      const result = evaluateAgainstCatalog(parseResult.expression, catalog, ownedSet);
-      setMatches(result);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : 'Failed to evaluate rule.';
-      setRunError(message);
-      setMatches(null);
-    }
-  }, [parseResult, catalog, ownedSet]);
+    previewMutation.mutate(
+      { expression: parseResult.expression, limit: PREVIEW_LIMIT },
+      {
+        onSuccess: (response) => {
+          setMatches(response);
+        },
+        onError: (cause) => {
+          const message = cause instanceof Error ? cause.message : 'Failed to evaluate rule.';
+          setRunError(message);
+          setMatches(null);
+        },
+      },
+    );
+  }, [parseResult, previewMutation]);
 
   const handleOpenSave = useCallback(() => {
     if (parseResult.status !== 'ok') return;
@@ -153,8 +133,8 @@ export function SmartCollectionEditorScreen(): ReactNode {
   }, [parseResult, saveName, saveDescription, createMutation, router]);
 
   const renderItem = useCallback(
-    ({ item }: { item: EvaluateMatch }) => (
-      <SmartPreviewTile match={item} />
+    ({ item }: { item: SmartPreviewItemDto }) => (
+      <SmartPreviewTile item={item} />
     ),
     [],
   );
@@ -167,7 +147,7 @@ export function SmartCollectionEditorScreen(): ReactNode {
     return <EditorSignInPrompt onSignIn={handleSignIn} />;
   }
 
-  const runDisabled = parseResult.status !== 'ok';
+  const runDisabled = parseResult.status !== 'ok' || previewMutation.isPending;
   const saveDisabled = !paid || parseResult.status !== 'ok';
 
   return (
@@ -200,10 +180,11 @@ export function SmartCollectionEditorScreen(): ReactNode {
         ) : null}
         <XStack gap="$2" flexWrap="wrap">
           <Button
-            label="Run"
+            label={previewMutation.isPending ? 'Running…' : 'Run'}
             variant="primary"
             size="md"
             disabled={runDisabled}
+            loading={previewMutation.isPending}
             onPress={handleRun}
             accessibilityLabel="Run query"
             testID="smart-editor-run"
@@ -251,12 +232,12 @@ export function SmartCollectionEditorScreen(): ReactNode {
         <YStack flex={1}>
           <YStack paddingHorizontal="$4" paddingBottom="$2">
             <Text variant="caption" tone="muted" testID="smart-editor-match-count">
-              {matches.length} {matches.length === 1 ? 'match' : 'matches'} (preview cap: {PREVIEW_CAP})
+              {formatMatchCount(matches, PREVIEW_LIMIT)}
             </Text>
           </YStack>
           <FlatList
-            data={matches}
-            keyExtractor={(item) => item.printing.id}
+            data={matches.items}
+            keyExtractor={(item) => item.printingId}
             renderItem={renderItem}
             numColumns={2}
             contentContainerStyle={styles.gridContent}
@@ -309,11 +290,11 @@ function DslStatusLine(props: DslStatusLineProps): ReactNode {
 }
 
 interface SmartPreviewTileProps {
-  readonly match: EvaluateMatch;
+  readonly item: SmartPreviewItemDto;
 }
 
 function SmartPreviewTile(props: SmartPreviewTileProps): ReactNode {
-  const { match } = props;
+  const { item } = props;
   return (
     <YStack
       flex={1}
@@ -321,19 +302,43 @@ function SmartPreviewTile(props: SmartPreviewTileProps): ReactNode {
       padding="$2"
       borderRadius={8}
       backgroundColor="$surfaceMuted"
-      testID={`smart-editor-match-${match.printing.id}`}
+      testID={`smart-editor-match-${item.printingId}`}
     >
       <Text variant="label" tone="default" numberOfLines={1}>
-        {match.card.name}
+        {item.cardName}
       </Text>
       <Text variant="caption" tone="muted" numberOfLines={1}>
-        {match.set.name} #{match.card.number}
+        {item.setName} #{item.cardNumber}
       </Text>
-      <Text variant="caption" tone={match.owned ? 'default' : 'muted'}>
-        {match.owned ? 'Owned' : 'Not owned'}
-      </Text>
+      {item.variantLabel.length > 0 ? (
+        <Text variant="caption" tone="muted" numberOfLines={1}>
+          {item.variantLabel}
+        </Text>
+      ) : null}
     </YStack>
   );
+}
+
+/**
+ * Render the "N matches" caption for the preview header.
+ *
+ * - Single page (`nextOffset === null`) ⇒ exact match count.
+ * - Server reports a higher `totalCount` than the page returned
+ *   ⇒ surface "Showing M of N matches" so the user knows the
+ *   preview is paginated.
+ * - The server caps `totalCount` at 100k for the count query
+ *   per the V2 handler docstring; if we're at the cap and there
+ *   are still more rows, append a `+` suffix.
+ */
+function formatMatchCount(response: SmartPreviewResponseDto, pageLimit: number): string {
+  const shown = response.items.length;
+  const total = response.totalCount;
+  const noun = total === 1 ? 'match' : 'matches';
+  if (response.nextOffset === null && total === shown) {
+    return `${shown} ${noun}`;
+  }
+  const totalLabel = total >= 100_000 ? '100,000+' : String(total);
+  return `Showing ${shown} of ${totalLabel} ${noun} (page size ${pageLimit})`;
 }
 
 interface SaveModalProps {

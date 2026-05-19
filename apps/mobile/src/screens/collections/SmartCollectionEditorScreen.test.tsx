@@ -7,7 +7,8 @@ import type {
   CollectionItemDto,
   CustomCollectionDto,
   PaginatedResponse,
-  PrintingWithContextDto,
+  SmartPreviewItemDto,
+  SmartPreviewResponseDto,
   SubscriptionDto,
 } from '@binderly/api-contracts';
 
@@ -71,91 +72,10 @@ function makeSubscription(tier: 'free' | 'pro'): SubscriptionDto {
   };
 }
 
-function makeOwnedItem(
-  partial: { id: string; printingId: string },
-): CollectionItemDto {
-  return {
-    id: partial.id,
-    userId: '00000000-0000-4000-8000-000000000001',
-    printingId: partial.printingId,
-    quantity: 1,
-    condition: 'NEAR_MINT',
-    gradeCompany: null,
-    grade: null,
-    acquiredAt: null,
-    acquiredPrice: null,
-    acquiredCurrency: null,
-    notes: null,
-    photoUrls: [],
-    source: 'manual',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-  };
-}
-
 function listCollectionPage(
   items: CollectionItemDto[],
 ): PaginatedResponse<CollectionItemDto> {
   return { items, nextCursor: null };
-}
-
-function makePrintingContext(partial: {
-  id: string;
-  cardId: string;
-  setId: string;
-  cardName?: string;
-}): PrintingWithContextDto {
-  const setId = partial.setId;
-  return {
-    id: partial.id,
-    variantKey: `en-card-${partial.cardId}-std`,
-    cardId: partial.cardId,
-    variantClass: 'NON_HOLO',
-    variantFlags: [],
-    variantCode: 'std',
-    includeInMasterSet: true,
-    imageSmallUrl: null,
-    imageLargeUrl: null,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    card: {
-      id: partial.cardId,
-      canonicalKey: `en-card-${partial.cardId}`,
-      setId,
-      language: 'en',
-      number: '1',
-      name: partial.cardName ?? `Card ${partial.cardId}`,
-      nameLocalized: null,
-      type: null,
-      subtype: null,
-      hp: null,
-      illustrator: null,
-      flavorText: null,
-      attacks: null,
-      weakness: null,
-      resistance: null,
-      retreatCost: null,
-      rarity: null,
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-    },
-    set: {
-      id: setId,
-      canonicalKey: `en-${setId}`,
-      code: setId,
-      language: 'en',
-      name: `Set ${setId}`,
-      series: 'Series',
-      releaseDate: '2024-01-01',
-      printedTotal: 100,
-      total: 100,
-      logoUrl: null,
-      symbolUrl: null,
-      masterSetRules: {},
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-01T00:00:00Z',
-    },
-  };
 }
 
 interface FakeClient {
@@ -173,6 +93,7 @@ interface FakeClient {
   };
   cards: { getPrinting: ReturnType<typeof vi.fn> };
   profile: { getMySubscription: ReturnType<typeof vi.fn> };
+  smartCollections: { preview: ReturnType<typeof vi.fn> };
 }
 
 function buildClient(): FakeClient {
@@ -191,6 +112,37 @@ function buildClient(): FakeClient {
     },
     cards: { getPrinting: vi.fn() },
     profile: { getMySubscription: vi.fn() },
+    smartCollections: { preview: vi.fn() },
+  };
+}
+
+function makePreviewItem(
+  partial: Partial<SmartPreviewItemDto> & {
+    printingId: string;
+    cardId: string;
+    setId: string;
+  },
+): SmartPreviewItemDto {
+  return {
+    printingId: partial.printingId,
+    cardId: partial.cardId,
+    setId: partial.setId,
+    cardName: partial.cardName ?? `Card ${partial.cardId}`,
+    cardNumber: partial.cardNumber ?? '1',
+    setName: partial.setName ?? `Set ${partial.setId}`,
+    setCode: partial.setCode ?? partial.setId,
+    variantLabel: partial.variantLabel ?? '',
+    imageSmallUrl: partial.imageSmallUrl ?? null,
+  };
+}
+
+function makePreviewResponse(
+  partial: Partial<SmartPreviewResponseDto> & { items: SmartPreviewItemDto[] },
+): SmartPreviewResponseDto {
+  return {
+    items: partial.items,
+    totalCount: partial.totalCount ?? partial.items.length,
+    nextOffset: partial.nextOffset !== undefined ? partial.nextOffset : null,
   };
 }
 
@@ -358,38 +310,28 @@ describe('<SmartCollectionEditorScreen> — Run', () => {
     expect(result.getByTestId('smart-editor-run').getAttribute('aria-disabled')).toBe('true');
   });
 
-  it('runs the rule against owned printings + renders the match grid', async () => {
+  it('runs the rule via the V2 server preview + renders the match grid', async () => {
     const client = buildClient();
     client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
-    client.collection.listCollectionItems.mockResolvedValue(
-      listCollectionPage([
-        makeOwnedItem({ id: 'i1', printingId: 'p1' }),
-        makeOwnedItem({ id: 'i2', printingId: 'p2' }),
-      ]),
+    client.smartCollections.preview.mockResolvedValue(
+      makePreviewResponse({
+        items: [
+          makePreviewItem({
+            printingId: 'p1',
+            cardId: 'c1',
+            setId: 'set-a',
+            cardName: 'Charizard',
+            cardNumber: '4',
+            setName: 'Base Set',
+          }),
+        ],
+        totalCount: 1,
+      }),
     );
-    client.cards.getPrinting.mockImplementation(async ({ id }: { id: string }) => {
-      if (id === 'p1')
-        return makePrintingContext({
-          id: 'p1',
-          cardId: 'c1',
-          setId: 'set-a',
-          cardName: 'Charizard',
-        });
-      return makePrintingContext({
-        id: 'p2',
-        cardId: 'c2',
-        setId: 'set-a',
-        cardName: 'Bulbasaur',
-      });
-    });
     const result = renderScreen({ client, session: SIGNED_IN });
     await waitFor(() =>
       expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
     );
-    // Wait for the printings context to load before running.
-    await waitFor(() => {
-      expect(client.cards.getPrinting).toHaveBeenCalled();
-    });
     await act(async () => {
       setEditorText(result, '{"type":"eq","field":"card.name","value":"Charizard"}');
     });
@@ -399,9 +341,183 @@ describe('<SmartCollectionEditorScreen> — Run', () => {
     await waitFor(() =>
       expect(result.queryByTestId('smart-editor-match-count')).not.toBeNull(),
     );
+    expect(client.smartCollections.preview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        expression: { type: 'eq', field: 'card.name', value: 'Charizard' },
+      }),
+    );
     expect(result.getByTestId('smart-editor-match-count').textContent).toContain('1 match');
     expect(result.queryByTestId('smart-editor-match-p1')).not.toBeNull();
-    expect(result.queryByTestId('smart-editor-match-p2')).toBeNull();
+  });
+
+  it('renders catalog-wide matches the user does not own (closes #FU-22)', async () => {
+    // The owned-only quirk goes away once Run uses the server
+    // preview — the editor must render results regardless of
+    // whether the user holds the printing. No "Owned" / "Not
+    // owned" chip on the tiles either; the wire shape doesn't
+    // carry it.
+    const client = buildClient();
+    client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
+    client.smartCollections.preview.mockResolvedValue(
+      makePreviewResponse({
+        items: [
+          makePreviewItem({
+            printingId: 'p-unknown',
+            cardId: 'c-unknown',
+            setId: 'set-z',
+            cardName: 'Charizard',
+            setName: 'Some Set',
+          }),
+        ],
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
+    );
+    await act(async () => {
+      setEditorText(result, '{"type":"eq","field":"card.name","value":"Charizard"}');
+    });
+    await act(async () => {
+      fireEvent.click(result.getByTestId('smart-editor-run'));
+    });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-match-p-unknown')).not.toBeNull(),
+    );
+    const tile = result.getByTestId('smart-editor-match-p-unknown');
+    expect(tile.textContent).not.toContain('Owned');
+    expect(tile.textContent).not.toContain('Not owned');
+  });
+
+  it('renders the "showing M of N" caption when the server reports more matches than fit on a page', async () => {
+    const client = buildClient();
+    client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
+    client.smartCollections.preview.mockResolvedValue(
+      makePreviewResponse({
+        items: [
+          makePreviewItem({ printingId: 'p1', cardId: 'c1', setId: 'set-a' }),
+          makePreviewItem({ printingId: 'p2', cardId: 'c2', setId: 'set-a' }),
+        ],
+        totalCount: 425,
+        nextOffset: 200,
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
+    );
+    await act(async () => {
+      setEditorText(result, '{"type":"eq","field":"card.name","value":"Charizard"}');
+    });
+    await act(async () => {
+      fireEvent.click(result.getByTestId('smart-editor-run'));
+    });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-match-count')).not.toBeNull(),
+    );
+    expect(result.getByTestId('smart-editor-match-count').textContent).toContain(
+      'Showing 2 of 425',
+    );
+  });
+
+  it('surfaces a server-side error via the run-error band', async () => {
+    const client = buildClient();
+    client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
+    client.smartCollections.preview.mockRejectedValue(
+      new Error('preview unsupported for user-state predicates'),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
+    );
+    await act(async () => {
+      setEditorText(result, '{"type":"eq","field":"collection.isOwned","value":true}');
+    });
+    await act(async () => {
+      fireEvent.click(result.getByTestId('smart-editor-run'));
+    });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-run-error')).not.toBeNull(),
+    );
+    expect(result.getByTestId('smart-editor-run-error').textContent).toContain(
+      'preview unsupported',
+    );
+    expect(result.queryByTestId('smart-editor-matches')).toBeNull();
+  });
+
+  it('renders the empty-matches state when the server returns zero items', async () => {
+    const client = buildClient();
+    client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
+    client.smartCollections.preview.mockResolvedValue(
+      makePreviewResponse({ items: [], totalCount: 0 }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
+    );
+    await act(async () => {
+      setEditorText(result, '{"type":"eq","field":"card.name","value":"Nope"}');
+    });
+    await act(async () => {
+      fireEvent.click(result.getByTestId('smart-editor-run'));
+    });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-no-matches')).not.toBeNull(),
+    );
+  });
+
+  it('does not call the legacy owned-printings fanout (getPrinting / listCollectionItems) on Run', async () => {
+    const client = buildClient();
+    client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
+    client.smartCollections.preview.mockResolvedValue(
+      makePreviewResponse({ items: [], totalCount: 0 }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
+    );
+    await act(async () => {
+      setEditorText(result, '{"type":"eq","field":"card.name","value":"Anything"}');
+    });
+    await act(async () => {
+      fireEvent.click(result.getByTestId('smart-editor-run'));
+    });
+    await waitFor(() => {
+      expect(client.smartCollections.preview).toHaveBeenCalled();
+    });
+    expect(client.cards.getPrinting).not.toHaveBeenCalled();
+    expect(client.collection.listCollectionItems).not.toHaveBeenCalled();
+  });
+
+  it('disables Run while the preview request is in flight', async () => {
+    const client = buildClient();
+    client.profile.getMySubscription.mockResolvedValue(makeSubscription('free'));
+    let resolvePreview: ((value: SmartPreviewResponseDto) => void) | undefined;
+    client.smartCollections.preview.mockReturnValue(
+      new Promise<SmartPreviewResponseDto>((resolve) => {
+        resolvePreview = resolve;
+      }),
+    );
+    const result = renderScreen({ client, session: SIGNED_IN });
+    await waitFor(() =>
+      expect(result.queryByTestId('smart-editor-input')).not.toBeNull(),
+    );
+    await act(async () => {
+      setEditorText(result, '{"type":"eq","field":"card.name","value":"Charizard"}');
+    });
+    await act(async () => {
+      fireEvent.click(result.getByTestId('smart-editor-run'));
+    });
+    await waitFor(() =>
+      expect(result.getByTestId('smart-editor-run').getAttribute('aria-disabled')).toBe('true'),
+    );
+    expect(result.getByTestId('smart-editor-run').getAttribute('aria-busy')).toBe('true');
+    await act(async () => {
+      resolvePreview?.(makePreviewResponse({ items: [], totalCount: 0 }));
+    });
+    await waitFor(() =>
+      expect(result.getByTestId('smart-editor-run').getAttribute('aria-busy')).not.toBe('true'),
+    );
   });
 });
 
