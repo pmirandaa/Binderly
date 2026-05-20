@@ -616,7 +616,22 @@ At v1 beta launch (EN-only catalog, ~3-5 k printings), the same inner loop proje
 
 **Recommendation:** defer the decision to T-SC-MATCH. It will have real-world miss-rate data from end-to-end testing, which is the only way to choose between accuracy-vs-latency tradeoffs honestly. Document the chosen path in T-SC-MATCH's brief.
 
-**Pablo's answer:** _(empty until answered)_
+**Pablo's answer:** choose accuracy, but also keep latency as low as possible.
+
+**Orchestrator interpretation + plan (2026-05-20):**
+
+Among the four options Pablo's directive maps cleanly to **Option 2 — native SIMD inner loop**:
+
+- Option 1 (pre-cluster) → trades recall for latency → rejected (accuracy-first).
+- **Option 2 (native SIMD: `vDSP_distancesq` on iOS Accelerate.framework + ARM Neon intrinsics on Android via JNI) → preserves 100 % recall (same brute-force, just vectorised), ~10-20× faster than pure JS → BEST MATCH.**
+- Option 3 (HNSW / IVF-PQ) → approximate, trades small recall for large latency win → rejected (accuracy-first).
+- Option 4 (debounced off-worklet) → adds visible recognition lag without accuracy gain → rejected.
+
+Option 2 is a proper Expo Module (Swift package + podspec, Kotlin AAR + autolinking, Expo plugin to register both in the project, TS wrapper with feature-detection fallback to the existing pure-JS path) — substantively its own task, not something to fold into T-SC-MATCH.
+
+T-SC-MATCH consumes `searchKNN()` through the existing TS surface, so a later transparent swap to a native-backed implementation is the right shape. **Logged as #FU-29 → `T-SC-ANN-NATIVE`** in `status.md`'s Known Follow-ups; the file at `apps/mobile/src/scanner/ann/search.ts` is the swap point.
+
+**Status: deferred to #FU-29.** Non-blocking for the scanner read-path closer (v1 beta catalog ~3-5 k printings stays inside the 30 ms budget on the pure-JS path; the native swap is needed before the catalog grows past ~10 k printings).
 
 ---
 
