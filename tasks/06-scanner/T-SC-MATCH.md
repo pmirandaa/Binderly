@@ -244,4 +244,51 @@ Stop and surface to orchestrator if:
 
 ## Notes from execution
 
-(Sub-agent appends here at end.)
+Shipped 9 source files + 8 test files under `apps/mobile/src/scanner/match/`:
+
+- `constants.ts` — 7 tunables matching the brief's defaults.
+- `types.ts` — `MatchResult`, `MatchSink`, `MatchQueue`,
+  `MatchConfig`, `EmbedCrop`, `SearchFn`, `MatcherDeps`,
+  `MatcherHandle`, `UseScannerOptions`, `UseScannerResult`.
+- `confidence.ts` — pure `classifyConfidence()` returning
+  `{ disposition, confidence, topGap, printingId }`.
+- `stability.ts` — mutable state machine: stability counter +
+  post-fire cooldown. `advanceStability()` handles the
+  card-removed branch (gap > stackResetMs) inline.
+- `match-sink.ts` / `match-queue.ts` — JS-thread bus + bounded
+  FIFO; mirror the upstream `DetectionSink` posture.
+- `matcher.ts` — core orchestrator. Async-debouncing via a
+  single `pending` slot (newest wins); `try/catch` around both
+  `embedCrop()` and `searchKNN()` so a single bad frame can't
+  kill the matcher.
+- `use-scanner.ts` — React hook; subscribes to the
+  `DetectionSink` and tears down on unmount.
+- `index.ts` — public barrel.
+
+**Bridge to embed module:** the elaborated brief called out that
+`EmbeddingModelHandle.embed()` accepts an `EmbedFrameInput` (raw
+uint8 RGB + `toArrayBuffer()`), not the detect stage's already-
+normalised Float32 crop. Matcher accepts an `embedCrop(crop:
+Float32Array) => Promise<Float32Array>` adapter so the seam
+lives entirely in the screen layer (T-SC-UX) where both handles
+are colocated. This kept `match/` from needing to touch sibling
+owns_paths.
+
+**Off-worklet posture verified:** the `useDetectFrameProcessor`
+hook upstream already routes via `useRunOnJS`; this layer
+subscribes on the JS thread. No `runOnJS` calls from the matcher;
+no deadlock surface. The `useRunOnJS` test mock resolves
+synchronously, so the rapid-fire test case fires through the
+async-debounce without hanging.
+
+**Confidence defaults:** first-principles for L2-normalised
+MobileNetV3-Small cosine. Auto-add at 0.78 with a 0.04 top gap;
+disambig floor 0.55. Real calibration is a follow-up — logged
+for orchestrator to file as #FU-30 (confidence calibration on
+labeled real-phone scans) when stitching the parallel-pair
+closure with T-GR-CAPTURE-UX.
+
+**Local CI:** 792/792 mobile tests (+72 new under
+`scanner/match/__tests__/`), workspace lint/typecheck/build all
+green. GH Actions skipped per orchestrator guidance (~90 %
+monthly quota).
