@@ -267,8 +267,7 @@ preserves the build. Documented prominently in the PR body so
 the orchestrator can rescope T-W-COLLECTION /
 T-W-PROFILE / etc. when those tasks dispatch.
 
-**Pablo's answer:** _(empty until answered — proceeding with
-recommendation in this PR; revert is one-line if rejected)_
+**Pablo's answer:** option 1 is ok, good choice
 
 ---
 
@@ -311,9 +310,7 @@ When `mv_user_set_completion` ships:
 3. The drill-down's per-set computation can stay as-is — having the full roster
    on hand is useful for the "Missing" tab anyway.
 
-**Pablo's answer:** _(empty — proceeding with on-device computation per partial
-roster; documented prominently in the PR body so the orchestrator can rescope
-when T-BE-EDGE-FUNCTIONS dispatches)_
+**Pablo's answer:** your approach is fine, just make sure to use the materialized view when the endpoint becomes available
 
 ---
 
@@ -368,7 +365,7 @@ an affiliate id lands in the environment, so users see the same
 The URL template change, when it lands, is a 5-line edit in two
 files + a test update.
 
-**Pablo's answer:** _(empty until answered)_
+**Pablo's answer:** leave placeholder, I'll look into this later
 
 ---
 
@@ -450,9 +447,7 @@ The web data layer in this PR drops in unchanged — only the
 runtime adapter swaps the degraded synthesis for a direct
 `getPublicShareablePayload(...)` call.
 
-**Pablo's answer:** _(empty — proceeding with degraded runtime
-adapter + injectable test fake; backend follow-up flagged for the
-next backend iteration)_
+**Pablo's answer:** go with option 1
 
 **Status:** ~~Open~~ **CLOSED — 2026-05-19** by
 T-BE-EDGE-FUNCTIONS-V2. Option 1 shipped:
@@ -579,7 +574,7 @@ correct, and the frontend follow-ups are unblocked. Schedule:
   accepts the DSL AST as `jsonb` and returns matching printings;
   swap the preview handler to call it.
 
-**Pablo's answer:** _(empty until answered)_
+**Pablo's answer:** if all required pieces are available, don't defer, do it now
 
 ---
 
