@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProvider } from '../../../test-utils/render.js';
 import { setMockCameraPermission } from '../../../test-utils/setup.js';
-import { CAPTURE_KINDS, CAPTURE_REVIEW_ROUTE } from '../constants.js';
+import { CAPTURE_KINDS } from '../constants.js';
 import {
   __getLastEmittedSession,
   __setLastEmittedSession,
@@ -254,11 +254,14 @@ describe('<GradingCaptureScreen> — capture flow', () => {
       });
     }
     await waitFor(() => {
-      expect(routerMocks.push).toHaveBeenCalledWith(CAPTURE_REVIEW_ROUTE);
+      expect(routerMocks.push).toHaveBeenCalledTimes(1);
     });
     const emitted = __getLastEmittedSession();
     expect(emitted).not.toBeNull();
     if (emitted === null) return;
+    expect(routerMocks.push).toHaveBeenCalledWith(
+      `/grading/centering?sessionId=${encodeURIComponent(emitted.id)}`,
+    );
     expect(emitted.frontFull.uri).toBe('file:///shot-frontFull-1.jpg');
     expect(emitted.backFull.uri).toBe('file:///shot-backFull-2.jpg');
     expect(emitted.frontCorner.uri).toBe('file:///shot-frontCorner-3.jpg');
