@@ -31,4 +31,12 @@ if (!config.resolver.assetExts.includes('tflite')) {
   config.resolver.assetExts = [...config.resolver.assetExts, 'tflite'];
 }
 
+// Register .bin as a bundled asset extension (mirrors the .tflite
+// block above). The on-device ANN index from T-SC-ANN-INDEX ships
+// as a single binary file (`apps/mobile/src/scanner/ann/index.bin`)
+// — without this Metro can't `require()` it as an asset module.
+if (!config.resolver.assetExts.includes('bin')) {
+  config.resolver.assetExts = [...config.resolver.assetExts, 'bin'];
+}
+
 module.exports = config;

@@ -40,17 +40,19 @@ dev = [
 binderly-build-tflite = "embeddings.scripts.build_tflite:main"
 binderly-build-card-embeddings = "embeddings.scripts.build_card_embeddings:main"
 binderly-embeddings-smoke = "embeddings.scripts.smoke:main"
+binderly-build-ann-index = "ann.scripts.build_ann_index:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["embeddings*"]
-exclude = ["embeddings.tests*"]
+include = ["embeddings*", "ann*"]
+exclude = ["embeddings.tests*", "ann.tests*"]
 
 [tool.setuptools.package-data]
 "embeddings" = ["py.typed"]
+"ann" = ["py.typed"]
 
 [tool.pytest.ini_options]
-testpaths = ["embeddings/tests"]
+testpaths = ["embeddings/tests", "ann/tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
 filterwarnings = [
