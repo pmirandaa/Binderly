@@ -24,6 +24,13 @@ dependencies = [
   # grading/centering — OpenCV for card-edge + inner-border detection.
   # The headless variant excludes the ~40 MB GUI dependencies.
   "opencv-python-headless>=4.9,<5.0",
+  # grading/scrapers/psa — HTTP client, HTML parser.
+  # httpx: async-capable, modern replacement for requests; no selenium/playwright.
+  # beautifulsoup4 + lxml: HTML parsing without JS rendering (PSA cert pages
+  # serve all grade data in the initial HTML response).
+  "httpx>=0.27,<1.0",
+  "beautifulsoup4>=4.12,<5.0",
+  "lxml>=5.0,<6.0",
 ]
 
 [project.optional-dependencies]
@@ -55,9 +62,16 @@ exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*"]
 "ann" = ["py.typed"]
 "grading" = ["py.typed"]
 "grading.centering" = ["py.typed"]
+"grading.scrapers" = ["py.typed"]
+"grading.scrapers.psa" = ["py.typed"]
 
 [tool.pytest.ini_options]
-testpaths = ["embeddings/tests", "ann/tests", "grading/centering/tests"]
+testpaths = [
+  "embeddings/tests",
+  "ann/tests",
+  "grading/centering/tests",
+  "grading/scrapers/psa/tests",
+]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
 filterwarnings = [
