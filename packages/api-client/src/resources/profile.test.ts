@@ -3,8 +3,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { HttpClient } from '../client.js';
-import { ApiResponseDecodeError, ApiUnauthorizedError, ApiValidationError } from '../error.js';
-import { mockFetch, okEnvelope } from '../test-helpers.js';
+import {
+  ApiNotFoundError,
+  ApiRateLimitError,
+  ApiResponseDecodeError,
+  ApiUnauthorizedError,
+  ApiValidationError,
+} from '../error.js';
+import { errEnvelope, mockFetch, okEnvelope } from '../test-helpers.js';
 import { VALID_PROFILE, VALID_SUBSCRIPTION } from './_fixtures.js';
 import { makeProfileResource } from './profile.js';
 
@@ -101,5 +107,111 @@ describe('profile.getMySubscription', () => {
       }),
     );
     await expect(profile.getMySubscription()).rejects.toBeInstanceOf(ApiResponseDecodeError);
+  });
+});
+
+describe('profile.checkHandleAvailability', () => {
+  it('returns available=true on a happy path response', async () => {
+    const { profile } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope({ handle: 'pablo', available: true }),
+      }),
+    );
+    const res = await profile.checkHandleAvailability({ handle: 'pablo' });
+    expect(res.available).toBe(true);
+    expect(res.reason).toBeUndefined();
+  });
+
+  it('returns available=false with reason on a taken handle', async () => {
+    const { profile } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope({ handle: 'pablo', available: false, reason: 'taken' }),
+      }),
+    );
+    const res = await profile.checkHandleAvailability({ handle: 'pablo' });
+    expect(res.available).toBe(false);
+    expect(res.reason).toBe('taken');
+  });
+
+  it('hits GET /v1/me/handle-available with the handle query param', async () => {
+    const { fetch, profile } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope({ handle: 'pablo', available: true }),
+      }),
+    );
+    await profile.checkHandleAvailability({ handle: 'pablo' });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/v1/me/handle-available');
+    expect(url).toContain('handle=pablo');
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  it('rejects locally (ApiValidationError) on an invalid handle without hitting the network', async () => {
+    const fetch = mockFetch({
+      status: 200,
+      body: okEnvelope({ handle: 'pablo', available: true }),
+    });
+    const { profile } = makeResource(fetch);
+    await expect(
+      profile.checkHandleAvailability({ handle: 'Bad Handle' }),
+    ).rejects.toBeInstanceOf(ApiValidationError);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects locally on a too-short handle', async () => {
+    const { profile } = makeResource(mockFetch({ status: 200, body: okEnvelope({}) }));
+    await expect(
+      profile.checkHandleAvailability({ handle: 'pa' }),
+    ).rejects.toBeInstanceOf(ApiValidationError);
+  });
+
+  it('throws ApiUnauthorizedError on 401 (no rate-limit budget without a session)', async () => {
+    const { profile } = makeResource(mockFetch({ status: 401 }));
+    await expect(profile.checkHandleAvailability({ handle: 'pablo' })).rejects.toBeInstanceOf(
+      ApiUnauthorizedError,
+    );
+  });
+
+  it('throws ApiNotFoundError until the backend endpoint ships', async () => {
+    const { profile } = makeResource(
+      mockFetch({ status: 404, body: errEnvelope({ code: 'NOT_FOUND', message: 'no route' }) }),
+    );
+    await expect(profile.checkHandleAvailability({ handle: 'pablo' })).rejects.toBeInstanceOf(
+      ApiNotFoundError,
+    );
+  });
+
+  it('throws ApiRateLimitError on 429 (per-user rate limit tripped)', async () => {
+    const { profile } = makeResource(mockFetch({ status: 429 }));
+    await expect(profile.checkHandleAvailability({ handle: 'pablo' })).rejects.toBeInstanceOf(
+      ApiRateLimitError,
+    );
+  });
+
+  it('throws ApiResponseDecodeError on a malformed envelope', async () => {
+    const { profile } = makeResource(
+      mockFetch({
+        status: 200,
+        // available:false missing reason - violates the contract refine
+        body: okEnvelope({ handle: 'pablo', available: false }),
+      }),
+    );
+    await expect(profile.checkHandleAvailability({ handle: 'pablo' })).rejects.toBeInstanceOf(
+      ApiResponseDecodeError,
+    );
+  });
+
+  it('forwards AbortSignal to the underlying fetch', async () => {
+    const fetch = mockFetch({
+      status: 200,
+      body: okEnvelope({ handle: 'pablo', available: true }),
+    });
+    const { profile } = makeResource(fetch);
+    const controller = new AbortController();
+    await profile.checkHandleAvailability({ handle: 'pablo', signal: controller.signal });
+    expect(fetch.mock.calls[0]?.[1]?.signal).toBe(controller.signal);
   });
 });

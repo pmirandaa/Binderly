@@ -5,10 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   defaultGradeTierViewSchema,
+  handleAvailabilityResponse,
+  handleUnavailableReasonSchema,
   profileDto,
   profilePreferencesSchema,
   profileThemeSchema,
   sessionDto,
+  shareableHandleSchema,
   subscriptionDto,
   subscriptionSourceSchema,
   subscriptionTierSchema,
@@ -156,6 +159,105 @@ describe('updateProfileRequest', () => {
 
   it('rejects a handle with a hyphen (alphanumeric or underscore only)', () => {
     expect(updateProfileRequest.safeParse({ handle: 'my-handle' }).success).toBe(false);
+  });
+});
+
+describe('shareableHandleSchema', () => {
+  it('accepts a minimal 3-char handle', () => {
+    expect(shareableHandleSchema.parse('abc')).toBe('abc');
+  });
+
+  it('accepts a handle with internal hyphens', () => {
+    expect(shareableHandleSchema.parse('pablo-test')).toBe('pablo-test');
+  });
+
+  it('rejects a leading hyphen', () => {
+    expect(shareableHandleSchema.safeParse('-pablo').success).toBe(false);
+  });
+
+  it('rejects uppercase letters', () => {
+    expect(shareableHandleSchema.safeParse('Pablo').success).toBe(false);
+  });
+
+  it('rejects too-short (<3) handles', () => {
+    expect(shareableHandleSchema.safeParse('pa').success).toBe(false);
+  });
+
+  it('rejects too-long (>30) handles', () => {
+    expect(shareableHandleSchema.safeParse('a'.repeat(31)).success).toBe(false);
+  });
+
+  it('rejects whitespace', () => {
+    expect(shareableHandleSchema.safeParse('pablo test').success).toBe(false);
+  });
+
+  it('rejects underscores (not in the picker pattern)', () => {
+    expect(shareableHandleSchema.safeParse('pablo_test').success).toBe(false);
+  });
+});
+
+describe('handleUnavailableReasonSchema', () => {
+  it('accepts every documented reason', () => {
+    for (const reason of ['taken', 'invalid', 'rate_limited', 'reserved'] as const) {
+      expect(handleUnavailableReasonSchema.parse(reason)).toBe(reason);
+    }
+  });
+
+  it('rejects unknown reasons', () => {
+    expect(handleUnavailableReasonSchema.safeParse('nope').success).toBe(false);
+  });
+});
+
+describe('handleAvailabilityResponse', () => {
+  it('parses an available response without a reason', () => {
+    expect(
+      handleAvailabilityResponse.parse({ handle: 'pablo', available: true }).available,
+    ).toBe(true);
+  });
+
+  it('parses an unavailable taken response with reason', () => {
+    expect(
+      handleAvailabilityResponse.parse({
+        handle: 'pablo',
+        available: false,
+        reason: 'taken',
+      }).reason,
+    ).toBe('taken');
+  });
+
+  it('rejects unavailable without a reason', () => {
+    expect(
+      handleAvailabilityResponse.safeParse({ handle: 'pablo', available: false }).success,
+    ).toBe(false);
+  });
+
+  it('rejects available WITH a reason (consistency invariant)', () => {
+    expect(
+      handleAvailabilityResponse.safeParse({
+        handle: 'pablo',
+        available: true,
+        reason: 'taken',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects extra keys (strict mode)', () => {
+    expect(
+      handleAvailabilityResponse.safeParse({
+        handle: 'pablo',
+        available: true,
+        extra: 'leak',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a handle that fails the picker pattern', () => {
+    expect(
+      handleAvailabilityResponse.safeParse({
+        handle: 'Pablo',
+        available: true,
+      }).success,
+    ).toBe(false);
   });
 });
 

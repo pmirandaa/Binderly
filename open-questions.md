@@ -843,3 +843,94 @@ T-OF-QUEUE, or T-OF-LOCAL-DB's repositories.
 **Status: closed by documented assumptions.** Non-blocking; no escalation
 required. Re-open if real-world page-walk costs surface as user-visible
 latency on conflict resolution.
+
+---
+
+## Q-020 — Shareables config model: brief diverges from merged shape
+
+**Raised by:** T-SH-CONFIG-MODEL sub-agent (iter 32, 2026-05-20).
+**Blocking:** No. T-SH-CONFIG-MODEL works around it.
+
+**Context:**
+
+The dispatch brief for T-SH-CONFIG-MODEL proposed a single-row
+`user_share_config` per user with fields:
+
+- `handle`, `is_public`, `display_name`, `bio`, `social_links_json`,
+  `theme_id`, `show_collection_value`, `show_set_completion`.
+
+The merged code (T-DL-SCHEMA-USERS / T-DL-SCHEMA-COLLECTIONS iter 8 +
+T-W-SHAREABLE-PUBLIC iter 20 + T-BE-EDGE-FUNCTIONS-V2 iter 21) ships a
+two-table split that does not align:
+
+1. **`profile` (1:1 with `auth.users`)** owns the per-user identity surface:
+   `handle` (citext, unique, case-insensitive), `display_name`, `avatar_url`,
+   `bio`, `preferences` (jsonb). Already RLS-enforced; already has
+   `getMyProfile` / `updateMyProfile` in `@binderly/api-client`.
+2. **`shareable` (0..N per user)** owns the per-page configuration:
+   `slug` (unique-per-user), `target` (`{kind:'full'} | {kind:'custom', custom_collection_id}`),
+   `theme` (default 'default'), `show_values`, `show_missing`, `show_photos`.
+   Already RLS-enforced; already has `listShareables` /
+   `getShareable` / `createShareable` / `updateShareable` /
+   `deleteShareable` in `@binderly/api-client`. PROJECT.md § 16 caps free
+   tier at 1 shareable per user; Pro is unlimited.
+
+The brief's `is_public` boolean does not exist — a shareable's *existence*
+plus its `(handle, slug)` URL is what makes it public. `rules/08-shareables.md`
+mandates an "owner can disable a shareable instantly (kill switch)"; the
+schema currently has no `is_active` column so the only way to disable
+today is to DELETE the row (which frees the slug). The brief's
+`social_links_json` field has no analog anywhere.
+
+**Options:**
+
+1. **Rewrite the data layer to the brief's single-row shape.** Would
+   require destructive schema changes to `profile` (move `handle`
+   ownership) and dropping the existing `shareable` table — invalidates
+   T-W-SHAREABLE-PUBLIC's SSR page, the T-BE-EDGE-FUNCTIONS-V2 endpoint,
+   and every existing contract / api-client test. Rejected.
+2. **Treat the brief as describing the *settings UI's logical model* and
+   map it onto the existing two-table physical model.** Surface
+   `profile.handle / display_name / bio` plus shareable rows in the
+   settings UI; keep the existing CRUD endpoints; add a thin
+   `checkHandleAvailability` resource method (new — server endpoint is
+   a backend follow-up). Recommended.
+3. **Add brand-new tables alongside both** (e.g. `user_share_config` with
+   handle, is_public, social_links). Creates two sources of truth for
+   handle ownership and re-implements what `profile` + `shareable`
+   already provide. Rejected.
+
+**Recommendation:** Option 2. Documented assumptions:
+
+- "config model" = existing `profile` + `shareable` rows; this task
+  does NOT add a `user_share_config` table.
+- `is_public` → existence of an `is_active`-true shareable row. The
+  kill-switch column (`is_active` BOOLEAN default true) is logged as
+  a follow-up — without it the UI's only "disable" affordance is to
+  delete the shareable. The settings UI exposes the delete action with
+  clear copy explaining it frees the slug.
+- `display_name`, `bio` → existing `profile` columns.
+- `theme_id` → existing `shareable.theme` (placeholder dropdown with
+  only 'default' selectable; T-SH-THEMES will populate the rest).
+- `show_collection_value` → existing `shareable.show_values`.
+- `show_set_completion` → no exact analog; closest is
+  `shareable.show_missing` (the master-set "what I'm chasing" gauge).
+  Surface both `show_missing` and `show_photos` toggles too — they're
+  already on the row and the public renderer reads them.
+- `social_links_json` → not shipped in this task. Logged as a
+  follow-up; would require a new `social_links` column on `profile`
+  plus contract additions.
+
+**Status: closed by documented assumptions.** Non-blocking; no
+escalation required. Backend follow-ups:
+
+- `T-BE-SHAREABLES-HANDLE-CHECK` — wire the
+  `GET /v1/me/handle-available?handle=…` endpoint that the new
+  `checkHandleAvailability` client method targets. Until shipped the
+  client-side debounced check returns "unknown" (settings UI degrades
+  to "we'll check when you save").
+- `T-SH-KILL-SWITCH` — add `is_active` column + RLS update + contract +
+  client; wire the toggle into the settings UI built by this task.
+- `T-SH-SOCIAL-LINKS` — add `social_links` jsonb to `profile`, contract,
+  client, settings-UI row editor.
+

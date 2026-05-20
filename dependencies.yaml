@@ -945,14 +945,13 @@ tasks:
     stage: 08-shareables
     title: Shareable configuration model + management UI (web + mobile)
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-W-COLLECTION, T-M-COLLECTION]
     parallel_safe_with: [T-SH-OG-IMAGES]
     provides: [shareables:config]
     owns_paths: [apps/web/app/settings/shareables/, apps/mobile/src/screens/shareables/]
     task_file: tasks/08-shareables/T-SH-CONFIG-MODEL.md
     est_effort: M
-    stub: true
 
   - id: T-SH-OG-IMAGES
     stage: 08-shareables
@@ -962,10 +961,9 @@ tasks:
     depends_on: [T-W-SHAREABLE-PUBLIC]
     parallel_safe_with: [T-SH-CONFIG-MODEL]
     provides: [shareables:og]
-    owns_paths: [apps/web/app/api/og/, apps/web/lib/og/]
+    owns_paths: [apps/web/app/api/og/]
     task_file: tasks/08-shareables/T-SH-OG-IMAGES.md
     est_effort: M
-    stub: false
 
   - id: T-SH-THEMES
     stage: 08-shareables
