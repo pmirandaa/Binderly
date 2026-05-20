@@ -1029,14 +1029,13 @@ tasks:
     stage: 10-paywall-billing
     title: RevenueCat SDK integration (mobile)
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-M-AUTH]
     parallel_safe_with: [T-PB-PADDLE]
     provides: [billing:revenuecat]
     owns_paths: [apps/mobile/src/billing/]
     task_file: tasks/10-paywall-billing/T-PB-REVENUECAT.md
     est_effort: M
-    stub: true
 
   - id: T-PB-PADDLE
     stage: 10-paywall-billing
