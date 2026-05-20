@@ -164,6 +164,9 @@ export interface PrintingLite {
   setName: string;
   setCode: string;
   imageSmallUrl: string | null;
+  /** Added in schema v2 (Q-016 Option 1). Null until the first upsert
+   *  that provides the value. */
+  setLogoUrl: string | null;
   lastSeenAt: string;
 }
 
@@ -174,5 +177,7 @@ export interface UpsertPrintingLiteInput {
   setName: string;
   setCode: string;
   imageSmallUrl?: string | null;
+  /** Optional — callers that don't have the set logo URL can omit this. */
+  setLogoUrl?: string | null;
   lastSeenAt: string;
 }

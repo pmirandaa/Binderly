@@ -123,6 +123,11 @@ export const CREATE_SMART_COLLECTION_INDEXES = `
 // for printings the user has in their collection (side-effect of
 // UserCollectionRepository.upsert). Does NOT cover the full catalog.
 // See #FU-41 for a full catalog mirror follow-up.
+//
+// Note: `set_logo_url` was added in migration v2 via
+// `ALTER TABLE printing_lite ADD COLUMN set_logo_url TEXT` (Q-016 Option 1).
+// The v1 CREATE TABLE below intentionally omits it so v1.ts continues
+// to produce the same schema as when it originally shipped.
 export const CREATE_PRINTING_LITE_TABLE = `
   CREATE TABLE IF NOT EXISTS printing_lite (
     id              TEXT PRIMARY KEY,
@@ -135,4 +140,29 @@ export const CREATE_PRINTING_LITE_TABLE = `
   )
 `.trim();
 
-export const CURRENT_SCHEMA_VERSION = 1;
+// `sync_queue` — pending mutation queue for the offline-sync replay engine
+// (T-OF-QUEUE). One row per write that has not yet been confirmed by the
+// server. Rows are deleted on successful replay or kept with status='failed'
+// for T-OF-CONFLICTS dead-letter handling.
+export const CREATE_SYNC_QUEUE_TABLE = `
+  CREATE TABLE IF NOT EXISTS sync_queue (
+    id              TEXT PRIMARY KEY,
+    table_name      TEXT NOT NULL,
+    op_type         TEXT NOT NULL,
+    payload_json    TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    attempts        INTEGER NOT NULL DEFAULT 0,
+    last_error      TEXT,
+    next_attempt_at TEXT NOT NULL,
+    status          TEXT NOT NULL DEFAULT 'pending'
+  )
+`.trim();
+
+export const CREATE_SYNC_QUEUE_INDEXES = `
+  CREATE INDEX IF NOT EXISTS sq_status_next_idx
+    ON sync_queue (status, next_attempt_at);
+  CREATE INDEX IF NOT EXISTS sq_created_at_idx
+    ON sync_queue (created_at)
+`.trim();
+
+export const CURRENT_SCHEMA_VERSION = 2;

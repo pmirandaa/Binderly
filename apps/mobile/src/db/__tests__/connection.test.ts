@@ -38,7 +38,8 @@ describe('getDb', () => {
       `SELECT value FROM _meta WHERE key = 'schema_version'`,
     );
     expect(row).not.toBeNull();
-    expect(row!.value).toBe('1');
+    // Schema version bumped to 2 by T-OF-QUEUE migration (sync_queue + set_logo_url)
+    expect(row!.value).toBe('2');
   });
 
   it('resetDbForTesting clears the singleton', async () => {
