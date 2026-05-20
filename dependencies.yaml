@@ -878,14 +878,14 @@ tasks:
     stage: 07-grading
     title: Corners subgrade model (training + inference)
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
     parallel_safe_with: [T-GR-EDGES, T-GR-SURFACE, T-GR-CENTERING]
-    provides: [grading:corners]
-    owns_paths: [apps/api-python/grading/corners/, apps/mobile/src/grading/corners/]
+    provides: [grading:corners, grading:ml_common]
+    owns_paths: [apps/api-python/grading/corners/, apps/mobile/src/grading/corners/, apps/api-python/grading/ml_common/]
     task_file: tasks/07-grading/T-GR-CORNERS.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-GR-EDGES
     stage: 07-grading
