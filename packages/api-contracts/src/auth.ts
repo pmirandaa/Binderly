@@ -221,6 +221,89 @@ export const updateProfileRequest = z
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequest>;
 
 // ============================================================
+// Handle availability — `GET /v1/me/handle-available?handle=…`
+// ============================================================
+
+/**
+ * Allowed shape for a public handle. The settings UI binds the
+ * input box to this regex so the user gets feedback before the
+ * round-trip; the server is the final authority (citext unique
+ * on `profile.handle`).
+ *
+ * Pattern:
+ *   - 3–30 chars total
+ *   - first char `[a-z0-9]` (no leading hyphen — keeps the URL
+ *     path readable and avoids the `-` that would prefix a flag)
+ *   - subsequent chars `[a-z0-9-]`
+ *
+ * The wider `updateProfileRequest.handle` schema currently
+ * accepts uppercase + underscore (legacy from T-BE-API-CONTRACTS
+ * iter 12). The narrower shape on this endpoint is what the
+ * settings UI bakes into its handle picker — the underlying
+ * `profile.handle` column is `citext`, so server-side
+ * uniqueness is case-insensitive regardless of the wire-time
+ * casing the picker advertises.
+ */
+export const SHAREABLE_HANDLE_PATTERN = /^[a-z0-9][a-z0-9-]{2,29}$/;
+export const shareableHandleSchema = z
+  .string()
+  .min(3)
+  .max(30)
+  .regex(SHAREABLE_HANDLE_PATTERN, 'handle must match ^[a-z0-9][a-z0-9-]{2,29}$');
+export type ShareableHandle = z.infer<typeof shareableHandleSchema>;
+
+/**
+ * Reasons a handle can be unavailable. The client renders
+ * different copy per reason:
+ *   - `taken` — somebody else owns it (suggest a variant).
+ *   - `invalid` — pattern check failed (the client also enforces
+ *     this so the server response is the fallback for stale
+ *     pages).
+ *   - `rate_limited` — too many recent checks (the picker
+ *     debounces 400 ms; sustained typing trips this on the
+ *     backend's per-IP rate limit).
+ *   - `reserved` — system-owned handle (e.g. "admin", "binderly",
+ *     "support"). The server-side reserved-handle list is
+ *     authoritative; the client just renders the message.
+ */
+export const HANDLE_UNAVAILABLE_REASONS = [
+  'taken',
+  'invalid',
+  'rate_limited',
+  'reserved',
+] as const;
+export const handleUnavailableReasonSchema = z.enum(HANDLE_UNAVAILABLE_REASONS);
+export type HandleUnavailableReason = z.infer<typeof handleUnavailableReasonSchema>;
+
+/**
+ * Wire shape for `GET /v1/me/handle-available?handle=<value>`.
+ *
+ * - `available: true` → the handle is free; `reason` is absent.
+ * - `available: false` → `reason` MUST be present; the client
+ *   uses it to render the right copy.
+ *
+ * The endpoint is auth-required (rate-limit budget per user),
+ * but checking your *current* handle returns `available: true`
+ * (you already own it) so the settings UI can render "looks
+ * good" even when the user hasn't typed a change yet.
+ */
+export const handleAvailabilityResponse = z
+  .object({
+    handle: shareableHandleSchema,
+    available: z.boolean(),
+    reason: handleUnavailableReasonSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (value) => (value.available === false ? value.reason !== undefined : value.reason === undefined),
+    {
+      message:
+        'reason MUST be set when available=false and MUST be absent when available=true',
+    },
+  );
+export type HandleAvailabilityResponse = z.infer<typeof handleAvailabilityResponse>;
+
+// ============================================================
 // Subscription — read DTO
 // ============================================================
 
