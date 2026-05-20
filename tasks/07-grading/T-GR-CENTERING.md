@@ -260,4 +260,49 @@ Stop and surface to orchestrator if:
 
 ## Notes from execution
 
-(Sub-agent appends here at end.)
+### Python implementation
+
+- Used a three-pass Canny approach (thresholds 5/20, 15/50, 30/100) to detect
+  both weak outer card edges (step ≈ 24 greyscale levels on synthetic cards)
+  and strong inner border edges. A single threshold pair missed the outer card
+  edge because the background-to-card-body contrast is below typical Canny thresholds.
+- Inner border detection uses a threshold-based dark-region finder
+  (`_detect_inner_by_threshold`) as the primary method, with Hough-line
+  fallback. This is more robust on synthetic cards; real Pokémon cards with
+  their yellow/coloured frame may need more Hough-line tuning.
+- 53 pytest tests cover: grade table (14 tests), detector (10 tests including
+  inner border), measure orchestrator (17 tests + 2 flags tests), types (4 tests).
+  All pass with Python 3.12 + opencv-python-headless 4.x.
+- The algorithm measures centering of the INNER BORDER within the OUTER CARD
+  BOUNDARY — this is the correct PSA interpretation. A card that is physically
+  off-centre on the photo but has an equal-margin inner border IS centred.
+
+### TypeScript implementation
+
+- The `CenteringScreen.test.tsx` file adds one new failing test suite due to
+  the pre-existing `@binderly/ui` Vite entry resolution issue (44 suites
+  failed at baseline; 45 at merge). The 30 new passing tests are in
+  session-store, centering-service, and use-centering test files.
+- The `waitFor` RTL assertion must use `expect` callbacks (not bare boolean
+  expressions) — a subtle RTL v16 behaviour difference. Fixed in
+  `use-centering.test.tsx`.
+- `GradingCaptureScreen.tsx` imports `storeSession` from the centering module
+  via `'../../../grading/centering/session-store.js'`. This is a deliberate
+  cross-module touch documented in the brief (justified cross-path, same pattern
+  as T-GR-CAPTURE-UX's route file touches).
+
+### Follow-ups raised
+
+- **#FU-33**: Pure-JS on-device centering algorithm. The TypeScript v1 ships
+  a `not_implemented` stub. A future task could port the contour-detection
+  approach to pure JS typed arrays (the scanner's gradient-projection rect finder
+  is a reference), enabling full on-device inference without OpenCV.
+
+### CI numbers
+
+- Python: 53 tests pass, 0 fail (`pytest -q grading/centering/tests/`).
+- TypeScript mobile: 514 tests pass (+30 from 484 baseline); 45 suites fail
+  (+1, pre-existing `@binderly/ui` resolution issue).
+- Mobile lint: 0 warnings, 0 errors.
+- Mobile typecheck: 1 new error (CenteringScreen.tsx `@binderly/ui`, same
+  pre-existing pattern as all other capture/screen files).
