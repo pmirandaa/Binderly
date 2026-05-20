@@ -551,7 +551,7 @@ tasks:
     stage: 02-backend
     title: Q-013 backend perf cleanup — land missing MVs + smart-preview Postgres RPC
     agent_role: backend
-    status: in_progress
+    status: review
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING]
     parallel_safe_with: []
     provides: [api:edge-v3]
