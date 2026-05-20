@@ -38,6 +38,7 @@ import { sql } from 'drizzle-orm';
 import {
   check,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -214,3 +215,77 @@ export const gradingTrainingSampleTable = pgTable(
 
 export type GradingTrainingSample = typeof gradingTrainingSampleTable.$inferSelect;
 export type NewGradingTrainingSample = typeof gradingTrainingSampleTable.$inferInsert;
+
+// ============================================================
+// T-GR-DATA-EBAY — eBay sold-listing observations for graded slabs
+// ============================================================
+//
+// Populated by `apps/api-python/grading/scrapers/ebay/`. Two downstream
+// consumers:
+//   1. Graded-card pricing intelligence (sold price → "PSA 10 sold for $X").
+//   2. Training corpus — a downstream job copies rows into
+//      `grading_training_sample` (source = 'ebay_sold').
+//
+// Service-role-only. No RLS (anon/authenticated revoked in migration).
+// Dedup key: `UNIQUE(listing_id)`.
+// Re-parse: bump `parser_version` in Python and sweep old rows using the
+//   `ebay_graded_listing_observation_parser_version_idx` index; `raw_blob_json`
+//   preserves the original eBay payload so re-parsing is a pure DB update.
+
+export const ebayGradedListingObservationTable = pgTable(
+  'ebay_graded_listing_observation',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    listingId: text('listing_id').notNull(),
+    title: text('title').notNull(),
+    // Grading company parsed from the listing title (PSA/BGS/CGC/SGC/OTHER).
+    // CHECK constraint pinned to the same enum used by grading_training_sample.
+    parsedGradingCompany: text('parsed_grading_company'),
+    // Overall grade 1.0–10.0. NULL = parse failed or Authentic slab.
+    parsedOverallGrade: numeric('parsed_overall_grade', { precision: 3, scale: 1 }),
+    // BGS sub-grades only: {centering, corners, edges, surface}.
+    parsedSubGrades: jsonb('parsed_sub_grades'),
+    // Price in the smallest currency unit (cents for USD/GBP/EUR; yen for JPY).
+    finalPriceCents: integer('final_price_cents').notNull(),
+    // ISO 4217 currency code as returned by eBay.
+    currencyCode: text('currency_code').notNull(),
+    // Listing end time (when the sale closed).
+    soldAt: timestamp('sold_at', { withTimezone: true }),
+    // Nullable FK → printing catalog. Backfilled by follow-up #FU-38.
+    printingId: uuid('printing_id').references(() => printingTable.id, {
+      onDelete: 'set null',
+    }),
+    // eBay hosted thumbnail URL. NOT proxied/downloaded by this task.
+    thumbnailUrl: text('thumbnail_url'),
+    // Full eBay Finding API item dict — preserved for re-parsing.
+    rawBlobJson: jsonb('raw_blob_json').notNull(),
+    // Parser version (semver string). Increment when regex evolves.
+    parserVersion: text('parser_version').notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true })
+      .notNull()
+      .default(sql`now()`),
+  },
+  (table) => [
+    unique('ebay_graded_listing_observation_listing_id_unique').on(table.listingId),
+    check(
+      'ebay_graded_listing_observation_company_check',
+      sql`${table.parsedGradingCompany} IS NULL OR ${table.parsedGradingCompany} IN ('PSA', 'BGS', 'CGC', 'SGC', 'OTHER')`,
+    ),
+    // Hot path: pricing queries for a given printing + grade company.
+    index('ebay_graded_listing_observation_printing_company_grade_idx').on(
+      table.printingId,
+      table.parsedGradingCompany,
+      table.parsedOverallGrade,
+    ),
+    // Hot path: recent sold data.
+    index('ebay_graded_listing_observation_sold_at_idx').on(table.soldAt),
+    // Re-parse sweep.
+    index('ebay_graded_listing_observation_parser_version_idx').on(table.parserVersion),
+  ],
+);
+
+export type EbayGradedListingObservation = typeof ebayGradedListingObservationTable.$inferSelect;
+export type NewEbayGradedListingObservation =
+  typeof ebayGradedListingObservationTable.$inferInsert;

@@ -1,0 +1,92 @@
+{
+  "findCompletedItemsResponse": [
+    {
+      "ack": ["Success"],
+      "version": ["1.13.0"],
+      "timestamp": ["2026-05-20T10:00:00.000Z"],
+      "searchResult": [
+        {
+          "@count": "2",
+          "item": [
+            {
+              "itemId": ["371234567890"],
+              "title": ["PSA 10 Pokemon Base Set Charizard Holo 4/102 GEM MINT"],
+              "globalId": ["EBAY-US"],
+              "primaryCategory": [
+                {
+                  "categoryId": ["183454"],
+                  "categoryName": ["Pokémon Individual Cards"]
+                }
+              ],
+              "galleryURL": ["https://i.ebayimg.com/thumbs/images/g/abc123/s-l140.jpg"],
+              "viewItemURL": ["https://www.ebay.com/itm/371234567890"],
+              "sellingStatus": [
+                {
+                  "currentPrice": [{ "@currencyId": "USD", "__value__": "2999.00" }],
+                  "convertedCurrentPrice": [{ "@currencyId": "USD", "__value__": "2999.00" }],
+                  "sellingState": ["EndedWithSales"],
+                  "timeLeft": ["PT0S"]
+                }
+              ],
+              "listingInfo": [
+                {
+                  "buyItNowAvailable": ["false"],
+                  "startTime": ["2026-05-13T10:00:00.000Z"],
+                  "endTime": ["2026-05-20T10:00:00.000Z"],
+                  "listingType": ["FixedPrice"],
+                  "gift": ["false"],
+                  "watchCount": ["42"]
+                }
+              ],
+              "condition": [
+                { "conditionId": ["2750"], "conditionDisplayName": ["Graded"] }
+              ]
+            },
+            {
+              "itemId": ["371234567891"],
+              "title": ["PSA 10 Pokemon Shadowless Charizard 4/102 GEM MINT Pop 1"],
+              "globalId": ["EBAY-US"],
+              "primaryCategory": [
+                {
+                  "categoryId": ["183454"],
+                  "categoryName": ["Pokémon Individual Cards"]
+                }
+              ],
+              "galleryURL": ["https://i.ebayimg.com/thumbs/images/g/def456/s-l140.jpg"],
+              "viewItemURL": ["https://www.ebay.com/itm/371234567891"],
+              "sellingStatus": [
+                {
+                  "currentPrice": [{ "@currencyId": "USD", "__value__": "9999.00" }],
+                  "convertedCurrentPrice": [{ "@currencyId": "USD", "__value__": "9999.00" }],
+                  "sellingState": ["EndedWithSales"],
+                  "timeLeft": ["PT0S"]
+                }
+              ],
+              "listingInfo": [
+                {
+                  "buyItNowAvailable": ["false"],
+                  "startTime": ["2026-05-14T08:00:00.000Z"],
+                  "endTime": ["2026-05-19T08:00:00.000Z"],
+                  "listingType": ["Auction"],
+                  "gift": ["false"],
+                  "watchCount": ["157"]
+                }
+              ],
+              "condition": [
+                { "conditionId": ["2750"], "conditionDisplayName": ["Graded"] }
+              ]
+            }
+          ]
+        }
+      ],
+      "paginationOutput": [
+        {
+          "pageNumber": ["1"],
+          "entriesPerPage": ["100"],
+          "totalPages": ["1"],
+          "totalEntries": ["2"]
+        }
+      ]
+    }
+  ]
+}
