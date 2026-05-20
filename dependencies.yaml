@@ -1001,14 +1001,14 @@ tasks:
     stage: 09-offline-sync
     title: Mutation queue + replay engine
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-OF-LOCAL-DB]
     parallel_safe_with: []
     provides: [offline:queue]
     owns_paths: [apps/mobile/src/sync/queue/]
     task_file: tasks/09-offline-sync/T-OF-QUEUE.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-OF-CONFLICTS
     stage: 09-offline-sync

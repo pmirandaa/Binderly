@@ -230,6 +230,9 @@ The web + mobile CollectionScreens both group user collection items by set and s
 
 **Status: open; not blocking.** Resolves when T-OF-QUEUE makes the catalog-mirror-scope call.
 
+**Resolution (T-OF-QUEUE sub-agent, iter 31; PR #89 `43a8afa`):**
+Option 1 — `set_logo_url` is denormalised into `printing_lite` as a nullable TEXT column added via the v2 schema migration (defensive `ALTER TABLE ... ADD COLUMN` with a `PRAGMA table_info` guard). T-OF-QUEUE mirrors user-relevant printings only (user collection scope, ~thousands of rows max), so the denormalisation cost is bounded and Option 2's JOIN complexity is not warranted. `UserCollectionRepository.upsertPrintingLite` now accepts and persists `setLogoUrl`. CollectionScreen offline set-logo rendering unblocked. **Q-016 closed.**
+
 ---
 
 ---
