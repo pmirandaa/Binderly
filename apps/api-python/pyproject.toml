@@ -21,6 +21,9 @@ dependencies = [
   "numpy>=1.26,<2.1",
   "Pillow>=10.0,<12.0",
   "pydantic>=2.6,<3.0",
+  # grading/centering — OpenCV for card-edge + inner-border detection.
+  # The headless variant excludes the ~40 MB GUI dependencies.
+  "opencv-python-headless>=4.9,<5.0",
 ]
 
 [project.optional-dependencies]
@@ -44,15 +47,17 @@ binderly-build-ann-index = "ann.scripts.build_ann_index:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["embeddings*", "ann*"]
-exclude = ["embeddings.tests*", "ann.tests*"]
+include = ["embeddings*", "ann*", "grading*"]
+exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*"]
 
 [tool.setuptools.package-data]
 "embeddings" = ["py.typed"]
 "ann" = ["py.typed"]
+"grading" = ["py.typed"]
+"grading.centering" = ["py.typed"]
 
 [tool.pytest.ini_options]
-testpaths = ["embeddings/tests", "ann/tests"]
+testpaths = ["embeddings/tests", "ann/tests", "grading/centering/tests"]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
 filterwarnings = [
