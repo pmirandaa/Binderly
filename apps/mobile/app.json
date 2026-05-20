@@ -36,7 +36,6 @@
         }
       ],
       "expo-secure-store",
-      "expo-web-browser",
       "expo-apple-authentication",
       [
         "react-native-vision-camera",
