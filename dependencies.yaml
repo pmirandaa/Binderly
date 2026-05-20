@@ -849,14 +849,14 @@ tasks:
     stage: 06-scanner
     title: On-device match pipeline + confidence calibration
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-SC-DETECT, T-SC-ANN-INDEX]
     parallel_safe_with: []
     provides: [scanner:match]
     owns_paths: [apps/mobile/src/scanner/match/]
     task_file: tasks/06-scanner/T-SC-MATCH.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-SC-UX
     stage: 06-scanner
