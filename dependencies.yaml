@@ -961,10 +961,9 @@ tasks:
     depends_on: [T-W-SHAREABLE-PUBLIC]
     parallel_safe_with: [T-SH-CONFIG-MODEL]
     provides: [shareables:og]
-    owns_paths: [apps/web/app/api/og/, apps/web/lib/og/]
+    owns_paths: [apps/web/app/api/og/]
     task_file: tasks/08-shareables/T-SH-OG-IMAGES.md
     est_effort: M
-    stub: false
 
   - id: T-SH-THEMES
     stage: 08-shareables
