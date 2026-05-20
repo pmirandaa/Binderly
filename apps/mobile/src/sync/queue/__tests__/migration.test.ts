@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { resetDbForTesting } from '../../../db/connection.js';
 import { getDb } from '../../../db/index.js';
+import { CURRENT_SCHEMA_VERSION } from '../../../db/schema.js';
 import { __resetSqliteDbs } from '../../../test-utils/setup.js';
 import { syncQueueRepo } from '../SyncQueueRepository.js';
 
@@ -60,9 +61,11 @@ afterEach(async () => {
 });
 
 describe('migration v2 — fresh install', () => {
-  it('sets schema_version to 2', async () => {
+  it('sets schema_version to CURRENT_SCHEMA_VERSION', async () => {
     await getDb(); // triggers migrations
-    expect(await getSchemaVersion()).toBe(2);
+    // T-OF-CONFLICTS bumped CURRENT_SCHEMA_VERSION to 3; the v2
+    // assertions below remain authoritative for v2's outputs.
+    expect(await getSchemaVersion()).toBe(CURRENT_SCHEMA_VERSION);
   });
 
   it('creates the sync_queue table', async () => {
@@ -159,16 +162,16 @@ describe('migration v2 — idempotency', () => {
   it('running getDb() twice does not re-run migrations', async () => {
     await getDb();
     await getDb(); // second call reuses the singleton — no-op
-    expect(await getSchemaVersion()).toBe(2);
+    expect(await getSchemaVersion()).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  it('schema_version stays 2 after repeated db open', async () => {
+  it('schema_version stays at CURRENT_SCHEMA_VERSION after repeated db open', async () => {
     await getDb();
     await resetDbForTesting();
     __resetSqliteDbs();
     // Simulate upgrade path: re-open after reset
     await getDb();
-    expect(await getSchemaVersion()).toBe(2);
+    expect(await getSchemaVersion()).toBe(CURRENT_SCHEMA_VERSION);
   });
 });
 

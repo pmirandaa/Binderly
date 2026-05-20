@@ -165,4 +165,36 @@ export const CREATE_SYNC_QUEUE_INDEXES = `
     ON sync_queue (created_at)
 `.trim();
 
-export const CURRENT_SCHEMA_VERSION = 2;
+// `sync_conflict_log` — append-only audit trail of every conflict the
+// LWW resolver (T-OF-CONFLICTS) has decided. One row per dead-letter
+// event resolved. Used for debugging today, future undo UX tomorrow.
+//
+// Columns mirror the elaborated task brief exactly. Resolution values
+// are constrained at the TypeScript layer (ConflictResolution enum) and
+// at the SQL layer via CHECK; idempotency-of-migration uses
+// CREATE TABLE IF NOT EXISTS so re-running v3 on an already-v3 db is
+// a no-op (matches the v2 pattern).
+export const CREATE_SYNC_CONFLICT_LOG_TABLE = `
+  CREATE TABLE IF NOT EXISTS sync_conflict_log (
+    id                  TEXT PRIMARY KEY,
+    table_name          TEXT NOT NULL,
+    entity_id           TEXT NOT NULL,
+    op_type             TEXT NOT NULL,
+    resolution          TEXT NOT NULL,
+    local_payload_json  TEXT NOT NULL,
+    server_payload_json TEXT,
+    local_updated_at    TEXT,
+    server_updated_at   TEXT,
+    error_detail        TEXT,
+    created_at          TEXT NOT NULL
+  )
+`.trim();
+
+export const CREATE_SYNC_CONFLICT_LOG_INDEXES = `
+  CREATE INDEX IF NOT EXISTS scl_table_entity_idx
+    ON sync_conflict_log (table_name, entity_id);
+  CREATE INDEX IF NOT EXISTS scl_created_at_idx
+    ON sync_conflict_log (created_at)
+`.trim();
+
+export const CURRENT_SCHEMA_VERSION = 3;

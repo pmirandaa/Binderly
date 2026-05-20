@@ -7,6 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { getDb, resetDbForTesting } from '../../db/index.js';
+import { CURRENT_SCHEMA_VERSION } from '../schema.js';
 
 describe('getDb', () => {
   beforeEach(async () => {
@@ -38,8 +39,10 @@ describe('getDb', () => {
       `SELECT value FROM _meta WHERE key = 'schema_version'`,
     );
     expect(row).not.toBeNull();
-    // Schema version bumped to 2 by T-OF-QUEUE migration (sync_queue + set_logo_url)
-    expect(row!.value).toBe('2');
+    // Schema version tracks CURRENT_SCHEMA_VERSION (T-OF-LOCAL-DB v1,
+    // T-OF-QUEUE v2 added sync_queue + set_logo_url, T-OF-CONFLICTS v3
+    // added sync_conflict_log).
+    expect(row!.value).toBe(String(CURRENT_SCHEMA_VERSION));
   });
 
   it('resetDbForTesting clears the singleton', async () => {

@@ -17,6 +17,7 @@
 import { CREATE_META_TABLE, CURRENT_SCHEMA_VERSION } from '../schema.js';
 import { up as v1up } from './v1.js';
 import { up as v2up } from './v2.js';
+import { up as v3up } from './v3.js';
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 
@@ -28,6 +29,7 @@ interface Migration {
 const MIGRATIONS: Migration[] = [
   { version: 1, up: v1up },
   { version: 2, up: v2up },
+  { version: 3, up: v3up },
 ];
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
