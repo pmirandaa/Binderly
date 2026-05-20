@@ -26,7 +26,11 @@ export default defineConfig({
     setupFiles: ['./src/test-utils/setup.ts'],
     server: {
       deps: {
-        inline: [/@tamagui\/.*/, /@binderly\/ui/],
+        // Tamagui + Binderly UI: JSX/ESM bundles need Vite transform.
+        // sql.js: inlined so Vitest handles the WASM load path correctly
+        // in the Node.js test environment (avoids ERR_UNKNOWN_FILE_EXTENSION
+        // when the sql-wasm.wasm file is resolved relative to the package).
+        inline: [/@tamagui\/.*/, /@binderly\/ui/, /sql\.js/],
       },
     },
     coverage: {
