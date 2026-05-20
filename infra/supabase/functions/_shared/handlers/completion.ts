@@ -172,7 +172,7 @@ export async function handleGetCollectionCompletion(
   }
 
   const setProgress = new Map<string, MvSetRow>();
-  for (const row of (setRows ?? []) as readonly MvSetRow[]) {
+  for (const row of ((setRows ?? []) as unknown) as readonly MvSetRow[]) {
     setProgress.set(row.set_id, row);
   }
 
@@ -207,7 +207,7 @@ export async function handleGetCollectionCompletion(
     })
     .sort((a, b) => a.setName.localeCompare(b.setName));
 
-  const globalRow = ((globalRows ?? []) as readonly MvGlobalRow[])[0];
+  const globalRow = (((globalRows ?? []) as unknown) as readonly MvGlobalRow[])[0];
   const global: GlobalCompletion =
     globalRow === undefined
       ? {
