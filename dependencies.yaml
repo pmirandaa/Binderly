@@ -839,14 +839,14 @@ tasks:
     stage: 07-grading
     title: PSA cert lookup scraper (rate-limited, ToS-aware)
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-SCHEMA-GRADING]
     parallel_safe_with: [T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS, T-GR-CAPTURE-UX]
     provides: [grading:data-psa]
     owns_paths: [apps/api-python/grading/scrapers/psa/]
     task_file: tasks/07-grading/T-GR-DATA-PSA.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-GR-DATA-EBAY
     stage: 07-grading
