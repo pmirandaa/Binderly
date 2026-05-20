@@ -34,7 +34,7 @@ need GitHub-side permissions the sandbox can't perform:
 2. The `master` branch can't be deleted on origin until the default
    branch is changed.
 
-`gh auth status` reports: _"The token in keyring is invalid."_
+`gh auth status` reports: *"The token in keyring is invalid."*
 
 **Options:**
 
@@ -55,7 +55,7 @@ need GitHub-side permissions the sandbox can't perform:
    the agent. Cons: a few clicks per task × ~109 tasks; tedious.
 
 **Recommendation:** Option 1. The orchestrator will continue dispatching
-sub-agents who _push_ their branches and print the GitHub
+sub-agents who *push* their branches and print the GitHub
 "Create a pull request for `agent/<task-id>`" URL in their completion
 summary. Pablo opens those PRs manually until `gh` is re-authed; after
 that, sub-agents will use `gh pr create --base main` automatically.
@@ -64,14 +64,12 @@ that, sub-agents will use `gh pr create --base main` automatically.
 
 **Orchestrator follow-up (2026-04-30, post-T-FN-CI):** still broken.
 `gh auth status` returns:
-
 ```
 github.com
   X Failed to log in to github.com account pmirandaa (keyring)
   - Active account: true
   - The token in keyring is invalid.
 ```
-
 Pablo: please re-run `gh auth login -h github.com` (HTTPS, paste a
 fresh PAT with `repo` + `workflow` + `admin:public_key` scopes, or
 the device-code flow). The orchestrator will run the default-branch
@@ -83,14 +81,13 @@ PRs were opened that way and it's working.
 **RESOLVED 2026-04-30 (post-Q-001 re-auth round 2):**
 `gh auth status` clean — token `gho_…`, scopes `gist, read:org, repo,
 workflow`. Orchestrator executed the cleanup actions:
-
 - `gh repo edit pmirandaa/Binderly --default-branch main` ✓
 - `git ls-remote --heads origin` confirms no `master` ref (already
   gone — likely cleared during the GH-side default-branch swap).
 - `git push origin --delete agent/T-FN-CI` ✓ (merged branch tidied).
-  Default branch verified `main` via `gh repo view --json
+Default branch verified `main` via `gh repo view --json
 defaultBranchRef`. Future sub-agent dispatches will use
-  `gh pr create --base main` automatically.
+`gh pr create --base main` automatically.
 
 ---
 
@@ -101,8 +98,8 @@ defaultBranchRef`. Future sub-agent dispatches will use
 T-FN-DB-MIGRATIONS, T-FN-ENV-CONVENTIONS, all of Phase 1).
 
 **Context:** The T-FN-DOCKER sub-agent ran its mandatory pre-flight
-(`docker info`) and the daemon refused: _"Cannot connect to the Docker
-daemon at unix:///Users/pmiranda/.docker/run/docker.sock"_. The Docker
+(`docker info`) and the daemon refused: *"Cannot connect to the Docker
+daemon at unix:///Users/pmiranda/.docker/run/docker.sock"*. The Docker
 CLI is installed (v28.3.3, context `desktop-linux`, darwin/arm64), but
 Docker Desktop itself isn't running. Per the task's escalation rule the
 sub-agent stopped immediately without modifying any files. The worktree
@@ -127,7 +124,7 @@ continue dispatching in parallel; Phase 1 will block on this if it
 isn't resolved by the time the iteration-3/4 dispatch wants
 T-FN-SUPABASE-LOCAL.
 
-**Pablo's answer:** this is solved
+**Pablo's answer:** _(empty until answered)_
 
 **Diagnostic round 1 (2026-04-30, end-of-day):**
 A diagnostic sub-agent identified the root cause as stale
@@ -150,7 +147,6 @@ work**. Diagnostic files left in `/tmp/docker-bounce-trace.log` +
 `/tmp/docker-bounce-trace.pid` for the next session.
 
 **Recommended next step (next session):**
-
 1. Reboot the Mac. launchd will not respawn the zombie Electrons,
    guaranteeing a clean process tree. This is the safest "did the
    pkill miss something?" hammer before anything destructive.
@@ -159,8 +155,8 @@ work**. Diagnostic files left in `/tmp/docker-bounce-trace.log` +
 3. If it STILL bounces post-reboot: re-tail
    `~/Library/Containers/com.docker.docker/Data/log/host/monitor.log`
    immediately after the bounce and paste the `[main.bugsnag]
-notifying bugsnag: [starting]` line. If pids of the form
-   "\* pid <N>: Docker Desktop" reappear, something is auto-launching
+   notifying bugsnag: [starting]` line. If pids of the form
+   "* pid <N>: Docker Desktop" reappear, something is auto-launching
    them — check Login Items (System Settings → General → Login Items)
    for stray Docker entries.
 4. If still broken: try Docker Desktop's built-in factory reset from
@@ -212,426 +208,27 @@ sibling `computeAllPokemonByPokedex()` (or similar).
 
 ---
 
-## Q-009 — `(tabs)/browse` placeholder collides with T-W-BROWSE's `app/browse/` route
-
-**Raised:** 2026-05-15
-**Blocking:** T-W-BROWSE
-
-**Context:** T-W-SHELL (PR merged at iter-14) created placeholder
-pages at `apps/web/app/(tabs)/browse/page.tsx`,
-`(tabs)/collection/page.tsx`, `(tabs)/scanner/page.tsx`, and
-`(tabs)/profile/page.tsx`, plus a sibling
-`apps/web/app/(tabs)/tabs.test.tsx` that imports each. The
-`(tabs)` route group does not add a URL segment in Next.js App
-Router — `(tabs)/browse/page.tsx` resolves to `/browse`.
-
-T-W-BROWSE's authoritative `owns_paths` (per `dependencies.yaml`)
-is `apps/web/app/browse/`, `apps/web/app/sets/`,
-`apps/web/app/cards/`. Creating
-`apps/web/app/browse/page.tsx` triggers a Next.js
-"You cannot have two parallel pages that resolve to the same
-path" build error because both `app/browse/page.tsx` and
-`app/(tabs)/browse/page.tsx` map to `/browse`.
-
-The shell appears to have anticipated a tab-navigation layout
-under `(tabs)/layout.tsx` that was never built — none of the
-four placeholder folders has a layout, and there's no
-shared-nav component. The placeholders exist solely so
-`(tabs)/tabs.test.tsx` has something to import.
-
-**Options:**
-
-1. **Delete `(tabs)/browse/page.tsx` and update
-   `(tabs)/tabs.test.tsx` to drop the browse test.** Land the
-   real `/browse` implementation under
-   `apps/web/app/browse/page.tsx` per the
-   T-W-BROWSE `owns_paths`. The other three `(tabs)/*`
-   placeholders stay untouched until their feature tasks land
-   (T-W-COLLECTION, T-W-AUTH/profile, scanner is mobile-only).
-   This is the minimal-blast-radius option.
-2. **Move the real implementation under
-   `(tabs)/browse/page.tsx`.** Cleaner long-term if a real tab
-   layout lands later, but it edits paths outside T-W-BROWSE's
-   `owns_paths` and effectively redirects the whole task into
-   `(tabs)/`, which the brief did not authorize. Also moves
-   set / card routes (`(tabs)/sets/[id]`,
-   `(tabs)/cards/[id]`) to mirror.
-3. **Keep both pages and special-case the conflict** — not an
-   option: Next.js refuses to compile.
-
-**Recommendation:** Option 1, executed inside this PR. The
-delete-and-update is a pure follow-up to a shell drift bug
-(empty placeholder + no tab layout) and the only path that
-both ships T-W-BROWSE at its declared `owns_paths` and
-preserves the build. Documented prominently in the PR body so
-the orchestrator can rescope T-W-COLLECTION /
-T-W-PROFILE / etc. when those tasks dispatch.
-
-**Pablo's answer:** option 1 is ok, good choice
-
----
-
-## Q-010 — `mv_user_set_completion` materialized view (T-M-COLLECTION)
-
-**Asked by:** T-M-COLLECTION sub-agent
-**Asked at:** 2026-05-15
-**Status:** Open — flagged for T-BE-EDGE-FUNCTIONS
-
-PROJECT.md § 8 promises a materialized view (`mv_user_set_completion`) keyed by
-`(user_id, set_id)` that the per-set completion rows would read from. The
-recompute job (T-SP-SET-COMPLETION) is merged but the read endpoint is still a
-stub — `T-BE-EDGE-FUNCTIONS` hasn't shipped. The `@binderly/api-client`
-`collection` resource only exposes `listCollectionItems` (the raw owned-printings
-list) and `getCollectionStats` is not yet wired.
-
-**What I did instead (in this PR):**
-
-- The home `CollectionScreen` walks `/v1/me/collection`, fans out
-  `getPrinting(id)` per owned printing to enrich with `setId / cardId /
-includeInMasterSet`, and computes Set % on-device using `set.total` as the
-  denominator and the count of distinct owned cards per set as the numerator.
-- Master % on the home row is intentionally left at 0 with an "Open set to
-  compute" affordance — the precise denominator requires the _full_ per-set
-  printing roster, which would fan out to hundreds of network calls per home
-  render. The drill-down (`CollectionSetScreen`) loads that roster once per set
-  visited and shows precise Set / Master percentages via
-  `@binderly/set-completion`.
-- All Pokémon % is the global aggregate (sum of unique-cards-owned across all
-  sets / sum of `set.total` across all sets).
-
-**What needs to happen later:**
-
-When `mv_user_set_completion` ships:
-
-1. The home screen should switch to reading the materialized view directly (one
-   query, no fan-out) for both Set % and Master %.
-2. `useOwnedPrintingsContextQuery` becomes the _fallback_ / offline-cache path
-   instead of the primary data source.
-3. The drill-down's per-set computation can stay as-is — having the full roster
-   on hand is useful for the "Missing" tab anyway.
-
-**Pablo's answer:** your approach is fine, just make sure to use the materialized view when the endpoint becomes available
-
----
-
-## Q-011 — Exact TCGplayer affiliate URL format unconfirmed
-
-**Raised:** 2026-05-15
-**Blocking:** _(none — `<BuyCta>` shipped with a documented placeholder)_
-**Related follow-up:** #FU-24
-
-**Context:** T-W-AFFILIATE-LINKS ships a `<BuyCta>` component (web + mobile)
-that builds TCGplayer affiliate search URLs of the form:
-
-```
-https://tcgplayer.com/search/pokemon/product?productLineName=pokemon
-  &q=<name> <number> <set name>
-  &utm_source=binderly
-  &utm_medium=affiliate
-  &utm_campaign=binderly-buy-cta
-  &utm_id=<NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID>
-```
-
-The brief explicitly told us to ship a documented placeholder if we
-couldn't verify the wire format against Impact's partner docs. We
-have not signed up for TCGplayer's affiliate program (via Impact) yet,
-so the URL above is a best-effort approximation:
-
-1. TCGplayer's storefront URL templates use both `search/pokemon/product`
-   and `search/all/product?productLineName=pokemon` in the wild — both
-   load card-search pages but the canonical "affiliate-friendly" path
-   isn't pinned anywhere we could find.
-2. Impact's standard tracking param is `clickref=<id>` or `irclickid=<id>`.
-   TCGplayer in particular has historically used `partner=<vendor>` on
-   their consumer storefront. The `utm_id` we ship will not break the
-   redirect, but it may not be what Impact's dashboard listens to.
-
-**Options:**
-
-1. **Sign up for the TCGplayer affiliate program once Pablo has the
-   business entity ready; receive the exact wire format + tracking
-   param spec from Impact; update both `apps/web/lib/affiliate/tcgplayer.ts`
-   and `apps/mobile/src/components/buy-cta/tcgplayer.ts` in lockstep.**
-   Tracked as #FU-24. Pros: the only path that guarantees attribution
-   is recorded server-side. Recommended.
-2. Ship the placeholder URL and trust that TCGplayer's frontend hashes
-   our `utm_id` into something Impact can correlate later. Pros: zero
-   work now. Cons: silent revenue loss if attribution doesn't land.
-
-**Recommendation:** Option 1 — but #FU-24 is non-blocking for this
-PR. The "Coming soon" degraded path is the production default until
-an affiliate id lands in the environment, so users see the same
-"button disabled" UX they did before this PR until we have a real id.
-The URL template change, when it lands, is a 5-line edit in two
-files + a test update.
-
-**Pablo's answer:** leave placeholder, I'll look into this later
-
----
-
-## Q-012 — Public shareable read endpoint not implemented; richer payload needed (T-W-SHAREABLE-PUBLIC)
-
-**Raised:** 2026-05-15
-**Blocking:** None as of this PR — page scaffold compiles & ships with
-the existing client surface and a degraded runtime adapter. Blocks the
-end-to-end "logged-out user sees a real collection snapshot" UX.
-**Status:** Open — flagged for the backend track (likely a follow-up
-to T-BE-EDGE-FUNCTIONS).
-
-**Context:**
-
-`@binderly/api-client` exposes `shareables.getPublicShareable({handle, slug})`
-which `POST /v1/c/{handle}/{slug}` (`anonymous: true`, returns
-`shareableDto`). The contract is wired client-side, but:
-
-1. **The route is not implemented in the Edge Function.** The dispatch
-   table at `infra/supabase/functions/_shared/routes-table.ts` carries
-   no `/c/...` entry — every entry is `/me/...`. Calling
-   `getPublicShareable` against the live function would 404 today.
-2. **`shareableDto` is metadata only.** It contains
-   `{ id, userId, slug, target, theme, show*, timestamps }` — no
-   owner handle, no display name, no collection name, no member
-   list, no ownership counts. The SSR page needs at minimum:
-   - owner `{ handle, displayName, avatarUrl?, bio? }`
-   - human title for the collection (custom name or "Full collection")
-   - counts: `{ ownedUnique, catalogTotal, masterPct? }`
-   - member list: `[{ printingId, cardId, cardName, setName, setCode, imageUrl }]`
-   The data layer in this PR (`apps/web/lib/share/api.ts`) defines a
-   `PublicSharePayload` type that captures that contract. Tests use a
-   fake adapter that returns a fully populated payload; the runtime
-   adapter calls `getPublicShareable` and synthesises a degraded
-   payload (metadata + URL-derived handle + empty members + zero
-   counts) so production renders the page header without crashing.
-
-**What this PR does:**
-
-- Builds the page (`/c/[handle]/[slug]`) and OG image route
-  (`/c/[handle]/[slug]/opengraph-image`) against `ShareApi` —
-  injectable, props-pattern — so tests exercise the full surface
-  without the backend.
-- Defines `PublicSharePayload` as the contract we expect the
-  backend to return; the runtime adapter fills as much of it as
-  the current client surface allows. The data layer is the seam
-  the backend follow-up edits.
-- Ships SSR meta tags + an OG image that renders correctly when
-  the payload is populated (test-injected).
-
-**Options for the backend follow-up:**
-
-1. **Add a single `GET /v1/c/{handle}/{slug}` Edge route** that
-   returns `{ shareable, owner, collectionTitle, counts, members }`
-   in one anonymous payload. The client surface already calls
-   this URL; the response shape would be a NEW `publicShareableDto`
-   in `@binderly/api-contracts` (the existing `getPublicShareable`
-   returns `shareableDto` only — promote it to the richer shape, or
-   add a sibling method that returns the richer shape). Lowest
-   client churn; one round-trip; the SSR page reads exactly what
-   it renders.
-2. **Two endpoints.** One returns `shareableDto` (as today), the
-   other returns the member list paginated. Lets the OG image and
-   header render before the member grid streams in — but adds a
-   client round-trip and the public page is intentionally simple
-   so this complexity isn't earning anything yet.
-3. **Compose from existing primitives.** Add anonymous-readable
-   variants of `/v1/me/collection` and `/v1/me/profile` gated by a
-   "shareable token" header. Reuses the existing handlers — but
-   the RLS rewrite is deep and the SSR page would have to fan out
-   3+ requests on the hot path. Worst option.
-
-**Recommendation:** Option 1. The contract change is additive
-(`publicShareableDto` is new) and the client surface already
-expects an anonymous round-trip at this URL. The Edge handler
-joins `shareable` ↔ `profile` ↔ `collection_item` (and
-optionally `custom_collection`) once and returns one envelope.
-The web data layer in this PR drops in unchanged — only the
-runtime adapter swaps the degraded synthesis for a direct
-`getPublicShareablePayload(...)` call.
-
-**Pablo's answer:** go with option 1
-
-**Status:** ~~Open~~ **CLOSED — 2026-05-19** by
-T-BE-EDGE-FUNCTIONS-V2. Option 1 shipped:
-
-- Added `GET /v1/c/{handle}/{slug}` as an anonymous Edge route
-  (`infra/supabase/functions/_shared/handlers/publicShareable.ts`)
-  wired into `routes-table.ts`. Uses the service-role client to
-  bypass RLS on `collection_item` while projecting only public
-  columns (no `user_id`, `acquired_price`, `notes`, etc.).
-- Added `publicShareableDto` to `@binderly/api-contracts`
-  (`packages/api-contracts/src/shareables.ts`) plus
-  `publicShareOwnerDto`, `publicShareMemberDto`, `publicShareCountsDto`
-  — shape-for-shape match of `PublicSharePayload` in
-  `apps/web/lib/share/api.ts` so the web adapter swap is mechanical.
-- Added `shareables.getPublicShareablePayload(...)` to
-  `@binderly/api-client` (`packages/api-client/src/resources/shareables.ts`).
-  Single-URL coexistence with the existing `getPublicShareable` —
-  the new method opts into the richer payload via an
-  `Accept: application/vnd.binderly.share+json` header; the legacy
-  method continues to receive the bare `shareableDto`.
-- Tests: 16 handler tests
-  (`infra/supabase/functions/_shared/handlers/publicShareable.test.ts`)
-  cover both Accept-header branches, both target kinds (`full` and
-  `custom`), the dedup / sum / display-name fallback rules, and the
-  404 / 500 envelopes.
-
-The web runtime adapter (`apps/web/lib/share/api.ts`) is unchanged
-in this PR — swapping `apiToShareApi` to call
-`getPublicShareablePayload` is a one-line frontend follow-up
-tracked separately.
-
----
-
-## Q-013 — T-BE-EDGE-FUNCTIONS-V2 divergences from the brief (deferred MVs + DSL → in-memory eval)
-
-**Raised:** 2026-05-19
-**Ratified:** 2026-05-20 by Pablo ("if all required pieces are
-available, don't defer, do it now") → both divergences landed in
-T-BE-Q013-CLEANUP at branch HEAD `f96649d` (worktree:
-`agent/T-BE-Q013-CLEANUP`).
-**Blocking:** None — the four endpoints ship behind correct contracts
-and the divergences are bounded.
-**Status:** CLOSED — both follow-ups (#FU-26 / T-DL-MV-COMPLETION
-and #FU-27 / T-BE-SMART-PREVIEW-RPC) landed in T-BE-Q013-CLEANUP
-(2026-05-20). See the elaborated task brief at
-`tasks/02-backend/T-BE-Q013-CLEANUP.md` and the corresponding
-migrations `packages/db/src/migrations/0018_mv_user_completion.sql`
-and `packages/db/src/migrations/0019_smart_preview_rpc.sql`. The
-completion handler now reads two MVs via wrapper views
-(`v_my_set_completion` / `v_my_global_completion`) filtered by
-`auth.uid()`; the smart-preview handler now calls
-`smart_collection_preview(ast, p_user_id, p_limit, p_offset)`
-which ports the DSL `expressionToSql()` compiler to PL/pgSQL.
-Wire shapes (`completionDto`, `smartPreviewResponse`) are
-unchanged; `collection.*` predicates are accepted in smart-preview
-(contract widening, not a break).
-
-**Context:**
-
-Implementing T-BE-EDGE-FUNCTIONS-V2 surfaced two places where the
-shipped handler diverges from the literal reading of the task brief.
-Both decisions are documented inline in the handlers and the
-elaborated task `.md`; logging them here so they aren't surprises in
-the next iteration.
-
-### 1. `GET /v1/me/collection/completion` reads tables, not MVs.
-
-The brief named two materialized views — `mv_user_set_completion` and
-`mv_user_global_completion` — as the data source. Neither view exists
-in the migrations (`packages/db/src/migrations/`). They're promised
-in `PROJECT.md` § 8 and referenced as "open" in Q-010 of this file,
-but the actual DDL was never written.
-
-Hard rule on this task: **no schema changes**. So the completion
-handler computes the same numbers on the fly from canonical tables
-(`collection_item`, `card`, `printing`, `set`) using a re-implementation
-of `@binderly/set-completion`'s `computeCompletion()` (the Edge bundle
-can't import the workspace package — the deno.jsonc import-map is
-`npm:` only). Algorithm: one Map per (cardId → setId), one pass over
-printings to tally per-set + global, one sort by `setName`. Complexity:
-O(P + C + I) where I is the user's `collection_item` count.
-
-At v1 catalog scale (~30k printings × ~25k cards × ~100 sets) this is
-well under 100ms per call — fine for the home-screen render path. If
-a future user crosses ~10k owned printings, or if the catalog grows
-past ~100k printings, the right fix is one of:
-
-1. Land the two MVs (a follow-up backend task with a hand-authored
-   migration) and swap the handler to read them.
-2. Cache the catalog projection per-process (TTL ~5 minutes) so the
-   per-call query reads only the user's `collection_item` rows.
-3. Move the computation into a Postgres function and call it via RPC.
-
-Option (1) is the canonical fix; the others are escape hatches if (1)
-is delayed.
-
-### 2. `POST /v1/smart-collections/preview` evaluates the AST in memory.
-
-The brief named `@binderly/smart-collection-dsl`'s `compileToSql()` (the
-function is actually `expressionToSql()` — name drift) as the
-compilation step. Two impediments to using it directly:
-
-- The Edge bundle can't import the workspace package (same
-  import-map constraint as above).
-- The result is a parameterized SQL fragment (`{ sql, params }`); the
-  supabase-js client surface is PostgREST, not raw SQL. There's no
-  clean way to execute the compiled SQL without either an RPC
-  function (schema change — forbidden) or a service-role backdoor
-  (security smell).
-
-The preview handler therefore validates the AST via a mirrored Zod
-schema (`previewExpressionSchema` in `infra/supabase/functions/_shared/contracts.ts`),
-loads the catalog projection (printing + card + set columns, ~30k
-rows), and evaluates the expression in JavaScript with a small
-re-implementation of `@binderly/smart-collection-dsl`'s `evaluate.ts`.
-Limitations versus the SQL compiler:
-
-- **`collection.*` fields are explicitly rejected** at the schema
-  layer — preview is catalog-wide; "is this in my collection?" is a
-  save-path concern. The save handler (a separate future task) can
-  reach the user's `collection_item` rows.
-- **Pagination is post-filter** — `totalCount` is exact, but the
-  catalog load + JS evaluation runs on every request. Adequate for
-  preview interactions (debounced editor calls); not adequate for
-  a hot-path read.
-
-The right long-term fix is the same as for completion: either land
-an RPC function that runs `expressionToSql()` server-side, or wire a
-bundle-step that pulls `@binderly/smart-collection-dsl` into the Edge
-function deploy artifact.
-
-**Recommendation:** Accept both divergences for this iteration. They
-are documented at the call sites, the contracts on the wire are
-correct, and the frontend follow-ups are unblocked. Schedule:
-
-- T-DL-MV-COMPLETION (backend): land the two missing materialized
-  views per `PROJECT.md` § 8 and swap the completion handler.
-- T-BE-SMART-PREVIEW-RPC (backend): land a Postgres function that
-  accepts the DSL AST as `jsonb` and returns matching printings;
-  swap the preview handler to call it.
-
-**Pablo's answer:** if all required pieces are available, don't defer, do it now
-
----
-
-## Q-014 — Pure-JS ANN dot-product exceeds 30 ms budget at full production catalog scale (T-SC-ANN-INDEX)
+## Q-016 — Should `printing_lite` cache `set.logo_url` for the CollectionScreen set-row renderer? (T-OF-LOCAL-DB)
 
 **Raised:** 2026-05-20
-**Blocking:** None — beta-launch catalog (~3-5 k printings, EN only) sits well inside the 30 ms stage budget; the issue only manifests once the catalog grows to full-production scale.
-**Owner of the decision:** T-SC-MATCH worker (next iter); they already need to pick the on-device latency contract for the scanner read path end-to-end.
+**Blocking:** No — `printing_lite` ships without it; CollectionScreen renders fine without set logos on the offline path (falls back to a Tamagui-token-colored placeholder block).
+**Owner of the decision:** T-OF-QUEUE worker (next iter), since they're the first downstream consumer of `printing_lite` and will know whether their full-catalog mirror plan would naturally bring set metadata along.
 
 **Context:**
 
-T-SC-ANN-INDEX shipped flat brute-force FP16-quantised nearest-neighbour search at `apps/mobile/src/scanner/ann/`. At the FP16-vs-FP32 ground-truth benchmark (1 000 queries × 5 000 catalog rows) recall@10 lands at 100.0 %, well above the >= 95 % target.
+T-OF-LOCAL-DB ships `printing_lite` as a thin per-printing cache: name, set_id, set_name, card_number, image_url, rarity. The set_id + set_name are denormalised into the row to keep the offline read path single-table (no JOIN against a hypothetical `set_lite` table the worker chose not to ship).
 
-The brute-force inner loop, projected forward to the full production catalog (~30 k printings × 576-dim MobileNetV3-Small embedding, FP16), benchmarks at **~140 ms per query on a Pixel 6-class device in pure JavaScript**. That is ~4.7x the 30 ms stage budget T-SC-CAMERA documented for the per-frame scanner pipeline.
+The web + mobile CollectionScreens both group user collection items by set and show a small set-logo thumbnail next to the set name. The logo URL is currently fetched from the server at render time. On the offline path this would 404; the screen handles that gracefully with a placeholder block but it's a minor visual regression.
 
-At v1 beta launch (EN-only catalog, ~3-5 k printings), the same inner loop projects to ~15-25 ms — comfortably under budget — so the issue is **deferred, not present today**.
+**Options:**
 
-**Options for T-SC-MATCH to evaluate:**
+1. **Add `set_logo_url` to `printing_lite`** as a TEXT column via a v2 schema migration. Pro: minimal change; one ALTER TABLE; T-OF-QUEUE keeps populating set_logo_url alongside set_name when it sees a new set. Con: denormalisation cost (every printing row in the same set carries the same logo URL — small at user-collection scale, wasteful at full-catalog mirror scale).
+2. **Add a separate `set_lite` table** (id, name, logo_url) and JOIN at read time. Pro: normalised; no per-row waste. Con: extra JOIN on every CollectionScreen render; adds a 3-row dependency to the offline schema.
+3. **Punt to the next refresh cycle**: don't cache the logo at all; once T-OF-QUEUE ships background sync, set logos are always at most a few hours stale. CollectionScreen shows the placeholder on first cold start, then refreshes. Pro: zero schema change. Con: visible "popping" on cold start.
 
-1. **Pre-cluster the catalog** (k-means or random partition) and only score the user's recent active subset of clusters; trades recall for latency in a tunable way. Pure-JS, no native module.
-2. **Push the inner loop into a tiny native module** (Swift + Kotlin, ~50 LOC each calling Accelerate.framework `vDSP_distancesq` / Neon `vmlaq_f32`). Keeps the index format; only the search primitive crosses the bridge.
-3. **Migrate the index format to HNSW or IVF-PQ** (the T-SC-ANN-INDEX manifest reserved the `format` field so this is an additive migration). Higher build complexity, lower runtime cost.
-4. **Accept the latency at full scale** and run ANN off the worklet thread on a debounced JS-thread tick (e.g. once per ~150 ms of stable detection rather than per frame); preserves the 10 FPS frame-processor budget but adds visible recognition lag.
+**Recommendation:** Option 1 if T-OF-QUEUE plans to mirror only user-relevant printings (the denormalisation cost is bounded by user collection size, ~thousand rows max). Option 2 if T-OF-QUEUE plans to mirror the full ~30 k production catalog (denormalisation cost ~30 k repeated URLs, which is wasteful). T-OF-QUEUE owner picks.
 
-**Recommendation:** defer the decision to T-SC-MATCH. It will have real-world miss-rate data from end-to-end testing, which is the only way to choose between accuracy-vs-latency tradeoffs honestly. Document the chosen path in T-SC-MATCH's brief.
-
-**Pablo's answer:** choose accuracy, but also keep latency as low as possible.
-
-**Orchestrator interpretation + plan (2026-05-20):**
-
-Among the four options Pablo's directive maps cleanly to **Option 2 — native SIMD inner loop**:
-
-- Option 1 (pre-cluster) → trades recall for latency → rejected (accuracy-first).
-- **Option 2 (native SIMD: `vDSP_distancesq` on iOS Accelerate.framework + ARM Neon intrinsics on Android via JNI) → preserves 100 % recall (same brute-force, just vectorised), ~10-20× faster than pure JS → BEST MATCH.**
-- Option 3 (HNSW / IVF-PQ) → approximate, trades small recall for large latency win → rejected (accuracy-first).
-- Option 4 (debounced off-worklet) → adds visible recognition lag without accuracy gain → rejected.
-
-Option 2 is a proper Expo Module (Swift package + podspec, Kotlin AAR + autolinking, Expo plugin to register both in the project, TS wrapper with feature-detection fallback to the existing pure-JS path) — substantively its own task, not something to fold into T-SC-MATCH.
-
-T-SC-MATCH consumes `searchKNN()` through the existing TS surface, so a later transparent swap to a native-backed implementation is the right shape. **Logged as #FU-29 → `T-SC-ANN-NATIVE`** in `status.md`'s Known Follow-ups; the file at `apps/mobile/src/scanner/ann/search.ts` is the swap point.
-
-**Status: deferred to #FU-29.** Non-blocking for the scanner read-path closer (v1 beta catalog ~3-5 k printings stays inside the 30 ms budget on the pure-JS path; the native swap is needed before the catalog grows past ~10 k printings).
+**Status: open; not blocking.** Resolves when T-OF-QUEUE makes the catalog-mirror-scope call.
 
 ---
 
