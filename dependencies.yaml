@@ -904,14 +904,14 @@ tasks:
     stage: 07-grading
     title: Surface subgrade model (training + inference)
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
     parallel_safe_with: [T-GR-CORNERS, T-GR-EDGES, T-GR-CENTERING]
     provides: [grading:surface]
     owns_paths: [apps/api-python/grading/surface/, apps/mobile/src/grading/surface/]
     task_file: tasks/07-grading/T-GR-SURFACE.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-GR-AGGREGATE
     stage: 07-grading
