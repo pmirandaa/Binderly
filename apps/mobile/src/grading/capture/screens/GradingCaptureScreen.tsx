@@ -34,13 +34,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 
 import { Button, Text, XStack, YStack } from '@binderly/ui';
 
+import { storeSession } from '../../../grading/centering/session-store.js';
 import { CameraPermissionPrompt } from '../../../scanner/camera/index.js';
 import { CaptureControls } from '../components/CaptureControls.js';
 import { CaptureFeedbackBanner } from '../components/CaptureFeedbackBanner.js';
 import { CaptureReviewModal } from '../components/CaptureReviewModal.js';
 import { CaptureStepIndicator } from '../components/CaptureStepIndicator.js';
 import { GradingCameraSurface } from '../components/GradingCameraSurface.js';
-import { CAPTURE_REVIEW_ROUTE } from '../constants.js';
 import {
   useCameraPermissionFlow,
   useCaptureSession,
@@ -51,21 +51,26 @@ import {
 import type { GradingCaptureSession, GradingShot, GradingShotKind } from '../types.js';
 import type { Camera } from 'react-native-vision-camera';
 
+/** The centering route path — the destination after a completed capture. */
+const CENTERING_ROUTE_BASE = '/grading/centering';
+
 /**
- * Placeholder session-handoff ref. The next worker
- * (T-GR-CENTERING) replaces this with a real route-param /
- * URL-safe encoding strategy. Today the value is stashed on a
- * module-scoped variable; the review screen reads it on mount.
+ * Placeholder session-handoff — kept for one release cycle so no external
+ * caller breaks.  Replaced by `storeSession` from the centering barrel.
  *
- * @deprecated FU-T-GR-CENTERING-ROUTING — moves to a real router
- * param when T-GR-CENTERING lands.
+ * @deprecated Use `storeSession` + `getSession` from
+ * `apps/mobile/src/grading/centering/session-store.ts` instead.
+ * The route now passes `?sessionId=<id>` and the centering screen reads
+ * from the module-scoped store.  This shim will be removed in a follow-up.
  */
-let lastEmittedSession: GradingCaptureSession | null = null;
+let _legacyLastSession: GradingCaptureSession | null = null;
+/** @deprecated See `storeSession` in the centering module. */
 export function __setLastEmittedSession(session: GradingCaptureSession | null): void {
-  lastEmittedSession = session;
+  _legacyLastSession = session;
 }
+/** @deprecated See `getSession` in the centering module. */
 export function __getLastEmittedSession(): GradingCaptureSession | null {
-  return lastEmittedSession;
+  return _legacyLastSession;
 }
 
 export interface GradingCaptureScreenProps {
@@ -155,8 +160,12 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
     const emitted = session.emitSession();
     if (emitted === null) return;
     navigatedRef.current = true;
+    // Store the session in the centering module's registry so the centering
+    // screen can retrieve it by id without URL-encoding 4 file URIs.
+    storeSession(emitted);
+    // Keep the legacy shim populated for any caller still using it.
     __setLastEmittedSession(emitted);
-    router.push(CAPTURE_REVIEW_ROUTE);
+    router.push(`${CENTERING_ROUTE_BASE}?sessionId=${encodeURIComponent(emitted.id)}`);
   }, [router, session, session.state.isComplete]);
 
   const handleRetakePending = useCallback((): void => {
