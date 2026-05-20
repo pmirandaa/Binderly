@@ -36,8 +36,8 @@
     "react": ">=18.0.0"
   },
   "dependencies": {
-    "@tamagui/core": "1.123.3",
-    "@tamagui/input": "1.123.3"
+    "@tamagui/core": "1.144.4",
+    "@tamagui/input": "1.144.4"
   },
   "devDependencies": {
     "@binderly/eslint-config": "workspace:*",
