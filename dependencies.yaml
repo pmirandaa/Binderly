@@ -635,7 +635,7 @@ tasks:
     stage: 04-web
     title: Public shareable pages (SSR, OG images)
     agent_role: frontend-web
-    status: pending
+    status: merged
     depends_on: [T-W-COLLECTION]
     parallel_safe_with: []
     provides: [web:public-shareable]
@@ -648,7 +648,7 @@ tasks:
     stage: 04-web
     title: TCGplayer affiliate "Buy" CTAs on card detail (web + mobile)
     agent_role: frontend-web
-    status: pending
+    status: merged
     depends_on: [T-W-BROWSE]
     parallel_safe_with: []
     provides: [web:affiliate-links]
@@ -732,7 +732,7 @@ tasks:
     stage: 06-scanner
     title: Camera + frame processor infrastructure (vision-camera)
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-M-SHELL]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:camera]
@@ -745,7 +745,7 @@ tasks:
     stage: 06-scanner
     title: Card rectangle detection + perspective correction
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-SC-CAMERA]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:detect]
@@ -758,7 +758,7 @@ tasks:
     stage: 06-scanner
     title: Choose + bundle embedding model (TFLite)
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-DL-IMAGE-PIPELINE]
     parallel_safe_with: [T-SC-CAMERA, T-SC-DETECT]
     provides: [scanner:embed-model]
@@ -771,7 +771,7 @@ tasks:
     stage: 06-scanner
     title: ANN index build (server) + on-device load
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-SC-EMBED-MODEL]
     parallel_safe_with: []
     provides: [scanner:ann-index]
@@ -784,7 +784,7 @@ tasks:
     stage: 06-scanner
     title: On-device match pipeline + confidence calibration
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-SC-DETECT, T-SC-ANN-INDEX]
     parallel_safe_with: []
     provides: [scanner:match]
@@ -813,7 +813,7 @@ tasks:
     stage: 07-grading
     title: Multi-shot guided capture flow
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-SC-CAMERA]
     parallel_safe_with: [T-GR-CENTERING, T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
     provides: [grading:capture-ux]
