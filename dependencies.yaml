@@ -826,14 +826,14 @@ tasks:
     stage: 07-grading
     title: Centering measurement (geometric, deterministic)
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-GR-CAPTURE-UX]
     parallel_safe_with: [T-GR-CORNERS, T-GR-EDGES, T-GR-SURFACE]
     provides: [grading:centering]
     owns_paths: [apps/api-python/grading/centering/, apps/mobile/src/grading/centering/]
     task_file: tasks/07-grading/T-GR-CENTERING.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-GR-DATA-PSA
     stage: 07-grading
