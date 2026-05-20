@@ -11,13 +11,17 @@
       "bundleIdentifier": "app.binderly.binderly",
       "supportsTablet": true,
       "usesAppleSignIn": true,
-      "associatedDomains": ["applinks:binderly.app"]
+      "associatedDomains": ["applinks:binderly.app"],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Binderly needs your camera to scan Pokémon cards and add them to your collection. Card images stay on your phone — they never leave the device."
+      }
     },
     "android": {
       "package": "app.binderly.binderly",
       "adaptiveIcon": {
         "backgroundColor": "#0FA3A3"
-      }
+      },
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "bundler": "metro"
@@ -32,8 +36,17 @@
         }
       ],
       "expo-secure-store",
-      "expo-web-browser",
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Binderly needs your camera to scan Pokémon cards and add them to your collection. Card images stay on your phone — they never leave the device.",
+          "enableMicrophonePermission": false,
+          "enableLocation": false,
+          "enableCodeScanner": false,
+          "enableFrameProcessors": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

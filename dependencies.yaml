@@ -784,14 +784,14 @@ tasks:
     stage: 06-scanner
     title: Camera + frame processor infrastructure (vision-camera)
     agent_role: frontend-mobile
-    status: pending
+    status: review
     depends_on: [T-M-SHELL]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:camera]
     owns_paths: [apps/mobile/src/scanner/camera/]
     task_file: tasks/06-scanner/T-SC-CAMERA.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-SC-DETECT
     stage: 06-scanner
