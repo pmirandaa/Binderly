@@ -1,0 +1,58 @@
+{
+  "findCompletedItemsResponse": [
+    {
+      "ack": ["Success"],
+      "version": ["1.13.0"],
+      "timestamp": ["2026-05-20T10:00:00.000Z"],
+      "searchResult": [
+        {
+          "@count": "1",
+          "item": [
+            {
+              "itemId": ["437789012345"],
+              "title": ["BGS 9.5 Beckett Pokemon Base Set Charizard Holo 4/102 UK Seller"],
+              "globalId": ["EBAY-GB"],
+              "primaryCategory": [
+                {
+                  "categoryId": ["183454"],
+                  "categoryName": ["Pokémon Individual Cards"]
+                }
+              ],
+              "galleryURL": ["https://i.ebayimg.com/thumbs/images/g/vwx234/s-l140.jpg"],
+              "viewItemURL": ["https://www.ebay.co.uk/itm/437789012345"],
+              "sellingStatus": [
+                {
+                  "currentPrice": [{ "@currencyId": "GBP", "__value__": "320.00" }],
+                  "convertedCurrentPrice": [{ "@currencyId": "GBP", "__value__": "320.00" }],
+                  "sellingState": ["EndedWithSales"],
+                  "timeLeft": ["PT0S"]
+                }
+              ],
+              "listingInfo": [
+                {
+                  "buyItNowAvailable": ["true"],
+                  "startTime": ["2026-05-11T15:00:00.000Z"],
+                  "endTime": ["2026-05-18T15:00:00.000Z"],
+                  "listingType": ["FixedPrice"],
+                  "gift": ["false"],
+                  "watchCount": ["9"]
+                }
+              ],
+              "condition": [
+                { "conditionId": ["2750"], "conditionDisplayName": ["Graded"] }
+              ]
+            }
+          ]
+        }
+      ],
+      "paginationOutput": [
+        {
+          "pageNumber": ["1"],
+          "entriesPerPage": ["100"],
+          "totalPages": ["1"],
+          "totalEntries": ["1"]
+        }
+      ]
+    }
+  ]
+}
