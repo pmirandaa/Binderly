@@ -852,14 +852,14 @@ tasks:
     stage: 07-grading
     title: eBay sold listings scraper for graded slabs
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-SCHEMA-GRADING]
     parallel_safe_with: [T-GR-DATA-PSA, T-GR-DATA-AUCTIONS, T-GR-CAPTURE-UX]
     provides: [grading:data-ebay]
     owns_paths: [apps/api-python/grading/scrapers/ebay/]
     task_file: tasks/07-grading/T-GR-DATA-EBAY.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-GR-DATA-AUCTIONS
     stage: 07-grading
