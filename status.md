@@ -1,18 +1,19 @@
-# Build status — Iter 19 closed. Phase 5 mobile COMPLETE. Iter 20 dispatching web tail (final iter of the night).
+# Build status — Iter 23 closed. Scanner stage opened (camera + embed model) + Q-013 backend perf cleanup landed in one sweep.
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11.
-**Phase 2 backend (Stage 02):** **Complete (4/4 merged)** — closed at iter 16.
+**Phase 2 backend (Stage 02):** **Complete (5/5 merged)** — closed at iter 16; +1 in iter 21 (T-BE-EDGE-FUNCTIONS-V2); +1 in iter 23 (T-BE-Q013-CLEANUP).
 **Phase 3 shared packages (Stage 03):** **Complete (4/4 merged)** — closed at iter 17.
-**Phase 4 web (Stage 04):** 6/8 merged (T-W-SHELL #48, T-W-AUTH #51, T-W-BROWSE #60, T-W-COLLECTION #61, T-W-CUSTOM #64, T-W-SMART #63). T-W-SHAREABLE-PUBLIC + T-W-AFFILIATE-LINKS dispatching iter 20 — those two close Stage 04.
-**Phase 5 mobile (Stage 05):** **Complete (5/5 merged)** — closed at iter 19 with T-M-CUSTOM.
-**Stages 06-11:** 0 / 32 merged.
+**Phase 4 web (Stage 04):** **Complete (8/8 merged)** — closed at iter 20; +1 in iter 22 (T-W-API-V2-WIRING).
+**Phase 5 mobile (Stage 05):** **Complete (5/5 merged)** — closed at iter 19 with T-M-CUSTOM; +1 in iter 22 (T-M-API-V2-WIRING).
+**Stage 06 scanner:** 2 / 6 merged (T-SC-CAMERA #71, T-SC-EMBED-MODEL #72 — iter 23).
+**Stages 07-11:** 0 / 26 merged.
 
-**In progress:** 2 (iter 20 dispatching — see block below).
+**In progress:** 0.
 **Blocked:** 0.
-**Blocked on humans:** 0 (Pablo has granted full autonomy: "don't wait for my approval to do stuff").
+**Blocked on humans:** 0 (Pablo has granted full autonomy: "don't wait for my approval to do stuff"; "Run Everything" enabled in Cursor).
 
-After iter 20 lands tonight, **Stage 04 web will be complete (8/8)** and the entire FRONTEND foundation (web + mobile + shared packages + backend core) is shipped. Remaining work for v1 launch: scanner stage (06), ML (07), integrations (08), admin (09), billing (10), deploy/launch (11) — 32 tasks, all backend / mobile-scanner / ops surfaces.
+Iter 23 opened the scanner stage in parallel with a Q-013 backend perf cleanup. T-SC-CAMERA + T-SC-EMBED-MODEL ship the camera + frame-processor seam and the MobileNetV3-Small TFLite embedding model + on-device inference wrapper that downstream T-SC-DETECT / T-SC-MATCH / T-SC-UX dock onto. T-BE-Q013-CLEANUP closes Q-013 (mvs `mv_user_set_completion` / `mv_user_global_completion` landed + `smart_collection_preview` Postgres RPC; completion handler swapped from on-the-fly compute to MV SELECT; smart-preview handler swapped from in-JS DSL eval to `client.rpc()`). Frontend wire shapes unchanged.
 
 ## Phase 1 close summary
 
@@ -48,6 +49,22 @@ The data layer is **done end-to-end** on main:
   image pipeline + parsers + jobs + repos).
 
 ## Dispatch loop status
+
+**Iter 23 CLOSED 2026-05-20 ~11:00 UTC-4. Three-worker iter:
+scanner stage opened (T-SC-CAMERA + T-SC-EMBED-MODEL) +
+Q-013 backend perf cleanup (T-BE-Q013-CLEANUP). All three
+PRs merged clean. PR #71 carried a small in-PR `fix(mobile)`
+hotfix during Pablo's smoke test (removed a stale
+`expo-web-browser` entry from `app.json` plugins — T-M-AUTH
+leftover that was crashing `expo prebuild`; package ships no
+`app.plugin.js`, so the plugin resolver fell through to
+`require()`-ing its ESM `build/WebBrowser.js`, which on
+Node 20+ followed `require(ESM)` into `expo-modules-core/src/index.ts`
+and threw `ERR_UNKNOWN_FILE_EXTENSION`). Same hotfix commit
+also switched `apps/mobile/package.json` scripts from
+`expo start --ios/android` → `expo run:ios/android` (vision-camera
+is native, not in Expo Go). #FU-26 + #FU-27 both closed by #73.
+Q-013 closed.**
 
 **Iter 22 CLOSED 2026-05-19 ~15:35 UTC-4. Frontend wiring of the
 4 V2 endpoints shipped on both platforms. Web (4 surfaces, +51
@@ -223,6 +240,68 @@ mobile vs packages) is reliably mergeable in parallel.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
+
+## Iter 23 close summary (scanner stage opened + Q-013 backend perf cleanup; #FU-26 + #FU-27 closed)
+
+Three workers, three orthogonal owns_paths trees, three clean
+merges in one sweep. Mixed-discipline iter (frontend-mobile +
+ml + backend) — possible only because the scanner subtree
+under `apps/mobile/src/scanner/` is brand new (no other tasks
+have touched it) and the Q-013 cleanup is purely backend
+(migrations + handler swaps + RPC, no client surface change).
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-SC-CAMERA | merged | #71 (`56aaa82`) | scanner camera infra | `react-native-vision-camera@4.6.4` + `react-native-worklets-core@1.5.0` (last 4.x minor with explicit RN 0.76 autolinking fixes); iOS NSCameraUsageDescription + Android camera permission + vision-camera config plugin with `enableFrameProcessors: true`; worklet-thread frame processor capped at 10 FPS; JS-side permission flow + Scan screen host. **In-PR hotfix `fix(mobile)`:** removed stale `expo-web-browser` plugin entry from `app.json` (T-M-AUTH leftover — package ships no `app.plugin.js`, plugin resolver fell through to ESM `build/WebBrowser.js` → `require(ESM)` → `expo-modules-core/src/index.ts` → `ERR_UNKNOWN_FILE_EXTENSION`); switched `apps/mobile/package.json` scripts to `expo run:ios/android` (vision-camera is native, not in Expo Go). |
+| T-SC-EMBED-MODEL | merged | #72 (`122e879`) | python + RN inference suite | MobileNetV3-Small TFLite (1.0_224, FP16) — best size/quality tradeoff for 224×224 card crops on iPhone + mid-tier Android; Python embedding pipeline (`apps/api-python/embeddings/`) with model conversion script + reference embeddings; `react-native-fast-tflite@3.0.1` on-device inference wrapper with manifest validation; `metro.config.js` bundles `.tflite` files; new `ci-python.yml` GH Action with path filters; `pnpm-workspace.yaml` negates `apps/api-python` to avoid mixed JS/Py tooling. |
+| T-BE-Q013-CLEANUP | merged | #73 (`ac01201`) | +10 edge-fn (303→313) | **#FU-26:** migration `0018_mv_user_completion.sql` ships `mv_user_set_completion` + `mv_user_global_completion` MVs with `UNIQUE` indexes (for `REFRESH CONCURRENTLY`), `security_barrier = true` wrapper views `v_my_set_completion` / `v_my_global_completion` filtered by `(SELECT auth.uid())` (PG17 lacks RLS on MVs), and `refresh_user_completion()` `SECURITY DEFINER` function. Completion handler swapped from on-the-fly compute → MV SELECT (`completionDto` wire shape unchanged). Best-effort `supabase.rpc()` refresh hook wired into every collection mutation. **#FU-27:** migration `0019_smart_preview_rpc.sql` ships `smart_collection_preview(ast, p_user_id, p_limit, p_offset)` `SECURITY DEFINER` RPC + 4 PL/pgSQL helpers that port `expressionToSql()`; smart-preview handler swapped to `client.rpc()`; `previewExpressionSchema` widened to accept `collection.*` (non-breaking). RPC security: `SECURITY DEFINER` + explicit `auth.uid() = p_user_id` guard + `SET search_path = ''` + `quote_literal()`-quoted values + static `CASE` allowlist for column refs. |
+
+**Refresh strategy (Q-013 / #FU-26):** synchronous `REFRESH
+MATERIALIZED VIEW CONCURRENTLY` wrapped in a best-effort
+`supabase.rpc(...)` from each collection mutation —
+strong-consistency UX in the typical case, eventually-consistent
+fallback on failure. Pivot to `pg_cron` documented if it scales
+badly. `lastUpdatedAt` temporarily `null` (MV doesn't carry
+`max(updated_at)` yet); widening is a tiny follow-up if the UI
+needs it. `bigint` may serialize as string over PostgREST;
+`coerceCount` handles both shapes.
+
+**New follow-up raised:** **#FU-28 (proposed `T-DL-RLS-PG-STAT-REVOKE`):**
+one-line REVOKE migration to fix 2 pre-existing `verify-rls`
+failures on `v_pg_stat_statements_top_queries`. Cause:
+Supabase's default `ALTER DEFAULT PRIVILEGES … GRANT ALL ON
+TABLES TO anon, authenticated` fires on view creation before
+migration `0016_admin_debug_views.sql`'s `REVOKE ALL FROM PUBLIC`
+runs (PUBLIC ≠ union of all roles). Fix: ship `0020_*.sql` with
+`REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM
+anon, authenticated;`. **Not introduced by #73** — predates
+branch base on main commit `b13d3ed` (T-DL-ADMIN-DEBUG-SURFACES,
+iter 11). Trivial to land.
+
+Final migration sequence on main: monotonic 0000-0019.
+
+  0018_mv_user_completion       (T-BE-Q013-CLEANUP, hand-authored; closes #FU-26)
+  0019_smart_preview_rpc        (T-BE-Q013-CLEANUP, hand-authored; closes #FU-27)
+
+HEAD: `122e879`. Open questions: 2 (Q-007 admin role,
+Q-011 TCGplayer URL); both non-blocking. Q-013 closed.
+
+**Next iter candidates (ranked):**
+
+1. **T-DL-RLS-PG-STAT-REVOKE (#FU-28).** Trivial one-line REVOKE
+   migration; closes the two pre-existing `verify-rls` failures.
+   Lowest-effort backend hygiene.
+2. **Scanner stage continuation: T-SC-DETECT.** Card detection
+   (frame → crop → quality gate) on top of T-SC-CAMERA's frame
+   processor + T-SC-EMBED-MODEL's manifest. Standalone; no
+   dependency outside the scanner subtree.
+3. **T-SC-ANN-INDEX.** Approximate nearest-neighbor index over
+   the embedding bank; pairs with the model from T-SC-EMBED-MODEL.
+4. **T-SC-MATCH.** End-to-end match pipeline that stitches
+   T-SC-DETECT → T-SC-EMBED → T-SC-ANN-INDEX into a recognised
+   printing. Closes the scanner read path.
+5. **Open the grading stage** (T-GR-CAPTURE-UX depends on
+   T-SC-CAMERA — now unblocked).
 
 ## Iter 22 close summary (frontend wiring of V2 endpoints — cross-platform; #FU-22 closed as side effect)
 
@@ -630,7 +709,7 @@ api-client `auth` resource — best cross-platform validation we
 can do at this layer. Iter 16 candidate: T-BE-EDGE-FUNCTIONS to
 close Stage 02.
 
-## Open questions (3 open; all non-blocking)
+## Open questions (2 open; all non-blocking)
 
 - **Q-007** (raised by T-DL-ADMIN-DEBUG-SURFACES, PR #40):
   should we provision a narrower Postgres `admin` role for read-only
@@ -645,27 +724,14 @@ close Stage 02.
   placeholder URL. Real format + Impact tracking param come once
   Pablo signs up. Non-blocking: env-missing degraded path is
   production default until affiliate id lands. **Logged as #FU-24.**
-- **Q-013** (raised by T-BE-EDGE-FUNCTIONS-V2, PR #68): two scope
-  divergences shipped in iter 21:
-  1. `mv_user_set_completion` and `mv_user_global_completion`
-     materialised views (named in PROJECT.md § 8 + Q-010
-     ratification) **don't exist in migrations** — the completion
-     handler computes on-the-fly against canonical tables instead.
-     Performant at v1 catalog size; not at 100x v1 scale. Proposed
-     follow-up **`T-DL-MV-COMPLETION`** lands the mvs + swaps the
-     handler to a single SELECT. **Logged as #FU-26.**
-  2. The Edge bundle can't import `@binderly/smart-collection-dsl`
-     (Deno bundler) and supabase-js is PostgREST-only (no raw-SQL
-     escape hatch). Smart-preview evaluates the AST **in JS in
-     memory** against a catalog projection instead of via
-     `compileToSql()`. `collection.*` predicates rejected at the
-     preview boundary; can't evaluate at catalog scale (capped by
-     projection size). Proposed follow-up
-     **`T-BE-SMART-PREVIEW-RPC`** ships a Postgres RPC function
-     accepting the DSL AST as JSON, compiling server-side. Unlocks
-     `collection.*` predicates + catalog-scale eval. **Logged as
-     #FU-27.**
 
+**Q-013** closed at iter 23 merge time. Both halves landed in
+T-BE-Q013-CLEANUP (PR #73 → `ac01201`): migration `0018_mv_user_completion.sql`
+ships the two missing mvs + wrapper views + refresh function (closes
+#FU-26); migration `0019_smart_preview_rpc.sql` ships
+`smart_collection_preview()` Postgres RPC + 4 PL/pgSQL helpers
+that port `expressionToSql()` faithfully (closes #FU-27). Both
+handlers swapped accordingly; wire shapes unchanged.
 **Q-012** closed at iter 21 merge time (additive `publicShareableDto`
 + `GET /v1/c/{handle}/{slug}` anonymous endpoint shipped in PR #68).
 
@@ -693,11 +759,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
-- T-W-API-V2-WIRING — `d45b9d4` (web wires 4 V2 endpoints into Collection/Card/Shareable/Smart-Editor surfaces; +51 tests → 499 total; `CardPriceBlock` new component; `apiToShareApi` swaps degraded synthesis → `getPublicShareablePayload()` (Q-012 fully closed end-to-end); `MatchGrid` widened via `runMatchToView` / `previewItemToView`; local DSL `evaluate()` kept as `collection.*` fallback + typing/explainer preview; 5xx-propagates posture on shareable; `catalogRoster()` retained for per-set Owned/Missing grids) — **iter 22 cap**
+- T-SC-EMBED-MODEL — `122e879` (MobileNetV3-Small TFLite + Python embedding pipeline + `react-native-fast-tflite@3.0.1` on-device wrapper + `metro.config.js` `.tflite` asset bundling + new `ci-python.yml` GH Action; `pnpm-workspace.yaml` negates `apps/api-python`; manifest validation; reference embeddings shipped) — **iter 23 cap**
+- T-SC-CAMERA — `56aaa82` (vision-camera@4.6.4 + worklets-core@1.5.0; iOS NSCameraUsageDescription + Android camera permission + vision-camera config plugin with `enableFrameProcessors: true`; worklet-thread frame processor capped at 10 FPS; permission flow + Scan screen host; **in-PR `fix(mobile)` hotfix removed a stale `expo-web-browser` plugin entry (T-M-AUTH leftover; broke `expo prebuild` on Node 20+ via `require(ESM)` → `expo-modules-core/src/index.ts`) and switched mobile npm scripts to `expo run:ios/android` because vision-camera is native, not in Expo Go**) — iter 23
+- T-BE-Q013-CLEANUP — `ac01201` (migration `0018_mv_user_completion.sql` ships `mv_user_set_completion` + `mv_user_global_completion` MVs + wrapper views + refresh function; migration `0019_smart_preview_rpc.sql` ships `smart_collection_preview()` Postgres RPC + 4 PL/pgSQL helpers porting `expressionToSql()`; completion handler swapped to MV SELECT; smart-preview swapped to `client.rpc()`; refresh hooks wired into every collection mutation; +10 edge-fn tests (303→313); **closes Q-013 + #FU-26 + #FU-27**) — iter 23
+- T-W-API-V2-WIRING — `d45b9d4` (web wires 4 V2 endpoints into Collection/Card/Shareable/Smart-Editor surfaces; +51 tests → 499 total; `CardPriceBlock` new component; `apiToShareApi` swaps degraded synthesis → `getPublicShareablePayload()` (Q-012 fully closed end-to-end); `MatchGrid` widened via `runMatchToView` / `previewItemToView`; local DSL `evaluate()` kept as `collection.*` fallback + typing/explainer preview; 5xx-propagates posture on shareable; `catalogRoster()` retained for per-set Owned/Missing grids) — iter 22 cap
 - T-M-API-V2-WIRING — `6186ef3` (mobile wires 3 V2 endpoints into Collection/Card/SmartEditor surfaces; +28 tests → 460 / 48 files; Master% real on first paint; `useMutation` not `useQuery` for smart preview; 404 → `data: null` sentinel; **#FU-22 closed as side effect** pinned by regression test rendering unowned printing tile)
-- T-BE-EDGE-FUNCTIONS-V2 — `472fdcf` (4 additive read endpoints: `/v1/me/collection/completion` + `/v1/printings/:id/current-price` + `/v1/c/{handle}/{slug}` anon dual-Accept + `/v1/smart-collections/preview`; +260 tests; Q-012 closed, Q-013 raised for missing mvs + Edge can't import smart-collection-dsl; on-the-fly completion compute + in-JS DSL eval are documented stop-gaps with #FU-26 + #FU-27 follow-ups) — iter 21 cap
-- T-W-SHAREABLE-PUBLIC — `79ad293` (public no-auth shareable pages at `/c/[handle]/[slug]` + Next 14 `next/og` OG image; +67 tests; PublicSharePayload contract now reads canonical publicShareableDto after iter 22 wiring) — iter 20 cap / Stage 04 cap / frontend foundation COMPLETE
-- T-W-AFFILIATE-LINKS — `d028681` (TCGplayer affiliate `<BuyCta>` on web + mobile card detail; +57 tests; documented placeholder URL; **Q-011 / #FU-24** raised for URL format verification)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -746,8 +812,10 @@ placeholders untouched.
 23. **Server-evaluated smart-collection preview.** ✅ **CLOSED iter 21-22 (functionally)** — T-BE-EDGE-FUNCTIONS-V2 shipped `/v1/smart-collections/preview` in iter 21; T-W/M-API-V2-WIRING swapped the Run / re-run paths to call it in iter 22 on both platforms. Local `evaluate()` is retained only as (a) typing/explainer preview during DSL editing and (b) `collection.*` predicate fallback when the server returns `ApiValidationError`. **Note**: the server-side handler also evaluates the AST in JS in-memory (the Edge bundle can't import `@binderly/smart-collection-dsl`), not via `compileToSql()`. Lifting eval to Postgres RPC is now tracked as **#FU-27** (T-BE-SMART-PREVIEW-RPC). **Closed as #FU-23; backend eval cleanup moved to #FU-27.**
 24. **TCGplayer affiliate URL format verification (Q-011).** T-W-AFFILIATE-LINKS' `<BuyCta>` ships with a documented placeholder URL (`/search/pokemon/product?productLineName=pokemon&q=<name> <number> <set>&utm_source=binderly&utm_medium=affiliate&utm_campaign=binderly-buy-cta&utm_id=<id>`). The Impact partner program may expect a different storefront path (`/search/all/product?productLineName=pokemon` is also common in the wild) and a different tracking param (`clickref` / `irclickid` / `partner` vs `utm_id`). Fix: sign up for the TCGplayer affiliate program once the business entity is ready; receive exact wire format + tracking param spec from Impact; update both `apps/web/lib/affiliate/tcgplayer.ts` and `apps/mobile/src/components/buy-cta/tcgplayer.ts` in lockstep (~5 LOC each + tests). Non-blocking: env-missing "Coming soon" degraded path is production default until an affiliate id lands in `NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID` / `EXPO_PUBLIC_TCGPLAYER_AFFILIATE_ID`. **Logged as #FU-24.**
 25. **Server-side public shareable read endpoint (Q-012).** ✅ **CLOSED iter 21** — `T-BE-EDGE-FUNCTIONS-V2` shipped `GET /v1/c/{handle}/{slug}` anonymous with `Accept: application/vnd.binderly.share+json` opting into the richer `publicShareableDto`. T-W-SHAREABLE-PUBLIC's runtime adapter can swap its degraded synthesis for `getPublicShareablePayload(...)` in a small follow-up; the data layer was designed as the seam for exactly this.
-26. **Land `mv_user_set_completion` + `mv_user_global_completion` materialised views (Q-013, half 1).** Both mvs are named in `PROJECT.md § 8` and were re-ratified at Q-010 close, but they **don't exist in any migration on main** (only `mv_current_price` does). T-BE-EDGE-FUNCTIONS-V2's completion handler re-implements `@binderly/set-completion`'s algorithm against canonical tables instead — fast at v1 size, breaks down at scale. Fix: hand-author a migration that ships both mvs + appropriate indexes + a refresh hook (or scheduled refresh; PostgREST + Supabase don't auto-refresh). Then swap the completion handler from on-the-fly compute to a single `SELECT` against the mv. Strictly improves perf; no API surface change. Proposed task: `T-DL-MV-COMPLETION`. **Logged as #FU-26.**
-27. **Smart-preview DSL-to-SQL via Postgres RPC (Q-013, half 2).** T-BE-EDGE-FUNCTIONS-V2's smart-preview handler evaluates the DSL AST **in JS in memory** because (a) the Edge bundle can't import `@binderly/smart-collection-dsl` (Deno bundler), and (b) supabase-js is PostgREST-only with no raw-SQL escape hatch. Side effect: `collection.*` predicates are rejected at the preview boundary, and eval is capped by the in-memory projection size (~few thousand printings). Fix: ship a Postgres RPC function (`smart_collection_preview(jsonb)`) that accepts the DSL AST as JSON, calls `compileToSql()` server-side, and runs as a single query. Edge handler then invokes the RPC via supabase-js's `.rpc(...)`. Unlocks `collection.*` predicates + catalog-scale eval. Proposed task: `T-BE-SMART-PREVIEW-RPC`. **Logged as #FU-27.**
+26. **Land `mv_user_set_completion` + `mv_user_global_completion` materialised views (Q-013, half 1).** ✅ **CLOSED iter 23** — T-BE-Q013-CLEANUP shipped both mvs + `UNIQUE` indexes (for `REFRESH CONCURRENTLY`) + `security_barrier = true` wrapper views `v_my_set_completion` / `v_my_global_completion` filtered by `(SELECT auth.uid())` (PG17 lacks RLS on MVs) + `refresh_user_completion()` `SECURITY DEFINER` function in migration `0018_mv_user_completion.sql`. Completion handler swapped from on-the-fly compute → MV SELECT; `completionDto` wire shape unchanged. Best-effort `supabase.rpc()` refresh hook wired into every collection mutation (strong-consistency UX in the typical case, eventually-consistent fallback on failure; documented pivot to `pg_cron` if it scales badly). `lastUpdatedAt` temporarily `null` (MV doesn't carry `max(updated_at)`); widening is a tiny follow-up if the UI ever needs it. `bigint` may serialize as string over PostgREST; `coerceCount` handles both shapes. **Closed as #FU-26.**
+27. **Smart-preview DSL-to-SQL via Postgres RPC (Q-013, half 2).** ✅ **CLOSED iter 23** — T-BE-Q013-CLEANUP shipped `smart_collection_preview(ast, p_user_id, p_limit, p_offset)` `SECURITY DEFINER` RPC + 4 PL/pgSQL helpers that port `expressionToSql()` faithfully in migration `0019_smart_preview_rpc.sql`. Smart-preview handler swapped to `client.rpc()`; `previewExpressionSchema` widened to accept `collection.*` (non-breaking). RPC security: `SECURITY DEFINER` + explicit `auth.uid() = p_user_id` guard + `SET search_path = ''` + `quote_literal()`-quoted values + static `CASE` allowlist for column refs. **Closed as #FU-27.**
+28. **One-line REVOKE migration for `v_pg_stat_statements_top_queries` (`T-DL-RLS-PG-STAT-REVOKE` proposed).** `pnpm --filter @binderly/db verify-rls` reports 2 pre-existing failures on this view (anon + authenticated can read it). Cause: Supabase's default `ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO anon, authenticated` fires on view creation **before** migration `0016_admin_debug_views.sql`'s `REVOKE ALL FROM PUBLIC` runs (`PUBLIC` ≠ the union of all roles). Fix: ship `0020_*.sql` with `REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM anon, authenticated;`. Surfaced by the T-BE-Q013-CLEANUP worker (PR #73). **Not introduced by #73** — predates branch base on main commit `b13d3ed` (T-DL-ADMIN-DEBUG-SURFACES, iter 11). Trivial to land. **Logged as #FU-28.**
+29. **Cosmetic chore for Pablo: orphan worktree dirs at `/Users/pmiranda/Stuff/binderly-wt-T-*`.** Git no longer tracks them as worktrees; safe to `rm -rf`. pnpm-store residue blocks sandbox `rm`. Affected: T-DL-SEED-INGEST, T-FN-LINT-CONFIG, T-M-COLLECTION, T-W-BROWSE, T-W-COLLECTION, T-W-CUSTOM, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING, T-SC-CAMERA, T-SC-EMBED-MODEL, T-BE-Q013-CLEANUP.
 
 ## Phase 0 ledger (closed; 10/10 merged)
 

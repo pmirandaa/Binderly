@@ -551,7 +551,7 @@ tasks:
     stage: 02-backend
     title: Q-013 backend perf cleanup — land missing MVs + smart-preview Postgres RPC
     agent_role: backend
-    status: review
+    status: merged
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING]
     parallel_safe_with: []
     provides: [api:edge-v3]
@@ -784,7 +784,7 @@ tasks:
     stage: 06-scanner
     title: Camera + frame processor infrastructure (vision-camera)
     agent_role: frontend-mobile
-    status: review
+    status: merged
     depends_on: [T-M-SHELL]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:camera]
@@ -810,7 +810,7 @@ tasks:
     stage: 06-scanner
     title: Choose + bundle embedding model (TFLite)
     agent_role: ml
-    status: review
+    status: merged
     depends_on: [T-DL-IMAGE-PIPELINE]
     parallel_safe_with: [T-SC-CAMERA, T-SC-DETECT]
     provides: [scanner:embed-model]
