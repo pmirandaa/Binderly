@@ -134,6 +134,13 @@
       "when": 1777920000008,
       "tag": "0018_mv_user_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777920000009,
+      "tag": "0019_smart_preview_rpc",
+      "breakpoints": true
     }
   ]
 }
