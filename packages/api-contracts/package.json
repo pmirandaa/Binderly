@@ -35,7 +35,7 @@
     "@binderly/prettier-config": "workspace:*",
     "@binderly/tsconfig": "workspace:*",
     "@types/node": "22.19.17",
-    "eslint": "9.39.4",
+    "eslint": "10.4.0",
     "prettier": "3.8.3",
     "typescript": "5.9.3",
     "vitest": "2.1.9"
