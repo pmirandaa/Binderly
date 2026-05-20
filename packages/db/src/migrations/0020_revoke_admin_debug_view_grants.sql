@@ -1,0 +1,68 @@
+-- T-DL-RLS-PG-STAT-REVOKE (closes #FU-28) — additive REVOKE for
+-- `v_pg_stat_statements_top_queries` to restore the service-role-only
+-- posture promised by `0016_admin_debug_views.sql`.
+--
+-- Background: `pnpm --filter @binderly/db verify-rls` against fresh
+-- local Supabase reports 2 pre-existing failures:
+--
+--   ✗ behavior:authenticated blocked from v_pg_stat_statements_top_queries
+--   ✗ behavior:anon blocked from v_pg_stat_statements_top_queries
+--
+-- Both fail because `anon` and `authenticated` can SELECT from the view
+-- even though `0016_admin_debug_views.sql` ships
+-- `REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM PUBLIC;`.
+--
+-- Cause: Supabase's project-init runs
+--   ALTER DEFAULT PRIVILEGES IN SCHEMA public
+--     GRANT ALL ON TABLES TO anon, authenticated, service_role;
+-- BEFORE any migration applies. PG's default-privileges machinery fires
+-- on `CREATE VIEW`, so the view ships with explicit per-role grants to
+-- `anon` and `authenticated` baked in. The subsequent `REVOKE ALL ...
+-- FROM PUBLIC;` strips only the PUBLIC pseudo-role — which is NOT the
+-- union of all roles in PostgreSQL — so the explicit per-role grants
+-- survive intact. Per the PG 17 docs at
+-- https://www.postgresql.org/docs/17/sql-revoke.html:
+--   "PUBLIC can be thought of as an implicitly defined group that always
+--    includes all roles. ... [but] REVOKE ... FROM PUBLIC only revokes
+--    privileges granted to PUBLIC; it does not revoke privileges granted
+--    to specific roles."
+--
+-- The same hazard exists in principle for the other four views in
+-- `0016_admin_debug_views.sql` (v_data_conflict_top,
+-- v_data_conflict_by_source, v_image_pipeline_coverage_gaps,
+-- v_fx_rate_freshness) — they too acquire the same `anon`/`authenticated`
+-- grants on CREATE. verify-rls passes on those four because their
+-- underlying tables (`data_conflict`, `printing`, `printing_image`,
+-- `fx_rate`) already RLS-gate `anon`/`authenticated` to zero rows under
+-- the PG 17 `security_invoker = false` default. The
+-- `v_pg_stat_statements_top_queries` view is the lone red because its
+-- underlying object (`extensions.pg_stat_statements`) is an extension
+-- view with no RLS — the wrapper view, owned by `postgres`, reads the
+-- extension with postgres's privileges and freely returns rows.
+--
+-- Scope of this migration: explicitly REVOKE the surviving grants on the
+-- one view whose privilege snapshot is observably wrong. Hardening the
+-- other four (defense in depth — they could leak if a future migration
+-- turned off RLS on `data_conflict` etc.) is intentionally out of scope;
+-- the hard rule for this PR is one migration, only the REVOKE statements
+-- needed to clear the verify-rls failures. The follow-up to widen this
+-- REVOKE block across the whole admin debug surface, if desired, can
+-- ride along with the next non-trivial 0016-adjacent change.
+--
+-- Hosted-Supabase posture: the same `ALTER DEFAULT PRIVILEGES` runs in
+-- hosted projects, so this migration is also load-bearing in production
+-- — the explicit per-role grants survive there too. Pure-defense
+-- migration; tightens the SQL privilege snapshot to match the policy
+-- posture documented in 0016.
+--
+-- Idempotency: REVOKE is idempotent in PostgreSQL by construction;
+-- re-running this migration against a database that already has the
+-- grants stripped is a no-op. No `IF EXISTS` guards are needed (the
+-- view exists by virtue of the 0016 dependency).
+--
+-- We do NOT modify `0016_admin_debug_views.sql` — that migration is
+-- merged on `main` and rewriting it would change history. This is the
+-- additive corrective, mirroring the pattern used by
+-- `0012_profile_grants_fix.sql` for Q-003.
+
+REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM anon, authenticated;
