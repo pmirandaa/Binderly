@@ -687,4 +687,74 @@ All 3 sub-grade tasks are merged → no scheduling risk from doing the cleanup i
 
 ---
 
+## Q-018 — Aggregator confidence-band categorical mapping + centering grade-hint adapter (T-GR-AGGREGATE)
+
+**Raised:** 2026-05-20 (iter 31, by T-GR-AGGREGATE worker)
+**Blocking:** No — both decisions are codified with documented assumptions; the threshold + mapping constants are constructor-configurable so a future calibration pass can re-tune them without breaking the public API.
+
+**Context:**
+
+T-GR-AGGREGATE's brief asks for a 3-band categorical confidence output
+(`'low' | 'medium' | 'high'`) classified from the 4 upstream sub-grade
+confidences. The escalation guidance ("if the 4 upstream sub-grade modules emit
+a confidence shape that doesn't fit a 3-band classifier (e.g. raw
+probabilities only), append a Q-018 entry…") applies — `ml_common.types.ConfidenceBand`
+ships as `(value: float, confidence: float ∈ [0,1])`, not a categorical.
+
+Additionally, T-GR-CENTERING emits `CenteringResult.grade_hint: Literal['10','9','8','7','worse','unknown']`
+plus `low_confidence: bool` — also not a `ConfidenceBand`. The aggregator needs
+to map both shapes into a single `(score: float, confidence_label: 'low'|'medium'|'high')`
+contract.
+
+**Decisions (documented, not blocking):**
+
+1. **Float→categorical confidence threshold** for the three ML sub-grade
+   modules (corners / edges / surface):
+   - `confidence >= 0.66` → `'high'`
+   - `confidence >= 0.33` → `'medium'`
+   - else → `'low'`
+
+   Reproduced from rules/07-grading.md's "confidence bands, not single numbers"
+   spirit; chosen as evenly-spaced thirds for v1. Exposed as constructor
+   parameters (`high_threshold`, `low_threshold`) so a future calibration pass
+   can re-tune without breaking the API.
+
+2. **Centering grade-hint → float score** mapping:
+
+   | `grade_hint` | numeric score |
+   |---|---|
+   | `'10'` | 10.0 |
+   | `'9'` | 9.0 |
+   | `'8'` | 8.0 |
+   | `'7'` | 7.0 |
+   | `'worse'` | 4.0 |
+   | `'unknown'` | 5.0 |
+
+   `'worse'` clamps to 4.0 (centre of the [1.0, 7.0) bin); `'unknown'` defaults to
+   5.0 (mid-scale neutral) and forces categorical confidence to `'low'` regardless
+   of the `low_confidence` boolean.
+
+3. **Centering categorical confidence** is `'low'` when
+   `CenteringResult.low_confidence == True` OR `grade_hint == 'unknown'`,
+   otherwise `'high'` (consistent with the "centering is geometric, deterministic"
+   stance from PROJECT.md § 12).
+
+4. **Aggregate confidence band** logic per the task brief:
+   - `'high'` when ALL 4 sub-grade categorical confidences are `'high'` AND
+     max-min spread across sub-grade scores `< 1.0` PSA point;
+   - `'low'` when ANY sub-grade categorical confidence is `'low'` OR max-min
+     spread `>= 2.0` PSA points (significant disagreement);
+   - `'medium'` otherwise.
+
+**Recommendation:** keep the documented assumptions for v1; revisit once
+real PSA-labelled grading sessions provide ground truth on which to calibrate.
+The constants live in `apps/api-python/grading/aggregate/service.py` next to
+`compute_confidence_band_label()`.
+
+**Status: closed by documented assumptions.** Non-blocking; no escalation
+required. Re-open if real-world calibration shows the chosen thresholds (or
+the centering 'unknown' → 5.0 default) systematically biases the output.
+
+---
+
 _(no other open questions yet)_

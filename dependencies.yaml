@@ -917,14 +917,13 @@ tasks:
     stage: 07-grading
     title: Subgrade aggregation + calibration to PSA + confidence band
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-GR-CENTERING, T-GR-CORNERS, T-GR-EDGES, T-GR-SURFACE]
     parallel_safe_with: []
     provides: [grading:aggregate]
     owns_paths: [apps/api-python/grading/aggregate/, apps/mobile/src/grading/aggregate/]
     task_file: tasks/07-grading/T-GR-AGGREGATE.md
     est_effort: M
-    stub: true
 
   - id: T-GR-COMMUNITY-FLYWHEEL
     stage: 07-grading

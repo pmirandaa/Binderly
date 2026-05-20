@@ -85,6 +85,7 @@ exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrap
 "grading.scrapers.auctions._shared" = ["py.typed"]
 "grading.scrapers.auctions.pwcc" = ["py.typed", "fixtures/*.html"]
 "grading.scrapers.auctions.goldin" = ["py.typed", "fixtures/*.html"]
+"grading.aggregate" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -94,6 +95,7 @@ testpaths = [
   "grading/ml_common/tests",
   "grading/corners/tests",
   "grading/surface/tests",
+  "grading/aggregate/tests",
   "grading/scrapers/psa/tests",
   "grading/scrapers/ebay/tests",
   "grading/scrapers/auctions/tests",
