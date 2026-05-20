@@ -16,6 +16,7 @@
 
 import { CREATE_META_TABLE, CURRENT_SCHEMA_VERSION } from '../schema.js';
 import { up as v1up } from './v1.js';
+import { up as v2up } from './v2.js';
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 
@@ -24,7 +25,10 @@ interface Migration {
   up: (db: SQLiteDatabase) => Promise<void>;
 }
 
-const MIGRATIONS: Migration[] = [{ version: 1, up: v1up }];
+const MIGRATIONS: Migration[] = [
+  { version: 1, up: v1up },
+  { version: 2, up: v2up },
+];
 
 export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   // Bootstrap: the _meta table may not exist on first run.

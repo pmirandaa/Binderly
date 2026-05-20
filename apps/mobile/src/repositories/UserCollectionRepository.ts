@@ -271,6 +271,7 @@ class UserCollectionRepositoryImpl {
       set_name: string;
       set_code: string;
       image_small_url: string | null;
+      set_logo_url: string | null;
       last_seen_at: string;
     }>(`SELECT * FROM printing_lite ORDER BY last_seen_at DESC`);
     return rows.map((r) => ({
@@ -280,6 +281,7 @@ class UserCollectionRepositoryImpl {
       setName: r.set_name,
       setCode: r.set_code,
       imageSmallUrl: r.image_small_url,
+      setLogoUrl: r.set_logo_url,
       lastSeenAt: r.last_seen_at,
     }));
   }
@@ -290,8 +292,8 @@ class UserCollectionRepositoryImpl {
   ): Promise<void> {
     await db.runAsync(
       `INSERT OR REPLACE INTO printing_lite (
-        id, variant_key, card_name, set_name, set_code, image_small_url, last_seen_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        id, variant_key, card_name, set_name, set_code, image_small_url, set_logo_url, last_seen_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.id,
         input.variantKey,
@@ -299,6 +301,7 @@ class UserCollectionRepositoryImpl {
         input.setName,
         input.setCode,
         input.imageSmallUrl ?? null,
+        input.setLogoUrl ?? null,
         input.lastSeenAt,
       ],
     );
