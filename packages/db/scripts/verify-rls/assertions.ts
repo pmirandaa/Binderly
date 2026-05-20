@@ -405,6 +405,7 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
   await assertSelectDenied(sql, 'grading_training_sample', 'authenticated', results);
   await assertSelectDenied(sql, 'price_observation', 'authenticated', results);
   await assertSelectDenied(sql, 'data_conflict', 'authenticated', results);
+  await assertSelectDenied(sql, 'paddle_webhook_log', 'authenticated', results);
 
   // Admin debug views: service-role-only. authenticated must be denied
   // on every view shipped by `0016_admin_debug_views.sql`.
@@ -438,6 +439,7 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
   await assertSelectDenied(sql, 'grading_training_sample', 'anon', results);
   await assertSelectDenied(sql, 'price_observation', 'anon', results);
   await assertSelectDenied(sql, 'data_conflict', 'anon', results);
+  await assertSelectDenied(sql, 'paddle_webhook_log', 'anon', results);
 
   // Admin debug views: anon must also be denied (same posture as
   // service-role-only base tables).
@@ -456,7 +458,12 @@ export async function assertBehavior(sql: Sql, results: AssertionResult[]): Prom
     return rows.length === 2 ? null : `expected 2 rows under BYPASSRLS, got ${rows.length}`;
   });
 
-  for (const tname of ['grading_training_sample', 'price_observation', 'data_conflict']) {
+  for (const tname of [
+    'grading_training_sample',
+    'price_observation',
+    'data_conflict',
+    'paddle_webhook_log',
+  ]) {
     await assertSelectAllowed(sql, tname, 'service_role', results);
   }
 

@@ -58,4 +58,9 @@ export * from './data_conflict.js';
 // ============================================================
 export * from './auction_lot_observation.js';
 
+// ============================================================
+// === T-PB-PADDLE === (Paddle webhook delivery audit log)
+// ============================================================
+export * from './paddle_webhook_log.js';
+
 export {};
