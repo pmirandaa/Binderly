@@ -162,6 +162,20 @@
       "when": 1779314400000,
       "tag": "0022_auction_lot_observation",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1779318000000,
+      "tag": "0023_paddle_webhook_log",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1779318000001,
+      "tag": "0024_paddle_webhook_log_rls",
+      "breakpoints": true
     }
   ]
 }

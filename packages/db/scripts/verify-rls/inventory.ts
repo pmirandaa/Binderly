@@ -9,6 +9,7 @@
 //   - 0009_pricing_rls.sql          → market, price_observation, price_aggregate,
 //                                     fx_rate
 //   - 0015_data_conflict_rls.sql    → data_conflict (service-role-only)
+//   - 0024_paddle_webhook_log_rls.sql → paddle_webhook_log (service-role-only)
 //   - 0016_admin_debug_views.sql    → v_data_conflict_top, v_data_conflict_by_source,
 //                                     v_image_pipeline_coverage_gaps,
 //                                     v_fx_rate_freshness,
@@ -73,6 +74,10 @@ export const EXPECTED_TABLES: readonly ExpectedTable[] = [
     tablename: 'data_conflict',
     note: 'admin debug — service_role only (no permissive policy)',
   },
+  {
+    tablename: 'paddle_webhook_log',
+    note: 'paywall — service_role only (no permissive policy)',
+  },
 ] as const;
 
 /**
@@ -83,6 +88,7 @@ export const NO_PERMISSIVE_POLICY_TABLES: readonly string[] = [
   'grading_training_sample',
   'price_observation',
   'data_conflict',
+  'paddle_webhook_log',
 ] as const;
 
 /**

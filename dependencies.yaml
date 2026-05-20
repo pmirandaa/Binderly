@@ -1039,14 +1039,14 @@ tasks:
     stage: 10-paywall-billing
     title: Paddle checkout (web; MoR with RC integration)
     agent_role: frontend-web
-    status: pending
+    status: merged
     depends_on: [T-W-AUTH]
     parallel_safe_with: [T-PB-REVENUECAT]
     provides: [billing:paddle]
-    owns_paths: [apps/web/app/billing/, apps/web/app/api/paddle/]
+    owns_paths: [apps/web/app/billing/, apps/web/app/api/paddle/, apps/web/lib/paddle/]
     task_file: tasks/10-paywall-billing/T-PB-PADDLE.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-PB-ENTITLEMENTS
     stage: 10-paywall-billing
