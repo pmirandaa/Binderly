@@ -24,11 +24,8 @@ dependencies = [
   # grading/centering — OpenCV for card-edge + inner-border detection.
   # The headless variant excludes the ~40 MB GUI dependencies.
   "opencv-python-headless>=4.9,<5.0",
-  # grading/scrapers/psa — HTTP client, HTML parser.
-  # httpx: async-capable, modern replacement for requests; no selenium/playwright.
-  # beautifulsoup4 + lxml: HTML parsing without JS rendering (PSA cert pages
-  # serve all grade data in the initial HTML response).
-  # grading/scrapers/ebay — httpx re-used for eBay Finding API + Supabase writes.
+  # grading/scrapers/{psa,ebay,auctions} — shared HTTP client + HTML/JSON parsers.
+  # httpx: async-capable, rate-limited; beautifulsoup4 + lxml: HTML parsing.
   "httpx>=0.27,<1.0",
   "beautifulsoup4>=4.12,<5.0",
   "lxml>=5.0,<6.0",
@@ -55,8 +52,8 @@ binderly-build-ann-index = "ann.scripts.build_ann_index:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["embeddings*", "ann*", "grading*"]
-exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*"]
+include = ["embeddings*", "ann*", "grading*", "grading.scrapers*"]
+exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrapers.*.tests*"]
 
 [tool.setuptools.package-data]
 "embeddings" = ["py.typed"]
@@ -66,6 +63,10 @@ exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*"]
 "grading.scrapers" = ["py.typed"]
 "grading.scrapers.psa" = ["py.typed"]
 "grading.scrapers.ebay" = ["py.typed", "fixtures/*.json"]
+"grading.scrapers.auctions" = ["py.typed"]
+"grading.scrapers.auctions._shared" = ["py.typed"]
+"grading.scrapers.auctions.pwcc" = ["py.typed", "fixtures/*.html"]
+"grading.scrapers.auctions.goldin" = ["py.typed", "fixtures/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = [
@@ -74,6 +75,9 @@ testpaths = [
   "grading/centering/tests",
   "grading/scrapers/psa/tests",
   "grading/scrapers/ebay/tests",
+  "grading/scrapers/auctions/tests",
+  "grading/scrapers/auctions/pwcc/tests",
+  "grading/scrapers/auctions/goldin/tests",
 ]
 python_files = ["test_*.py"]
 addopts = "-ra --strict-markers"
