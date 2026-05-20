@@ -576,3 +576,146 @@ afterEach(async () => {
 // keys when needed. Keeping it co-located with the mock means tests
 // don't have to duplicate the in-memory model.
 export const __secureStorageMap = secureStorageMap;
+
+// ---- expo-sqlite (sql.js-backed in-memory fake) ----------------------
+//
+// expo-sqlite requires native Expo modules unavailable in jsdom. The mock
+// below replaces it with sql.js (a WASM-compiled SQLite running in Node.js)
+// wrapped in the expo-sqlite async-API shape:
+//
+//   - `openDatabaseAsync(name)` returns a fake SQLiteDatabase backed by a
+//     sql.js in-memory database, keyed by name (one db per name).
+//   - All async methods (execAsync, runAsync, getAllAsync, getFirstAsync,
+//     withTransactionAsync, closeAsync) are Promise wrappers around
+//     sql.js's synchronous API.
+//   - The same name always returns the same in-memory database so the
+//     migration runner and repositories share state within a test.
+//   - `__resetSqliteDbs()` closes all databases and clears the map;
+//     called from the global `afterEach` below.
+//
+// `resetDbForTesting()` in `apps/mobile/src/db/connection.ts` also clears
+// the module-level db singleton between tests; tests that import the
+// repositories directly should call it in their own `afterEach`.
+
+// Lazy sql.js initialiser — avoids loading WASM at module parse time.
+let _sqlJsPromise: Promise<import('sql.js').SqlJsStatic> | null = null;
+function getSqlJs(): Promise<import('sql.js').SqlJsStatic> {
+  if (_sqlJsPromise === null) {
+    _sqlJsPromise = import('sql.js').then((mod) => {
+      const initSqlJs = mod.default as (
+        config?: Record<string, unknown>,
+      ) => Promise<import('sql.js').SqlJsStatic>;
+      return initSqlJs();
+    });
+  }
+  return _sqlJsPromise;
+}
+
+// Per-name database instances.
+const _sqliteDbs = new Map<string, import('sql.js').Database>();
+
+export function __resetSqliteDbs(): void {
+  for (const db of _sqliteDbs.values()) {
+    try {
+      db.close();
+    } catch {
+      // tolerated
+    }
+  }
+  _sqliteDbs.clear();
+}
+
+vi.mock('expo-sqlite', () => {
+  // Factory-level init of sql.js so openDatabaseAsync can be async.
+  // Each call creates or reuses an in-memory database keyed by name.
+  return {
+    openDatabaseAsync: async (name: string): Promise<unknown> => {
+      const SQL = await getSqlJs();
+      if (!_sqliteDbs.has(name)) {
+        const newDb = new SQL.Database();
+        // Enable FK enforcement (off by default in SQLite).
+        newDb.run('PRAGMA foreign_keys = ON');
+        _sqliteDbs.set(name, newDb);
+      }
+      const db = _sqliteDbs.get(name)!;
+
+      // Helper: run a sql.js statement and return all matching rows
+      // as objects keyed by column name.
+      function execStatement<T>(sql: string, params?: unknown[]): T[] {
+        const stmt = db.prepare(sql);
+        if (params !== undefined && params.length > 0) {
+          stmt.bind(params as import('sql.js').BindParams);
+        }
+        const rows: T[] = [];
+        while (stmt.step()) {
+          rows.push(stmt.getAsObject() as T);
+        }
+        stmt.free();
+        return rows;
+      }
+
+      const fakeDb = {
+        databasePath: name,
+
+        async execAsync(source: string): Promise<void> {
+          // Split on semicolons so multi-statement strings work
+          const statements = source
+            .split(';')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+          for (const stmt of statements) {
+            db.run(stmt);
+          }
+        },
+
+        async runAsync(
+          source: string,
+          params?: unknown[],
+        ): Promise<{ lastInsertRowId: number; changes: number }> {
+          const normalizedParams = Array.isArray(params) ? params : [];
+          db.run(source, normalizedParams as import('sql.js').BindParams);
+          return { lastInsertRowId: db.exec('SELECT last_insert_rowid()')[0]?.values[0]?.[0] as number ?? 0, changes: db.getRowsModified() };
+        },
+
+        async getAllAsync<T>(source: string, params?: unknown[]): Promise<T[]> {
+          const normalizedParams = Array.isArray(params) ? params : [];
+          return execStatement<T>(source, normalizedParams);
+        },
+
+        async getFirstAsync<T>(source: string, params?: unknown[]): Promise<T | null> {
+          const normalizedParams = Array.isArray(params) ? params : [];
+          const rows = execStatement<T>(source, normalizedParams);
+          return rows[0] ?? null;
+        },
+
+        async withTransactionAsync(task: () => Promise<void>): Promise<void> {
+          db.run('BEGIN');
+          try {
+            await task();
+            db.run('COMMIT');
+          } catch (err) {
+            db.run('ROLLBACK');
+            throw err;
+          }
+        },
+
+        async closeAsync(): Promise<void> {
+          // Don't actually close — tests reuse the same in-memory db.
+          // Real close happens in __resetSqliteDbs().
+        },
+
+        async isInTransactionAsync(): Promise<boolean> {
+          return false;
+        },
+      };
+
+      return fakeDb;
+    },
+  };
+});
+
+// Reset sqlite databases between tests (in addition to the connection
+// singleton reset handled by individual test files via resetDbForTesting).
+afterEach(() => {
+  __resetSqliteDbs();
+});

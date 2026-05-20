@@ -40,6 +40,7 @@
     "expo-router": "4.0.22",
     "expo-secure-store": "14.0.1",
     "expo-splash-screen": "0.29.24",
+    "expo-sqlite": "^55.0.16",
     "expo-status-bar": "2.0.1",
     "expo-system-ui": "4.0.9",
     "expo-web-browser": "14.0.2",
@@ -66,12 +67,14 @@
     "@testing-library/react": "16.3.2",
     "@types/node": "22.19.17",
     "@types/react": "18.3.28",
+    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "4.7.0",
     "@vitest/coverage-v8": "2.1.9",
     "babel-preset-expo": "12.0.12",
     "eslint": "9.39.4",
     "jsdom": "25.0.1",
     "prettier": "3.8.3",
+    "sql.js": "^1.14.1",
     "typescript": "5.9.3",
     "vitest": "2.1.9"
   }
