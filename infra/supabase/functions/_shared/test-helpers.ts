@@ -242,6 +242,24 @@ export function createFakeSupabase(setup: FakeSupabaseSetup = {}): FakeSupabaseC
       calls.push({ method: 'from', args: [table], table });
       return buildQuery(table);
     },
+    /**
+     * Tiny `.rpc(name, args?)` stub. Queues are keyed `rpc:<name>` so
+     * tests enqueue outcomes via `tableResponses: { 'rpc:foo': [...] }`
+     * or `.enqueue('rpc:foo', ...)`. If no outcome is queued, the call
+     * resolves to `{ data: null, error: null }` rather than throwing —
+     * that matches the "best-effort refresh hook" pattern used by the
+     * collection-mutation handlers, where a missing `.rpc(...)` shim
+     * shouldn't break the underlying mutation test.
+     */
+    rpc: (name: string, args?: Record<string, unknown>) => {
+      calls.push({ method: 'rpc', table: name, args: args === undefined ? [] : [args] });
+      const queue = queues[`rpc:${name}`];
+      const outcome =
+        queue === undefined || queue.length === 0
+          ? { data: null, error: null }
+          : (queue.shift() ?? { data: null, error: null });
+      return Promise.resolve({ data: outcome.data ?? null, error: outcome.error ?? null });
+    },
     auth: {
       getUser: async (token?: string) => {
         calls.push({ method: 'auth.getUser', args: [token] });
