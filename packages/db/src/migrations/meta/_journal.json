@@ -148,6 +148,13 @@
       "when": 1777920000010,
       "tag": "0020_revoke_admin_debug_view_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1779314400000,
+      "tag": "0021_auction_lot_observation",
+      "breakpoints": true
     }
   ]
 }
