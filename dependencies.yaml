@@ -878,14 +878,14 @@ tasks:
     stage: 07-grading
     title: Multi-shot guided capture flow
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-SC-CAMERA]
     parallel_safe_with: [T-GR-CENTERING, T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
     provides: [grading:capture-ux]
     owns_paths: [apps/mobile/src/grading/capture/]
     task_file: tasks/07-grading/T-GR-CAPTURE-UX.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-GR-CENTERING
     stage: 07-grading

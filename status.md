@@ -1,4 +1,4 @@
-# Build status — Iter 25 closed. Scanner stage 4/6 merged (DETECT + ANN-INDEX landed in parallel; MATCH + UX remain). Q-014 raised (non-blocking).
+# Build status — Stage 07 (grading) opened. T-GR-CAPTURE-UX merged (1/X). Scanner stage 4/6 merged. Q-014 raised (non-blocking).
 
 **Phase 0:** Complete (10/10 merged).
 **Phase 1:** Complete (23/23 merged) — closed at iter 11; +1 in iter 24 (T-DL-RLS-PG-STAT-REVOKE).
@@ -7,7 +7,8 @@
 **Phase 4 web (Stage 04):** **Complete (8/8 merged)** — closed at iter 20; +1 in iter 22 (T-W-API-V2-WIRING).
 **Phase 5 mobile (Stage 05):** **Complete (5/5 merged)** — closed at iter 19 with T-M-CUSTOM; +1 in iter 22 (T-M-API-V2-WIRING).
 **Stage 06 scanner:** 4 / 6 merged (T-SC-CAMERA #71, T-SC-EMBED-MODEL #72 — iter 23; T-SC-ANN-INDEX #76, T-SC-DETECT #77 — iter 25). T-SC-MATCH + T-SC-UX remain.
-**Stages 07-11:** 0 / 26 merged.
+**Stage 07 grading:** **opened** — 1 / 10 merged (T-GR-CAPTURE-UX #79 — iter 26).
+**Stages 08-11:** 0 / 16 merged.
 
 **In progress:** 0.
 **Blocked:** 0.
@@ -788,12 +789,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
+- T-GR-CAPTURE-UX — `fa9faab` (opens Stage 07 grading; guided four-shot capture flow on top of T-SC-CAMERA's vision-camera infra — `frontFull`/`backFull`/`frontCorner`/`backCorner`; pure quality gate (gradient-projection sharpness + brightness window + edge-coverage proxy, stricter than scanner: sharpness ≥ 9.0, brightness ∈ [0.18, 0.85]); pure session reducer with accept/reject/retake/reset + idempotent re-entry within mount; injectable `attemptCapture` so production wires a frame-processor's live quality stream with `takePhoto()`; Tamagui-only UI (step indicator + framing overlay + feedback banner + controls + review modal + camera surface); re-uses scanner `CameraPermissionPrompt` via the barrel without modification; placeholder review screen reached via 2nd route file `app/grading/capture/review.tsx`; +76 vitest tests → 796 total mobile / 81 files; no new deps; documented follow-ups: FU-T-GR-CAPTURE-FULL-SCHEMA (2 remaining corner crops + surface raking-light shot from PROJECT.md § 12) + FU-T-GR-CENTERING-ROUTING (placeholder module-scoped session ref tagged `@deprecated` → real router-param strategy lands with T-GR-CENTERING) + live frame-processor wiring once a CPU JPEG decoder is bundled)
 - T-SC-MATCH — `378116b` (scanner read-path closer: `useScanner()` JS-thread orchestrator under `apps/mobile/src/scanner/match/`; detect→embed→ann wired through a confidence+stability gate with stack-mode cooldown + bounded fired-match FIFO; 72 new vitest cases / 792 total mobile tests; ships against pure-JS `searchKNN()` per Q-014 → native SIMD swap deferred to #FU-29)
 - T-SC-EMBED-MODEL — `122e879` (MobileNetV3-Small TFLite + Python embedding pipeline + `react-native-fast-tflite@3.0.1` on-device wrapper + `metro.config.js` `.tflite` asset bundling + new `ci-python.yml` GH Action; `pnpm-workspace.yaml` negates `apps/api-python`; manifest validation; reference embeddings shipped) — **iter 23 cap**
 - T-SC-CAMERA — `56aaa82` (vision-camera@4.6.4 + worklets-core@1.5.0; iOS NSCameraUsageDescription + Android camera permission + vision-camera config plugin with `enableFrameProcessors: true`; worklet-thread frame processor capped at 10 FPS; permission flow + Scan screen host; **in-PR `fix(mobile)` hotfix removed a stale `expo-web-browser` plugin entry (T-M-AUTH leftover; broke `expo prebuild` on Node 20+ via `require(ESM)` → `expo-modules-core/src/index.ts`) and switched mobile npm scripts to `expo run:ios/android` because vision-camera is native, not in Expo Go**) — iter 23
 - T-BE-Q013-CLEANUP — `ac01201` (migration `0018_mv_user_completion.sql` ships `mv_user_set_completion` + `mv_user_global_completion` MVs + wrapper views + refresh function; migration `0019_smart_preview_rpc.sql` ships `smart_collection_preview()` Postgres RPC + 4 PL/pgSQL helpers porting `expressionToSql()`; completion handler swapped to MV SELECT; smart-preview swapped to `client.rpc()`; refresh hooks wired into every collection mutation; +10 edge-fn tests (303→313); **closes Q-013 + #FU-26 + #FU-27**) — iter 23
-- T-W-API-V2-WIRING — `d45b9d4` (web wires 4 V2 endpoints into Collection/Card/Shareable/Smart-Editor surfaces; +51 tests → 499 total; `CardPriceBlock` new component; `apiToShareApi` swaps degraded synthesis → `getPublicShareablePayload()` (Q-012 fully closed end-to-end); `MatchGrid` widened via `runMatchToView` / `previewItemToView`; local DSL `evaluate()` kept as `collection.*` fallback + typing/explainer preview; 5xx-propagates posture on shareable; `catalogRoster()` retained for per-set Owned/Missing grids) — iter 22 cap
-- T-M-API-V2-WIRING — `6186ef3` (mobile wires 3 V2 endpoints into Collection/Card/SmartEditor surfaces; +28 tests → 460 / 48 files; Master% real on first paint; `useMutation` not `useQuery` for smart preview; 404 → `data: null` sentinel; **#FU-22 closed as side effect** pinned by regression test rendering unowned printing tile)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
