@@ -1014,7 +1014,6 @@ tasks:
     title: Conflict resolution (last-write-wins + log)
     agent_role: frontend-mobile
     status: merged
-    status: pending
     depends_on: [T-OF-QUEUE]
     parallel_safe_with: []
     provides: [offline:conflicts]
