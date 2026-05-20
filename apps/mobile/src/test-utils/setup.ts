@@ -542,6 +542,53 @@ vi.mock('react-native-fast-tflite', () => ({
   useTensorflowModel: vi.fn(),
 }));
 
+// ---- react-native-purchases -----------------------------------------
+// Default mock for the RevenueCat SDK. The mobile billing module
+// (`apps/mobile/src/billing/`) static-imports
+// `react-native-purchases` from `sdk.ts` so the package types flow
+// through cleanly; this default mock keeps every test that just
+// imports the billing module (e.g. via `index.ts`) from dragging
+// in RC's native module under jsdom.
+//
+// Per-suite tests in `apps/mobile/src/billing/__tests__/` that need
+// to assert calls against `configure` / `logIn` / `logOut` re-mock
+// the module locally with their own `vi.mock(...)` call. The
+// default below resolves every method to a benign no-op so
+// non-billing tests that incidentally pull in the billing module
+// never hit a "module not configured" error path.
+vi.mock('react-native-purchases', () => {
+  const emptyCustomerInfo = {
+    entitlements: { all: {}, active: {}, verification: 'NOT_REQUESTED' },
+    activeSubscriptions: [],
+    allPurchasedProductIdentifiers: [],
+    latestExpirationDate: null,
+    firstSeen: new Date(0).toISOString(),
+    originalAppUserId: '$RCAnonymousID:setup-default',
+    requestDate: new Date(0).toISOString(),
+    allExpirationDates: {},
+    allPurchaseDates: {},
+    originalApplicationVersion: null,
+    originalPurchaseDate: null,
+    managementURL: null,
+    nonSubscriptionTransactions: [],
+    subscriptionsByProductIdentifier: {},
+  };
+  return {
+    default: {
+      configure: vi.fn(),
+      logIn: vi.fn(async () => ({ customerInfo: emptyCustomerInfo, created: false })),
+      logOut: vi.fn(async () => emptyCustomerInfo),
+      getOfferings: vi.fn(async () => ({ all: {}, current: null })),
+      getCustomerInfo: vi.fn(async () => emptyCustomerInfo),
+      purchasePackage: vi.fn(async () => ({
+        customerInfo: emptyCustomerInfo,
+        productIdentifier: 'noop',
+      })),
+      restorePurchases: vi.fn(async () => emptyCustomerInfo),
+    },
+  };
+});
+
 // ---- cleanup --------------------------------------------------------
 //
 // The dynamic-import guards below tolerate test files that
