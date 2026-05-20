@@ -1013,6 +1013,7 @@ tasks:
     stage: 09-offline-sync
     title: Conflict resolution (last-write-wins + log)
     agent_role: frontend-mobile
+    status: merged
     status: pending
     depends_on: [T-OF-QUEUE]
     parallel_safe_with: []
@@ -1020,7 +1021,7 @@ tasks:
     owns_paths: [apps/mobile/src/sync/conflicts/]
     task_file: tasks/09-offline-sync/T-OF-CONFLICTS.md
     est_effort: M
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 10 — PAYWALL / BILLING

@@ -758,3 +758,88 @@ the centering 'unknown' → 5.0 default) systematically biases the output.
 ---
 
 _(no other open questions yet)_
+
+## Q-019 — Missing single-GET endpoints + repository `upsertFromServer` API (T-OF-CONFLICTS)
+
+**Context.** T-OF-CONFLICTS' LWW resolver consumes dead-letter events from
+T-OF-QUEUE, fetches the current server state for the conflicting entity, and
+either re-enqueues the local mutation (local wins) or overwrites the local
+SQLite row with the server payload (server wins). Two upstream API gaps
+surfaced during implementation:
+
+### Gap 1 — `@binderly/api-client` lacks single-fetch GETs for two of the four conflicting entity types
+
+`CollectionResource` exposes:
+
+- `listCollectionItems({ cursor })` — paginated; no `getCollectionItem(id)`
+- `getCustomCollection({ id })` — single-fetch ✅
+- `listCustomCollectionItems({ customCollectionId })` — collection-scoped;
+  no `getCustomCollectionItem({ collectionId, printingId })`
+- `getSmartCollectionRule({ id })` — single-fetch ✅ (only the rule, not the
+  smart_collection metadata; for the metadata the resolver reuses
+  `getCustomCollection` since smart_collection is stored as `custom_collection`
+  with `kind='smart'`)
+
+Adding `getCollectionItem({ id })` and `getCustomCollectionItem({
+customCollectionId, printingId })` would be ~30 LOC of additive client code
+(matching the existing single-fetch shape) plus a tiny backend route — but
+both are out of scope for a conflict-resolution task; touching the API client
+would also pull T-OF-CONFLICTS into the `@binderly/api-client` test surface,
+which is owned by T-BE-API-CLIENT.
+
+### Gap 2 — Repositories don't expose `upsertFromServer` / merge-from-server
+
+`UserCollectionRepository`, `CustomCollectionRepository`,
+`SmartCollectionRepository` each expose `upsert(entity)` — but `upsert` fires
+the `onLocalWrite` subscription that T-OF-QUEUE listens to, so calling it from
+the resolver to apply a server-wins overwrite would re-enqueue the row we
+just resolved (feedback loop → unbounded queue growth → re-runs the same
+conflict on next replay → unbounded conflict log growth → eventually
+duplicate row sentinel breaks).
+
+Adding `upsertFromServer(entity)` to the 3 repositories (skipping the
+`onLocalWrite` notify) would be ~10 LOC each but expands the repository
+public surface that T-OF-LOCAL-DB owns.
+
+### Decision (documented, not blocking)
+
+1. **For Gap 1**, the resolver's `server-fetcher.ts` wraps the existing
+   paginated `listCollectionItems` / `listCustomCollectionItems` and walks
+   pages client-side to find the target id. A hard `MAX_PAGE_WALK = 50`
+   cap (~5 000 items at the typical 100-per-page) prevents pathological
+   scans; exceeding the cap surfaces as `transient_error` (the dead-letter
+   row stays in place, the user retries on next connectivity event, and a
+   future api-client upgrade will swap in a single-fetch). For
+   `custom_collection_item`, the same pagination pattern over the
+   `customCollectionId`-scoped list runs against a much smaller cohort
+   (one collection at a time, typically << 100 items).
+
+2. **For Gap 2**, the resolver bypasses the 3 repositories entirely on
+   server-wins and uses a local `local-writer.ts` module that performs
+   direct `INSERT OR REPLACE` / `DELETE` SQL against the same tables.
+   Since the writes never fire `onLocalWrite`, they don't re-enter the
+   sync queue — exactly the semantics needed. The schema mirrors the
+   repositories' `mapEntityToRow` shape (verified by parity tests).
+
+Both workarounds keep the change strictly within `apps/mobile/src/sync/conflicts/`
+(this task's owns_paths) and add zero surface area to `@binderly/api-client`,
+T-OF-QUEUE, or T-OF-LOCAL-DB's repositories.
+
+### Follow-ups
+
+- **#FU-49 (logged below as well)** — adding the 2 missing single-GET endpoints
+  to `@binderly/api-client` + matching backend routes is a small standalone
+  task (`T-BE-API-CLIENT-SINGLE-GET-COLLECTION-ITEMS`); land it once
+  T-BE-API-CLIENT has a maintainer cycle and the resolver will benefit
+  immediately (drop the page-walk, drop the `MAX_PAGE_WALK` cap, swap in
+  `getCollectionItem` / `getCustomCollectionItem` behind the same
+  `ServerFetcher` interface).
+- Adding `upsertFromServer` to the 3 repositories is **not** logged as a
+  follow-up — the direct-SQL `local-writer` pattern is a deliberate
+  invariant (the resolver is the only consumer that needs feedback-loop-free
+  writes; widening the repository API would risk other consumers
+  accidentally bypassing the queue).
+
+**Status: closed by documented assumptions.** Non-blocking; no escalation
+required. Re-open if real-world page-walk costs surface as user-visible
+latency on conflict resolution.
