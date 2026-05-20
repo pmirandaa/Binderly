@@ -988,14 +988,14 @@ tasks:
     stage: 09-offline-sync
     title: Mobile SQLite schema mirror + local repository layer
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-M-COLLECTION]
     parallel_safe_with: [T-OF-QUEUE]
     provides: [offline:local-db]
     owns_paths: [apps/mobile/src/db/, apps/mobile/src/repositories/]
     task_file: tasks/09-offline-sync/T-OF-LOCAL-DB.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-OF-QUEUE
     stage: 09-offline-sync

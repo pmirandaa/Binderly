@@ -8,7 +8,9 @@
 **Phase 5 mobile (Stage 05):** **Complete (5/5 merged)** — closed at iter 19 with T-M-CUSTOM; +1 in iter 22 (T-M-API-V2-WIRING).
 **Stage 06 scanner:** ✅ **CLOSED — 6 / 6 merged** (T-SC-CAMERA #71, T-SC-EMBED-MODEL #72 — iter 23; T-SC-ANN-INDEX #76, T-SC-DETECT #77 — iter 25; T-SC-MATCH #78 — iter 26; T-SC-UX #80 — iter 27). End-to-end pipeline + UI live: camera surface → frame-processor detect → mobilenet embed → flat FP16 ANN search → confidence/stability gate → MatchOverlay or DisambigPicker → stack-mode review.
 **Stage 07 grading:** **5 / 10 merged** (T-GR-CAPTURE-UX #79 — iter 26; T-GR-CENTERING #81 — iter 27; T-GR-DATA-PSA #82, T-GR-DATA-EBAY #83, T-GR-DATA-AUCTIONS #84 — iter 28). Capture flow + centering + 3 data scrapers (PSA cert lookup, eBay sold listings, PWCC/Goldin auction archives) shipped.
-**Stages 08-11:** 0 / 16 merged.
+**Stage 08:** 0 / 1 merged.
+**Stage 09 offline-sync:** **1 / 3 merged** (T-OF-LOCAL-DB #85 — iter 29). Foundation (local DB + repositories) live; T-OF-QUEUE + T-OF-CONFLICTS pending.
+**Stages 10-11:** 0 / 12 merged.
 
 **In progress:** 0.
 **Blocked:** 0.
@@ -243,6 +245,36 @@ mobile vs packages) is reliably mergeable in parallel.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
+
+## Iter 29 close summary (Stage 09 offline-sync foundation — T-OF-LOCAL-DB)
+
+Single worker. Shipped the mobile SQLite schema mirror + local repository layer — the foundation for Stage 09 offline sync.
+
+| Task | Status | PR / commit | vitest | Highlight |
+|---|---|---|---|---|
+| T-OF-LOCAL-DB | merged | #85 (`3005b13`) | 104 / 104 new (1099 total) | 6-table SQLite schema (`user_collection_item`, `custom_collection`, `custom_collection_item`, `smart_collection`, `printing_lite`, `_meta`), forward-only migrations, lazy singleton connection. Three typed repository facades (`UserCollectionRepository`, `CustomCollectionRepository`, `SmartCollectionRepository`) with `onLocalWrite` subscribe-hook seam for T-OF-QUEUE. `expo-sqlite` mocked via sql.js (real SQLite WASM, FK enforcement). |
+
+**Local CI battery (final, on main after merge):**
+
+- `pnpm build` (workspace): 11 / 11 tasks ✓.
+- `pnpm --filter @binderly/mobile lint`: 0 warnings ✓.
+- `pnpm --filter @binderly/mobile typecheck`: 0 errors ✓.
+- `pnpm --filter @binderly/mobile test`: 1099 / 1099 (109 test files) ✓.
+
+**New follow-ups:**
+
+- **#FU-41** — Full catalog mirror in `printing_lite` (currently only populated for user-interacted printings). Blocked on T-OF-QUEUE wiring the sync path.
+
+**Open questions raised:**
+
+- **Q-016** — Should `printing_lite` cache `set.logo_url` for the CollectionScreen set-row renderer, or defer to T-OF-QUEUE? Decision deferred; table can be extended with `ALTER TABLE` in a v2 migration without breaking T-OF-QUEUE.
+
+**Notes:**
+
+- Stage 09 is now partially open: T-OF-LOCAL-DB (foundation) merged; T-OF-QUEUE and T-OF-CONFLICTS remain pending.
+- `expo-sqlite` is already part of Expo SDK 52 — no new native deps added. `sql.js` + `@types/sql.js` added as devDependencies only (not in production bundle).
+
+HEAD: `3005b13`. Open questions: 4 non-blocking (Q-007, Q-011, Q-014 deferred to #FU-29, Q-016).
 
 ## Iter 28 close summary (3 grading data scrapers shipped in parallel; ML training trio unblocked)
 
@@ -982,6 +1014,7 @@ placeholders untouched.
 38. **#FU-38 — browser-driven fetcher fallback (iter 28 cross-cutting follow-up).** Playwright / headless-chrome backend swapped behind the existing `fetch_html` (PSA) and `_fetch_page` (auctions) hooks. Needed only if PSA's Cloudflare gating triggers in practice or if Goldin / PWCC archive pages turn out to be JS-gated. Pure HTML path is the v1 default; this follow-up swaps in a heavier backend behind the same hook contract without API changes upstream. **Logged as #FU-38.**
 39. **#FU-39 — image download + Supabase Storage / R2 ingest for graded card images.** Today the iter 28 scrapers persist `thumbnail_url` (eBay) and `lot_image_urls` (auctions) as remote URLs only. Hosting images ourselves needs: a downloader job + content-addressed storage on R2 (or Supabase Storage) + a normalised image rewrite when the row is read. Re-uses `T-DL-IMAGE-PIPELINE`'s sharp transcode + SHA-256 dedup primitives. **Logged as #FU-39.**
 40. **#FU-40 — `T-GR-DATA-PRINTING-MATCH` (proposed; iter 28 cross-cutting follow-up).** Resolve the NULL `printing_id` FK on grading observation tables (`grading_training_sample` rows from PSA + eBay, `auction_lot_observation` rows from PWCC + Goldin). All 3 scrapers leave `printing_id` NULL intentionally — fuzzy matching against the canonical `printings` table is its own task. Likely strategy: trigram + ANN search over `(card_name, set_name, card_number)` tuples + a confidence threshold + a manual-resolution surface in admin UI for low-confidence matches. Substantively a backend Python task with its own pytest battery. **Logged as #FU-40.**
+41. **#FU-41 — Full catalog mirror in `printing_lite` (T-OF-LOCAL-DB follow-up; iter 29).** Today `printing_lite` is populated only as a side-effect of `UserCollectionRepository.upsert()` — i.e. only for printings the user has actually added to their collection. A background catalog sync would pre-populate all printings the user has interacted with across browse history too (so the CollectionScreen can render thumbnails without a network round-trip even for printings not yet in the collection). Blocked on T-OF-QUEUE shipping the sync engine that drives the background refresh. The `printing_lite` table schema can be extended in-place with `ALTER TABLE` in a v2 migration if additional columns (e.g. `set.logo_url`) are needed. **Logged as #FU-41.**
 34. **#FU-34 — Thumbnail images in MatchOverlay + DisambigPicker (T-SC-UX follow-up).** `MatchOverlay` and `DisambigPicker` render a coloured placeholder box in place of a card thumbnail. Blocked on T-SC-MATCH exposing a thumbnail URL in `MatchResult` or a separate printings-lookup hook (`usePrinting(printingId)`). Once available, swap the `YStack` placeholder for `<Image source={{ uri: thumbnailUrl }} />` with a shimmer fallback. **Logged as #FU-34.**
 35. **#FU-35 — Module-level model cache for useModelLoader (T-SC-UX follow-up).** `useModelLoader` re-triggers load on every `ScanScreen` remount (tab switch, back-navigate). A singleton/module-scope cache (similar to `expo-av`'s `Audio.Sound`) would keep the model warm across tab switches and skip the loading state on second visit. Blocked on deciding the right cache lifetime and eviction strategy (low-memory signal? app backgrounding?). **Logged as #FU-35.**
 36. **#FU-36 — Pure-JS on-device centering algorithm (T-GR-CENTERING follow-up).** The TypeScript v1 ships a `not_implemented` stub that gracefully defers to the Python service. A pure-JS port of the contour-detection approach (using the scanner's gradient-projection rect finder as a reference) would enable full on-device inference without OpenCV. Blocked on: accuracy validation against real Pokémon card photos; decision on acceptable latency budget. **Logged as #FU-36.**
