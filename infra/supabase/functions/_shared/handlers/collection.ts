@@ -17,6 +17,16 @@
 //     `_shared/contracts.ts`.
 //   - Translates PostgREST errors via `translatePostgrestError`.
 //   - Returns the result envelope via `apiOk` / `apiError`.
+//
+// Completion-MV refresh hook (T-BE-Q013-CLEANUP). Every mutation
+// (add / update / delete / bulk) fires a best-effort
+// `supabase.rpc('refresh_user_completion')` after the mutation
+// commits. Best-effort means: a refresh failure is logged via the
+// request id (the structured `console.warn` channel) and does NOT
+// change the mutation's HTTP response — the next read picks up the
+// change on the next refresh. Strong-consistency UX in the typical
+// case, eventually-consistent fallback when the refresh transiently
+// fails (lock conflict, slow REFRESH on a hot MV, etc.).
 
 import {
   addCollectionItemRequest,
@@ -40,6 +50,49 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 const COLLECTION_ITEM_TABLE = 'collection_item';
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 200;
+const REFRESH_USER_COMPLETION_RPC = 'refresh_user_completion';
+
+/**
+ * Fire-and-forget refresh of the per-user completion MVs. Returns a
+ * Promise the caller may `await` for strong-consistency UX (the
+ * next read sees the change) or ignore for best-effort throughput.
+ *
+ * All known failure modes are non-fatal for the surrounding
+ * mutation:
+ *
+ *   - Refresh lock conflict (concurrent mutation also refreshing) —
+ *     the second caller's CONCURRENTLY waits; if it times out at
+ *     the PG layer, the next read sees the stale MV one extra
+ *     beat. Acceptable.
+ *   - Refresh function missing (pre-0018 environment) — surfaces as
+ *     a `function not found` PostgREST error. Logged + ignored.
+ *   - RPC connectivity blip — same.
+ *
+ * The structured log line uses the request id so on-call can
+ * correlate a "the home screen lagged my last add by ~30s" report
+ * with the specific refresh that didn't fire.
+ */
+async function bestEffortRefreshUserCompletion(
+  session: AuthenticatedSession,
+  requestId: string,
+): Promise<void> {
+  try {
+    const { error } = await session.supabase.rpc(REFRESH_USER_COMPLETION_RPC);
+    if (error !== null && error !== undefined) {
+      console.warn(
+        `[rid=${requestId}] refresh_user_completion RPC returned an error; ` +
+          `the mutation succeeded, but the MV is stale until the next refresh. ` +
+          `Error: ${error.message}`,
+      );
+    }
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause);
+    console.warn(
+      `[rid=${requestId}] refresh_user_completion RPC threw; the mutation ` +
+        `succeeded, but the MV is stale until the next refresh. Error: ${message}`,
+    );
+  }
+}
 
 /**
  * Snake-cased DB row shape — what the Supabase JS client returns
@@ -213,6 +266,7 @@ export async function handleAddCollectionItem(
     .single();
 
   if (insertError === null && insertData !== null) {
+    await bestEffortRefreshUserCompletion(session, ctx.requestId);
     return apiOk(request, ctx.cors, ctx.requestId, rowToWire(insertData as CollectionItemRow), {
       status: 201,
     });
@@ -222,6 +276,7 @@ export async function handleAddCollectionItem(
     // Conflict — read existing row by the unique-constraint key,
     // bump its quantity, return it.
     const updated = await additiveQuantityUpdate(session, insertRow, requestQuantity);
+    await bestEffortRefreshUserCompletion(session, ctx.requestId);
     return apiOk(request, ctx.cors, ctx.requestId, rowToWire(updated), { status: 200 });
   }
 
@@ -298,7 +353,9 @@ export async function handleUpdateCollectionItem(
   }
   const payload = await parseJsonBody(request, updateCollectionItemRequest);
   const updateRow = patchToRow(payload);
-  return await applySingleRowUpdate(session, request, ctx, id, updateRow);
+  const response = await applySingleRowUpdate(session, request, ctx, id, updateRow);
+  await bestEffortRefreshUserCompletion(session, ctx.requestId);
+  return response;
 }
 
 // ============================================================
@@ -340,6 +397,7 @@ export async function handleDeleteCollectionItem(
   if (deleteError !== null) {
     throw translatePostgrestError(deleteError);
   }
+  await bestEffortRefreshUserCompletion(session, ctx.requestId);
   return apiNoContent(request, ctx.cors, ctx.requestId);
 }
 
@@ -410,6 +468,7 @@ export async function handleBulkUpdateCollection(
     await revertSnapshot(session.supabase, applied);
     throw cause;
   }
+  await bestEffortRefreshUserCompletion(session, ctx.requestId);
   return apiOk(request, ctx.cors, ctx.requestId, { items: results });
 }
 

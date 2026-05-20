@@ -551,14 +551,14 @@ tasks:
     stage: 02-backend
     title: Q-013 backend perf cleanup — land missing MVs + smart-preview Postgres RPC
     agent_role: backend
-    status: pending
+    status: review
     depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING]
     parallel_safe_with: []
     provides: [api:edge-v3]
-    owns_paths: [packages/db/src/migrations/, packages/db/src/schema/, infra/supabase/functions/_shared/handlers/, infra/supabase/functions/_shared/contracts.ts]
+    owns_paths: [packages/db/src/migrations/, packages/db/src/schema/, infra/supabase/functions/_shared/handlers/, infra/supabase/functions/_shared/contracts.ts, infra/supabase/functions/_shared/test-helpers.ts]
     task_file: tasks/02-backend/T-BE-Q013-CLEANUP.md
     est_effort: L
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 3 — SHARED PACKAGES

@@ -213,20 +213,25 @@ export {
 // package). We mirror just the leaf node shapes here — the same
 // shape `smart_collection_rule.expression` already stores as opaque
 // `jsonb` — so the preview handler can validate the AST structurally
-// without compiling SQL.
+// before forwarding it to the database.
 //
-// The compiler step happens inside the handler too: we translate
-// each leaf into a PostgREST filter via the supabase-js builder
-// rather than executing the dsl's `expressionToSql()` (which would
-// require raw SQL execution against the DB, not available through
-// the supabase-js boundary). Limitations:
+// The compiler step happens server-side now (T-BE-Q013-CLEANUP /
+// Surface 2 / #FU-27): the handler hands the AST to the
+// `smart_collection_preview(ast, p_user_id, p_limit, p_offset)`
+// RPC (migration `0019_smart_preview_rpc.sql`) which ports
+// `@binderly/smart-collection-dsl`'s `expressionToSql()` to
+// PL/pgSQL. Implications for the schema:
 //
-//   - `collection.*` predicates are explicitly rejected by the
-//     preview endpoint (the editor surfaces them only on the
-//     "save" path, not on preview). The mirror schema rejects
-//     them via a `superRefine`.
-//   - `enumArray` fields use PostgREST's `cs` (contains) operator
-//     for `eq`, and `ov` (overlaps) for `in`.
+//   - `collection.*` predicates are NOW accepted by the preview
+//     endpoint. The RPC entry point LEFT JOINs `collection_item`
+//     filtered by `p_user_id`, so `collection.condition`,
+//     `collection.grade`, `collection.isOwned`, etc. all
+//     resolve. This is a contract widening — old clients that
+//     only used `card.*` / `printing.*` / `set.*` continue to
+//     work; new clients can ask "things I already own at
+//     condition NEAR_MINT" without churning the wire shape.
+//   - `enumArray` fields (`printing.variantFlags`) compile to
+//     `ANY(...)` for `eq` and `&&` for `in` inside the RPC.
 
 const ALLOWED_PREVIEW_FIELDS = [
   'card.name',
@@ -249,6 +254,16 @@ const ALLOWED_PREVIEW_FIELDS = [
   'printing.variantFlags',
   'printing.variantCode',
   'printing.includeInMasterSet',
+  // `collection.*` — widened in T-BE-Q013-CLEANUP. The RPC
+  // joins `collection_item` filtered by the caller's id so
+  // these resolve to per-user predicates. `collection.isOwned`
+  // is the synthetic "row exists in collection_item" boolean.
+  'collection.condition',
+  'collection.gradeCompany',
+  'collection.grade',
+  'collection.quantity',
+  'collection.acquiredAt',
+  'collection.isOwned',
 ] as const;
 
 export type SmartPreviewField = (typeof ALLOWED_PREVIEW_FIELDS)[number];

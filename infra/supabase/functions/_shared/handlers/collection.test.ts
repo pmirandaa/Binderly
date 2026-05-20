@@ -593,3 +593,231 @@ describe('all collection routes — common posture', () => {
     expect(authCalls[0]!.args[0]).toBe(token);
   });
 });
+
+// ============================================================
+// T-BE-Q013-CLEANUP: refresh_user_completion best-effort hook
+// ============================================================
+//
+// Every successful mutation (add / update / delete / bulk) fires
+// the `supabase.rpc('refresh_user_completion')` shim so the
+// per-user completion MVs reflect the change before the next read.
+// These tests assert:
+//
+//   - The RPC is invoked exactly once per successful mutation.
+//   - An RPC failure does NOT change the mutation's HTTP response
+//     (the underlying mutation already succeeded).
+//   - A read-only GET does NOT fire the RPC (no MV mutation to
+//     reflect).
+
+describe('collection mutations — completion MV refresh hook (T-BE-Q013-CLEANUP)', () => {
+  function rpcCallCount(fake: ReturnType<typeof createFakeSupabase>): number {
+    return fake.calls.filter(
+      (c) => c.method === 'rpc' && c.table === 'refresh_user_completion',
+    ).length;
+  }
+
+  it('POST /v1/me/collection (insert path) fires refresh_user_completion once', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [{ data: collectionItemRowFixture(), error: null }],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection',
+        method: 'POST',
+        token: makeFakeJwt(),
+        body: { printingId: FIXTURE_PRINTING_ID },
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(1);
+  });
+
+  it('POST /v1/me/collection (additive-update path) fires refresh_user_completion once', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [
+          // 1) INSERT — conflict
+          { data: null, error: { code: '23505', message: 'unique violation' } },
+          // 2) SELECT existing row
+          { data: [collectionItemRowFixture({ quantity: 2 })], error: null },
+          // 3) UPDATE
+          { data: collectionItemRowFixture({ quantity: 3 }), error: null },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection',
+        method: 'POST',
+        token: makeFakeJwt(),
+        body: { printingId: FIXTURE_PRINTING_ID, quantity: 1 },
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(1);
+  });
+
+  it('PATCH /v1/me/collection/:id fires refresh_user_completion once on success', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [
+          { data: { id: FIXTURE_COLLECTION_ITEM_ID, user_id: FIXTURE_USER_ID }, error: null },
+          { data: collectionItemRowFixture({ quantity: 5 }), error: null },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/collection/${FIXTURE_COLLECTION_ITEM_ID}`,
+        method: 'PATCH',
+        token: makeFakeJwt(),
+        body: { quantity: 5 },
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(1);
+  });
+
+  it('DELETE /v1/me/collection/:id fires refresh_user_completion once on success', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [
+          { data: { id: FIXTURE_COLLECTION_ITEM_ID, user_id: FIXTURE_USER_ID }, error: null },
+          { data: null, error: null },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/collection/${FIXTURE_COLLECTION_ITEM_ID}`,
+        method: 'DELETE',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(1);
+  });
+
+  it('POST /v1/me/collection/bulk fires refresh_user_completion once on success', async () => {
+    const item1Pre = collectionItemRowFixture({ id: BULK_ITEM_1 });
+    const item2Pre = collectionItemRowFixture({ id: BULK_ITEM_2, quantity: 4 });
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [
+          { data: [item1Pre, item2Pre], error: null },
+          { data: { ...item1Pre, quantity: 7 }, error: null },
+          { data: { ...item2Pre, quantity: 8 }, error: null },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection/bulk',
+        method: 'POST',
+        token: makeFakeJwt(),
+        body: {
+          items: [
+            { id: BULK_ITEM_1, patch: { quantity: 7 } },
+            { id: BULK_ITEM_2, patch: { quantity: 8 } },
+          ],
+        },
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(1);
+  });
+
+  it('bulk rollback path does NOT fire refresh_user_completion (mutation failed)', async () => {
+    const item1Pre = collectionItemRowFixture({ id: BULK_ITEM_1 });
+    const item2Pre = collectionItemRowFixture({ id: BULK_ITEM_2, quantity: 4 });
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [
+          { data: [item1Pre, item2Pre], error: null },
+          { data: { ...item1Pre, quantity: 7 }, error: null },
+          { data: null, error: { code: 'XX999', message: 'pg failed' } },
+          { data: item1Pre, error: null },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection/bulk',
+        method: 'POST',
+        token: makeFakeJwt(),
+        body: {
+          items: [
+            { id: BULK_ITEM_1, patch: { quantity: 7 } },
+            { id: BULK_ITEM_2, patch: { quantity: 8 } },
+          ],
+        },
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(0);
+  });
+
+  it('GET /v1/me/collection does NOT fire refresh_user_completion (read-only)', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: { collection_item: [{ data: [], error: null }] },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection',
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(rpcCallCount(fake)).toBe(0);
+  });
+
+  it('refresh failure does NOT change the mutation HTTP response (best-effort)', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [{ data: collectionItemRowFixture(), error: null }],
+        // Enqueue an error outcome for the rpc:refresh_user_completion
+        // queue; the helper's try/catch swallows it. The mutation
+        // response should still be 201.
+        'rpc:refresh_user_completion': [
+          { data: null, error: { code: 'XXMV1', message: 'concurrent refresh in progress' } },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection',
+        method: 'POST',
+        token: makeFakeJwt(),
+        body: { printingId: FIXTURE_PRINTING_ID },
+      }),
+    );
+    expect(response.status).toBe(201);
+  });
+
+  it('refresh that throws does NOT change the mutation HTTP response (best-effort)', async () => {
+    // Stub the rpc to throw by replacing the underlying client. We
+    // build the fake first, then monkey-patch `rpc` to throw.
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [{ data: collectionItemRowFixture(), error: null }],
+      },
+    });
+    // Override .rpc — the helper's try/catch should swallow.
+    (fake.client as unknown as { rpc: () => Promise<never> }).rpc = () =>
+      Promise.reject(new Error('boom'));
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection',
+        method: 'POST',
+        token: makeFakeJwt(),
+        body: { printingId: FIXTURE_PRINTING_ID },
+      }),
+    );
+    expect(response.status).toBe(201);
+  });
+});

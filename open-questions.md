@@ -484,11 +484,26 @@ tracked separately.
 ## Q-013 — T-BE-EDGE-FUNCTIONS-V2 divergences from the brief (deferred MVs + DSL → in-memory eval)
 
 **Raised:** 2026-05-19
+**Ratified:** 2026-05-20 by Pablo ("if all required pieces are
+available, don't defer, do it now") → both divergences landed in
+T-BE-Q013-CLEANUP at branch HEAD `f96649d` (worktree:
+`agent/T-BE-Q013-CLEANUP`).
 **Blocking:** None — the four endpoints ship behind correct contracts
 and the divergences are bounded.
-**Status:** Open — informational; flags the two implementation
-choices the orchestrator should know about before reading the PR
-and may want to schedule follow-ups for.
+**Status:** CLOSED — both follow-ups (#FU-26 / T-DL-MV-COMPLETION
+and #FU-27 / T-BE-SMART-PREVIEW-RPC) landed in T-BE-Q013-CLEANUP
+(2026-05-20). See the elaborated task brief at
+`tasks/02-backend/T-BE-Q013-CLEANUP.md` and the corresponding
+migrations `packages/db/src/migrations/0018_mv_user_completion.sql`
+and `packages/db/src/migrations/0019_smart_preview_rpc.sql`. The
+completion handler now reads two MVs via wrapper views
+(`v_my_set_completion` / `v_my_global_completion`) filtered by
+`auth.uid()`; the smart-preview handler now calls
+`smart_collection_preview(ast, p_user_id, p_limit, p_offset)`
+which ports the DSL `expressionToSql()` compiler to PL/pgSQL.
+Wire shapes (`completionDto`, `smartPreviewResponse`) are
+unchanged; `collection.*` predicates are accepted in smart-preview
+(contract widening, not a break).
 
 **Context:**
 
