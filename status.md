@@ -1,19 +1,21 @@
-# Build status — Iter 24 closed. One-line REVOKE migration fixed 2 pre-existing verify-rls failures on the admin debug view (#FU-28 → ✅ CLOSED).
+# Build status — Iter 25 closed. Scanner stage 4/6 merged (DETECT + ANN-INDEX landed in parallel; MATCH + UX remain). Q-014 raised (non-blocking).
 
 **Phase 0:** Complete (10/10 merged).
-**Phase 1:** Complete (23/23 merged) — closed at iter 11; +1 in iter 24 (T-DL-RLS-PG-STAT-REVOKE backend-hygiene chore, #FU-28).
+**Phase 1:** Complete (23/23 merged) — closed at iter 11; +1 in iter 24 (T-DL-RLS-PG-STAT-REVOKE).
 **Phase 2 backend (Stage 02):** **Complete (5/5 merged)** — closed at iter 16; +1 in iter 21 (T-BE-EDGE-FUNCTIONS-V2); +1 in iter 23 (T-BE-Q013-CLEANUP).
 **Phase 3 shared packages (Stage 03):** **Complete (4/4 merged)** — closed at iter 17.
 **Phase 4 web (Stage 04):** **Complete (8/8 merged)** — closed at iter 20; +1 in iter 22 (T-W-API-V2-WIRING).
 **Phase 5 mobile (Stage 05):** **Complete (5/5 merged)** — closed at iter 19 with T-M-CUSTOM; +1 in iter 22 (T-M-API-V2-WIRING).
-**Stage 06 scanner:** 2 / 6 merged (T-SC-CAMERA #71, T-SC-EMBED-MODEL #72 — iter 23).
+**Stage 06 scanner:** 4 / 6 merged (T-SC-CAMERA #71, T-SC-EMBED-MODEL #72 — iter 23; T-SC-ANN-INDEX #76, T-SC-DETECT #77 — iter 25). T-SC-MATCH + T-SC-UX remain.
 **Stages 07-11:** 0 / 26 merged.
 
 **In progress:** 0.
 **Blocked:** 0.
 **Blocked on humans:** 0 (Pablo has granted full autonomy: "don't wait for my approval to do stuff"; "Run Everything" enabled in Cursor).
 
-Iter 23 opened the scanner stage in parallel with a Q-013 backend perf cleanup. T-SC-CAMERA + T-SC-EMBED-MODEL ship the camera + frame-processor seam and the MobileNetV3-Small TFLite embedding model + on-device inference wrapper that downstream T-SC-DETECT / T-SC-MATCH / T-SC-UX dock onto. T-BE-Q013-CLEANUP closes Q-013 (mvs `mv_user_set_completion` / `mv_user_global_completion` landed + `smart_collection_preview` Postgres RPC; completion handler swapped from on-the-fly compute to MV SELECT; smart-preview handler swapped from in-JS DSL eval to `client.rpc()`). Frontend wire shapes unchanged.
+Iter 25 closed the scanner read path's middle (T-SC-DETECT) and end (T-SC-ANN-INDEX) in one parallel pair. Detection runs pure-JS on the worklet thread (gradient-projection rectangle finder + sharpness/brightness/aspect quality gate + 224×224×3 mobilenet_v3-normalised crop); ANN runs flat FP16-quantised brute-force (recall@10 = 100% on the synthetic benchmark; portable index format with reserved upgrade slot for HNSW/PQ). T-SC-MATCH is now unblocked and will stitch detect → embed → ann into recognised printings, closing the scanner read path. Q-014 raised by T-SC-ANN-INDEX worker (pure-JS dot-product at full production catalog scale projects to ~140 ms on Pixel 6, exceeding the 30 ms stage budget; beta-launch catalog at ~3-5 k printings stays inside the budget; T-SC-MATCH owns the decide-to-go-native call).
+
+**GitHub Actions usage** is at ~90 % of monthly quota — all PRs from iter 24 onward merge without CI gate, with full local CI-equivalent battery (`pnpm lint` / `typecheck` / `test` / `build` + `pytest` where applicable) exercised in the worktree before push. Workers report local-battery pass counts in their summaries for orchestrator audit.
 
 ## Phase 1 close summary
 
@@ -49,22 +51,6 @@ The data layer is **done end-to-end** on main:
   image pipeline + parsers + jobs + repos).
 
 ## Dispatch loop status
-
-**Iter 24 CLOSED 2026-05-20 ~11:51 UTC-4. Single-worker
-backend-hygiene chore: T-DL-RLS-PG-STAT-REVOKE shipped one
-additive REVOKE migration (`0020_revoke_admin_debug_view_grants.sql`)
-that strips the surviving `anon` / `authenticated` privileges on
-`public.v_pg_stat_statements_top_queries`. verify-rls moved from
-**123 passed / 2 failed** on `main` @ `761c254` to **125 passed /
-0 failed** post-fix (both reds — anon + authenticated — clearing
-exactly as predicted). Pre-existing failures; predate iter-23 close,
-introduced way back on `b13d3ed` (T-DL-ADMIN-DEBUG-SURFACES, iter 11).
-**#FU-28 closed.** Merged via `gh pr merge --squash --delete-branch`
-without CI gate (GitHub Actions at ~90% monthly quota — full
-CI-equivalent battery exercised locally in the worktree before push:
-lint 0 warnings / typecheck 0 errors / test 3443 passed across
-10 packages / build success / verify-rls 125/0). Q-007 (admin role
-provisioning) intentionally untouched — separate open question.**
 
 **Iter 23 CLOSED 2026-05-20 ~11:00 UTC-4. Three-worker iter:
 scanner stage opened (T-SC-CAMERA + T-SC-EMBED-MODEL) +
@@ -257,56 +243,30 @@ mobile vs packages) is reliably mergeable in parallel.
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
 
-## Iter 24 close summary (one-line REVOKE migration; #FU-28 closed)
+## Iter 25 close summary (scanner read-path middle + end; Q-014 raised, non-blocking)
 
-Single-worker backend-hygiene chore. Clean ship, no surprises.
+Two sibling workers, fully orthogonal owns_paths trees (`scanner/detect/` vs `scanner/ann/` + `apps/api-python/ann/`), both green on local CI, both squash-merged without GH Actions gating (quota at ~90 % monthly cap). Lockfile conflict was structurally impossible from the DETECT side (no new mobile deps) and the ANN-INDEX worker raced through its own state commit first; no merge friction at all.
 
 | Task | Status | PR / commit | Tests | Highlight |
 |---|---|---|---|---|
-| T-DL-RLS-PG-STAT-REVOKE | merged | #75 (`f1c4d7c`) | verify-rls 123/2 → 125/0 (full workspace `pnpm test`: 3443 passed across 10 packages, unchanged) | One additive migration `0020_revoke_admin_debug_view_grants.sql` with a single `REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM anon, authenticated;` plus a header comment explaining the cause. Pattern mirrors `0012_profile_grants_fix.sql` (Q-003 / Option 1): additive corrective, no edits to the originating migration, idempotent REVOKE, journal append. Hard rule for the PR was "one migration, only the REVOKE statements"; verified via `verify-rls` that no other view needed REVOKEing — only `v_pg_stat_statements_top_queries` was observably red because its underlying object (`extensions.pg_stat_statements`) is an extension view with no RLS. **Merged without CI gate** due to GH Actions at ~90% monthly quota; full CI-equivalent battery exercised locally in the worktree before push (lint 0 warnings / typecheck 0 errors / test 3443 passed / build success / verify-rls 125/0). |
+| T-SC-DETECT | merged | #77 (`6411b75`) | +90 mobile (577→667) | Pure-JS, no native module. Frame-processor-safe pipeline: RGB → Rec. 601 luma grayscale → aspect-preserving downsample to a **dynamic** ≤96×128 analysis grid (originally-planned fixed 96×128 distorted landscape sources enough to flip the aspect gate — caught by synthetic-frame tests) → 2-tap finite-difference gradients → row/column activity projections → first-from-each-side scan above `0.35 × max(profile)` gated on noise floor `12` → sharpness/brightness/aspect quality gate → axis-aligned crop + nearest-neighbour resize to 224×224 + mobilenet_v3 normalisation (`byte/127.5 - 1`, `[-1, +1]`). `useDetectFrameProcessor()` mirrors T-SC-CAMERA's 10 FPS throttle; ships a `DetectionSink` JS-side bus that T-SC-MATCH will subscribe to. Failed-gate frames emit `cropped: null` to preserve the embedding budget. **Explicit deferrals** (in scope of the brief, not blockers): full perspective correction (T-SC-MATCH may add it once real-world miss data lands); auto-rotation on landscape (v1 rejects via gate); stack-mode geometry stability (T-SC-MATCH owns — needs consecutive accepted rects). |
+| T-SC-ANN-INDEX | merged | #76 (`9549e44`) | +53 mobile vitest, +65 pytest | Flat brute-force, FP16-quantised. Portable binary format: 32-byte LE header + fixed-width ASCII ids + row-major embedding block; `format` field reserved so HNSW/PQ is an additive future migration. Python builder + CLI under `apps/api-python/ann/`; TS runtime under `apps/mobile/src/scanner/ann/` reads byte-for-byte mirror. `metro.config.js` additively registers `.bin` as a bundled asset extension (mirrors T-SC-EMBED-MODEL's `.tflite` block). **Recall@10 = 100.0 %** on the FP16-vs-FP32 ground-truth benchmark (1 000 queries × 5 000 catalog rows). No new runtime deps (Python: `numpy` + `pydantic` already present; TS: `zod` already present). **Q-014 raised** in the brief's "Notes from execution": pure-JS dot-product at full 30 k × 576 production catalog projects to ~140 ms on a Pixel 6-class device, **exceeding the 30 ms stage budget**; beta-launch catalog (~3-5 k printings, EN only) stays inside the budget. T-SC-MATCH owns the on-device latency story and the decide-to-go-native call. |
 
-**Why only `v_pg_stat_statements_top_queries` was red.** All five views
-in `0016_admin_debug_views.sql` acquire the same surviving `anon` /
-`authenticated` grants from Supabase's `ALTER DEFAULT PRIVILEGES` on
-`CREATE VIEW`. Four of them (`v_data_conflict_top`,
-`v_data_conflict_by_source`, `v_image_pipeline_coverage_gaps`,
-`v_fx_rate_freshness`) pass verify-rls because their underlying tables
-(`data_conflict`, `printing`, `printing_image`, `fx_rate`) RLS-gate
-`anon`/`authenticated` to zero rows under the PG 17 `security_invoker
-= false` default — the wrapper view, owned by `postgres`, still reads
-the underlying with postgres's privileges but the RLS predicates run
-against the caller and elide every row. The pg_stat_statements wrapper
-is the lone red because `extensions.pg_stat_statements` is an extension
-view with no RLS — there's nothing to gate the rows once SQL-grant
-access is allowed. Hardening the other four (defense in depth — they
-could leak if a future migration disabled RLS on their underlying
-tables) is intentionally **out of scope for this PR** per the
-one-migration-only rule; can ride along with the next non-trivial
-0016-adjacent change.
+**Local CI battery (substitute for GH Actions; both workers ran the full set in their worktrees):**
 
-**Q-007 (admin role provisioning) intentionally untouched.** That's an
-open product question — separate scope.
+- `pnpm lint`: 0 warnings (12/12 packages).
+- `pnpm typecheck`: 20/20 packages green.
+- `pnpm test`: **3 496 JS tests** pass (mobile 667 after +90 detect tests + 53 ann tests; data-pipeline 1101; web 499; etc.).
+- `pnpm build`: 11/11 packages green.
+- `pytest` under `apps/api-python/`: 128 tests pass (+65 net-new under `ann/tests/`).
 
-Final migration sequence on main: monotonic 0000-0020.
-
-  0020_revoke_admin_debug_view_grants   (T-DL-RLS-PG-STAT-REVOKE, hand-authored; closes #FU-28)
-
-HEAD: `f1c4d7c` (PR #75 squash). Open questions: 2 (Q-007 admin role,
-Q-011 TCGplayer URL); both non-blocking.
+Final migration sequence on main: monotonic 0000-0020 (no new migrations in iter 25; iter 24 added 0020). HEAD: `0e8442b`. Open questions: 3 (Q-007 admin role, Q-011 TCGplayer URL, Q-014 ANN catalog-scale latency); all non-blocking.
 
 **Next iter candidates (ranked):**
 
-1. **Scanner stage continuation: T-SC-DETECT.** Card detection
-   (frame → crop → quality gate) on top of T-SC-CAMERA's frame
-   processor + T-SC-EMBED-MODEL's manifest. Standalone; no
-   dependency outside the scanner subtree.
-2. **T-SC-ANN-INDEX.** Approximate nearest-neighbor index over
-   the embedding bank; pairs with the model from T-SC-EMBED-MODEL.
-3. **T-SC-MATCH.** End-to-end match pipeline that stitches
-   T-SC-DETECT → T-SC-EMBED → T-SC-ANN-INDEX into a recognised
-   printing. Closes the scanner read path.
-4. **Open the grading stage** (T-GR-CAPTURE-UX depends on
-   T-SC-CAMERA — now unblocked).
+1. **T-SC-MATCH** (single worker, scanner read-path closer): stitches T-SC-DETECT → T-SC-EMBED-MODEL → T-SC-ANN-INDEX into a recognised printing. Owns the Q-014 decision (whether to push ANN into a native module for full-catalog latency). Critical path for closing the scanner stage.
+2. **T-GR-CAPTURE-UX** (grading stage opener): depends on T-SC-CAMERA only (merged); fully orthogonal to scanner. Can run in parallel with T-SC-MATCH.
+3. **T-SC-UX** (scanner UX shell): depends on T-SC-MATCH; sequence after MATCH lands.
 
 ## Iter 23 close summary (scanner stage opened + Q-013 backend perf cleanup; #FU-26 + #FU-27 closed)
 
@@ -776,7 +736,7 @@ api-client `auth` resource — best cross-platform validation we
 can do at this layer. Iter 16 candidate: T-BE-EDGE-FUNCTIONS to
 close Stage 02.
 
-## Open questions (2 open; all non-blocking)
+## Open questions (3 open; all non-blocking)
 
 - **Q-007** (raised by T-DL-ADMIN-DEBUG-SURFACES, PR #40):
   should we provision a narrower Postgres `admin` role for read-only
@@ -791,6 +751,19 @@ close Stage 02.
   placeholder URL. Real format + Impact tracking param come once
   Pablo signs up. Non-blocking: env-missing degraded path is
   production default until affiliate id lands. **Logged as #FU-24.**
+
+- **Q-014** (raised by T-SC-ANN-INDEX, PR #76): pure-JS dot-product
+  brute-force ANN search projects to ~140 ms per query on a
+  Pixel 6-class device at full production catalog (~30 k × 576),
+  exceeding the 30 ms scanner stage budget. Beta-launch catalog
+  (~3-5 k printings) stays inside the budget, so v1 is fine.
+  T-SC-MATCH worker owns the decision: pre-cluster the catalog,
+  push the inner loop into a tiny native module
+  (`vDSP_distancesq` / Neon `vmlaq_f32`), migrate the index to
+  HNSW/IVF-PQ (the manifest's `format` field reserves this slot
+  for additive migration), or accept the latency off-worklet on a
+  debounced JS tick. **Status: open; not blocking. Resolved when
+  T-SC-MATCH ships with its chosen latency contract.**
 
 **Q-013** closed at iter 23 merge time. Both halves landed in
 T-BE-Q013-CLEANUP (PR #73 → `ac01201`): migration `0018_mv_user_completion.sql`
@@ -826,13 +799,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
-- T-SC-DETECT — `6411b75` (card detection + quality gate; pure-JS gradient-projection rectangle finder on the worklet thread — no native module, no new mobile-app runtime deps, `pnpm-lock.yaml` unchanged; pipeline: RGB → grayscale (Rec. 601 luma) → aspect-preserving nearest-neighbour downsample to a `≤ 96 × 128` analysis grid → 2-tap finite-difference gradient field → row/column activity projections → first-from-each-side scan above `0.35 × max(profile)` gated on a noise floor of `12` → sharpness/brightness/aspect quality gate → axis-aligned crop + nearest-neighbour resize to `224×224` + mobilenet_v3 normalisation (`byte/127.5 - 1`, `[-1, +1]`) drop-in for T-SC-EMBED-MODEL's `embed()`; failed-gate frames return `cropped: null` to preserve the embedding budget; `useDetectFrameProcessor()` hook mirrors T-SC-CAMERA's 10-FPS throttle posture and ships a `DetectionSink` JS-side bus T-SC-MATCH will subscribe to; **dynamic-aspect grid** chosen over the originally-planned fixed `96×128` so the aspect quality-gate is honest about portrait vs landscape regardless of source resolution (the synthetic-frame tests caught the fixed-grid distortion); 90 net-new vitest tests across 8 files (grayscale, gradient, rectangle, quality, crop with cross-module regression check against `scanner/embed/embed.ts`'s `mobilenet_v3` recipe, detect sink, top-level pipeline, worklet adapter) — `pnpm --filter @binderly/mobile test` 577 → 667; merged without CI gate due to GH Actions ~90 % monthly quota, full local CI-equivalent battery exercised: lint 0 warnings / typecheck 0 errors / mobile 667 passed / workspace 20 turbo tasks green / build 11/11; **axis-aligned crop only — full perspective correction explicitly deferred** to a future task once T-SC-MATCH surfaces real-world miss data; landscape-orientation detection flips `aspectOK: false` for v1 — auto-rotation is a follow-up) — iter 25
-- T-SC-ANN-INDEX — `9549e44` (on-device approximate nearest neighbor over the T-SC-EMBED-MODEL embedding bank; flat brute-force FP16-quantised index format with a 32-byte LE header + ASCII ids + row-major embedding block; Python builder + CLI under `apps/api-python/ann/` + TS runtime under `apps/mobile/src/scanner/ann/` mirror byte-for-byte; **recall@10 lands at 100.0 %** on the FP16-vs-FP32 5 000-row × 1 000-query synthetic benchmark; `metro.config.js` additively registers `.bin` as a bundled asset extension mirroring the `.tflite` block; 65 net-new pytest tests + 53 net-new vitest tests; no new runtime deps; merged without CI gate due to GH Actions quota, full local battery exercised — lint 0/0, typecheck 20/20, test 3496 JS + 128 py, build 11/11; **Q-014 logged** in `Notes from execution` re: pure-JS dot-product over the full 30 k × 576 production catalog projecting to ~140 ms on a Pixel 6-class device — beta-launch catalog at ~3-5 k printings keeps us inside the 30 ms budget; T-SC-MATCH owns the on-device latency story) — **opens scanner stage iter on the ANN side**
-- T-DL-RLS-PG-STAT-REVOKE — `f1c4d7c` (one additive migration `0020_revoke_admin_debug_view_grants.sql` REVOKEs the surviving `anon` / `authenticated` privileges on `public.v_pg_stat_statements_top_queries`; restores service-role-only posture promised by 0016; root cause: Supabase project-init `ALTER DEFAULT PRIVILEGES ... GRANT ALL ... TO anon, authenticated` fires on `CREATE VIEW` before the 0016 `REVOKE ALL FROM PUBLIC` which only strips PUBLIC ≠ union-of-all-roles; only 5/5 views are observably red because `extensions.pg_stat_statements` is the lone underlying object without RLS to gate anon/authenticated to zero rows; verify-rls 123/2 → 125/0; **closes #FU-28**; merged without CI gate due to GH Actions quota, full CI-equivalent battery exercised locally) — **iter 24 cap**
-- T-SC-EMBED-MODEL — `122e879` (MobileNetV3-Small TFLite + Python embedding pipeline + `react-native-fast-tflite@3.0.1` on-device wrapper + `metro.config.js` `.tflite` asset bundling + new `ci-python.yml` GH Action; `pnpm-workspace.yaml` negates `apps/api-python`; manifest validation; reference embeddings shipped) — iter 23 cap
+- T-SC-EMBED-MODEL — `122e879` (MobileNetV3-Small TFLite + Python embedding pipeline + `react-native-fast-tflite@3.0.1` on-device wrapper + `metro.config.js` `.tflite` asset bundling + new `ci-python.yml` GH Action; `pnpm-workspace.yaml` negates `apps/api-python`; manifest validation; reference embeddings shipped) — **iter 23 cap**
 - T-SC-CAMERA — `56aaa82` (vision-camera@4.6.4 + worklets-core@1.5.0; iOS NSCameraUsageDescription + Android camera permission + vision-camera config plugin with `enableFrameProcessors: true`; worklet-thread frame processor capped at 10 FPS; permission flow + Scan screen host; **in-PR `fix(mobile)` hotfix removed a stale `expo-web-browser` plugin entry (T-M-AUTH leftover; broke `expo prebuild` on Node 20+ via `require(ESM)` → `expo-modules-core/src/index.ts`) and switched mobile npm scripts to `expo run:ios/android` because vision-camera is native, not in Expo Go**) — iter 23
 - T-BE-Q013-CLEANUP — `ac01201` (migration `0018_mv_user_completion.sql` ships `mv_user_set_completion` + `mv_user_global_completion` MVs + wrapper views + refresh function; migration `0019_smart_preview_rpc.sql` ships `smart_collection_preview()` Postgres RPC + 4 PL/pgSQL helpers porting `expressionToSql()`; completion handler swapped to MV SELECT; smart-preview swapped to `client.rpc()`; refresh hooks wired into every collection mutation; +10 edge-fn tests (303→313); **closes Q-013 + #FU-26 + #FU-27**) — iter 23
 - T-W-API-V2-WIRING — `d45b9d4` (web wires 4 V2 endpoints into Collection/Card/Shareable/Smart-Editor surfaces; +51 tests → 499 total; `CardPriceBlock` new component; `apiToShareApi` swaps degraded synthesis → `getPublicShareablePayload()` (Q-012 fully closed end-to-end); `MatchGrid` widened via `runMatchToView` / `previewItemToView`; local DSL `evaluate()` kept as `collection.*` fallback + typing/explainer preview; 5xx-propagates posture on shareable; `catalogRoster()` retained for per-set Owned/Missing grids) — iter 22 cap
+- T-M-API-V2-WIRING — `6186ef3` (mobile wires 3 V2 endpoints into Collection/Card/SmartEditor surfaces; +28 tests → 460 / 48 files; Master% real on first paint; `useMutation` not `useQuery` for smart preview; 404 → `data: null` sentinel; **#FU-22 closed as side effect** pinned by regression test rendering unowned printing tile)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -883,7 +854,7 @@ placeholders untouched.
 25. **Server-side public shareable read endpoint (Q-012).** ✅ **CLOSED iter 21** — `T-BE-EDGE-FUNCTIONS-V2` shipped `GET /v1/c/{handle}/{slug}` anonymous with `Accept: application/vnd.binderly.share+json` opting into the richer `publicShareableDto`. T-W-SHAREABLE-PUBLIC's runtime adapter can swap its degraded synthesis for `getPublicShareablePayload(...)` in a small follow-up; the data layer was designed as the seam for exactly this.
 26. **Land `mv_user_set_completion` + `mv_user_global_completion` materialised views (Q-013, half 1).** ✅ **CLOSED iter 23** — T-BE-Q013-CLEANUP shipped both mvs + `UNIQUE` indexes (for `REFRESH CONCURRENTLY`) + `security_barrier = true` wrapper views `v_my_set_completion` / `v_my_global_completion` filtered by `(SELECT auth.uid())` (PG17 lacks RLS on MVs) + `refresh_user_completion()` `SECURITY DEFINER` function in migration `0018_mv_user_completion.sql`. Completion handler swapped from on-the-fly compute → MV SELECT; `completionDto` wire shape unchanged. Best-effort `supabase.rpc()` refresh hook wired into every collection mutation (strong-consistency UX in the typical case, eventually-consistent fallback on failure; documented pivot to `pg_cron` if it scales badly). `lastUpdatedAt` temporarily `null` (MV doesn't carry `max(updated_at)`); widening is a tiny follow-up if the UI ever needs it. `bigint` may serialize as string over PostgREST; `coerceCount` handles both shapes. **Closed as #FU-26.**
 27. **Smart-preview DSL-to-SQL via Postgres RPC (Q-013, half 2).** ✅ **CLOSED iter 23** — T-BE-Q013-CLEANUP shipped `smart_collection_preview(ast, p_user_id, p_limit, p_offset)` `SECURITY DEFINER` RPC + 4 PL/pgSQL helpers that port `expressionToSql()` faithfully in migration `0019_smart_preview_rpc.sql`. Smart-preview handler swapped to `client.rpc()`; `previewExpressionSchema` widened to accept `collection.*` (non-breaking). RPC security: `SECURITY DEFINER` + explicit `auth.uid() = p_user_id` guard + `SET search_path = ''` + `quote_literal()`-quoted values + static `CASE` allowlist for column refs. **Closed as #FU-27.**
-28. **One-line REVOKE migration for `v_pg_stat_statements_top_queries`.** ✅ **CLOSED iter 24** — `T-DL-RLS-PG-STAT-REVOKE` shipped `0020_revoke_admin_debug_view_grants.sql` (PR #75 → `f1c4d7c`). One REVOKE statement strips the surviving `anon` / `authenticated` privileges left in place by Supabase's project-init `ALTER DEFAULT PRIVILEGES` firing on `CREATE VIEW` before 0016's `REVOKE ALL FROM PUBLIC` (PUBLIC ≠ union of all roles for REVOKE semantics). verify-rls 123/2 → 125/0. Other 4 views in 0016 acquire the same surviving grants but pass verify-rls today because their underlying tables RLS-gate `anon`/`authenticated` to zero rows under PG 17's `security_invoker = false` default — hardening those left as a defense-in-depth follow-up if needed. **Closed as #FU-28.**
+28. **One-line REVOKE migration for `v_pg_stat_statements_top_queries` (`T-DL-RLS-PG-STAT-REVOKE` proposed).** `pnpm --filter @binderly/db verify-rls` reports 2 pre-existing failures on this view (anon + authenticated can read it). Cause: Supabase's default `ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO anon, authenticated` fires on view creation **before** migration `0016_admin_debug_views.sql`'s `REVOKE ALL FROM PUBLIC` runs (`PUBLIC` ≠ the union of all roles). Fix: ship `0020_*.sql` with `REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM anon, authenticated;`. Surfaced by the T-BE-Q013-CLEANUP worker (PR #73). **Not introduced by #73** — predates branch base on main commit `b13d3ed` (T-DL-ADMIN-DEBUG-SURFACES, iter 11). Trivial to land. **Logged as #FU-28.**
 29. **Cosmetic chore for Pablo: orphan worktree dirs at `/Users/pmiranda/Stuff/binderly-wt-T-*`.** Git no longer tracks them as worktrees; safe to `rm -rf`. pnpm-store residue blocks sandbox `rm`. Affected: T-DL-SEED-INGEST, T-FN-LINT-CONFIG, T-M-COLLECTION, T-W-BROWSE, T-W-COLLECTION, T-W-CUSTOM, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING, T-SC-CAMERA, T-SC-EMBED-MODEL, T-BE-Q013-CLEANUP.
 
 ## Phase 0 ledger (closed; 10/10 merged)

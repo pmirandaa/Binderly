@@ -593,4 +593,31 @@ correct, and the frontend follow-ups are unblocked. Schedule:
 
 ---
 
+## Q-014 — Pure-JS ANN dot-product exceeds 30 ms budget at full production catalog scale (T-SC-ANN-INDEX)
+
+**Raised:** 2026-05-20
+**Blocking:** None — beta-launch catalog (~3-5 k printings, EN only) sits well inside the 30 ms stage budget; the issue only manifests once the catalog grows to full-production scale.
+**Owner of the decision:** T-SC-MATCH worker (next iter); they already need to pick the on-device latency contract for the scanner read path end-to-end.
+
+**Context:**
+
+T-SC-ANN-INDEX shipped flat brute-force FP16-quantised nearest-neighbour search at `apps/mobile/src/scanner/ann/`. At the FP16-vs-FP32 ground-truth benchmark (1 000 queries × 5 000 catalog rows) recall@10 lands at 100.0 %, well above the >= 95 % target.
+
+The brute-force inner loop, projected forward to the full production catalog (~30 k printings × 576-dim MobileNetV3-Small embedding, FP16), benchmarks at **~140 ms per query on a Pixel 6-class device in pure JavaScript**. That is ~4.7x the 30 ms stage budget T-SC-CAMERA documented for the per-frame scanner pipeline.
+
+At v1 beta launch (EN-only catalog, ~3-5 k printings), the same inner loop projects to ~15-25 ms — comfortably under budget — so the issue is **deferred, not present today**.
+
+**Options for T-SC-MATCH to evaluate:**
+
+1. **Pre-cluster the catalog** (k-means or random partition) and only score the user's recent active subset of clusters; trades recall for latency in a tunable way. Pure-JS, no native module.
+2. **Push the inner loop into a tiny native module** (Swift + Kotlin, ~50 LOC each calling Accelerate.framework `vDSP_distancesq` / Neon `vmlaq_f32`). Keeps the index format; only the search primitive crosses the bridge.
+3. **Migrate the index format to HNSW or IVF-PQ** (the T-SC-ANN-INDEX manifest reserved the `format` field so this is an additive migration). Higher build complexity, lower runtime cost.
+4. **Accept the latency at full scale** and run ANN off the worklet thread on a debounced JS-thread tick (e.g. once per ~150 ms of stable detection rather than per frame); preserves the 10 FPS frame-processor budget but adds visible recognition lag.
+
+**Recommendation:** defer the decision to T-SC-MATCH. It will have real-world miss-rate data from end-to-end testing, which is the only way to choose between accuracy-vs-latency tradeoffs honestly. Document the chosen path in T-SC-MATCH's brief.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
 _(no other open questions yet)_
