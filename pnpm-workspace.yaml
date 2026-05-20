@@ -1,5 +1,9 @@
 packages:
   - "apps/*"
+  # `apps/api-python` is a Python package (pyproject.toml). Excluded
+  # from the JS workspace so pnpm / turbo / eslint leave it alone. Its
+  # own CI lives in `.github/workflows/ci-python.yml`.
+  - "!apps/api-python"
   - "packages/*"
   - "packages/config/*"
   - "data-pipeline"

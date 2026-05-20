@@ -9,19 +9,26 @@
 //   2. ESM `exports` fields on the `@binderly/api-client` and
 //      `@binderly/ui` packages route to the right `dist/`
 //      entries.
+//   3. `.tflite` files are bundled as static assets so
+//      `require('./model.tflite')` resolves at runtime — the
+//      `react-native-fast-tflite` binding loads from these asset
+//      module IDs. (Per T-SC-EMBED-MODEL: bundle-only for v1;
+//      on-device update from R2 is a follow-up.)
 //
 // Reference: Metro's package exports docs
 // https://reactnative.dev/blog/2025/05/12/version-0.79#metro-package-exports
-//
-// Keep this thin — the shell doesn't add custom transformers,
-// asset extensions, or source maps tweaks here. Future tasks
-// (T-SC-CAMERA, T-OF-LOCAL-DB) can extend this if a native module
-// requires a custom transformer.
 
 const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
 config.resolver.unstable_enablePackageExports = true;
+
+// Register .tflite as a bundled asset extension. Metro's default
+// assetExts list doesn't include it; without this, `require()` of a
+// .tflite file fails with "unable to resolve module".
+if (!config.resolver.assetExts.includes('tflite')) {
+  config.resolver.assetExts = [...config.resolver.assetExts, 'tflite'];
+}
 
 module.exports = config;
