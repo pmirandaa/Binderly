@@ -39,6 +39,12 @@ export function generateMetadata({ params }: PageParams): Metadata {
   const url = publicShareUrl(params.handle, params.slug);
   const title = `@${params.handle} on Binderly`;
   const description = `Browse @${params.handle}'s Pokémon TCG collection on Binderly.`;
+  // T-SH-OG-IMAGES routes the dynamic OG card through
+  // `/api/og/share/[handle]/[slug]` (the rich card-grid hero).
+  // The sibling file-based `opengraph-image.tsx` route stays in
+  // place as a passive fallback (Next.js still resolves it for
+  // `og:image` consumers that read the file convention directly).
+  const ogImageUrl = `/api/og/share/${encodeURIComponent(params.handle)}/${encodeURIComponent(params.slug)}`;
   return {
     title,
     description,
@@ -49,11 +55,13 @@ export function generateMetadata({ params }: PageParams): Metadata {
       url,
       siteName: 'Binderly',
       type: 'website',
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: title }],
     },
     twitter: {
       card: 'summary_large_image',
       title,
       description,
+      images: [ogImageUrl],
     },
   };
 }

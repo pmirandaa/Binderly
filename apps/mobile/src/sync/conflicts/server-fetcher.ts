@@ -27,8 +27,8 @@ import {
   type CollectionResource,
 } from '@binderly/api-client';
 
-import type { DeadLetterEvent, QueueTableName } from '../queue/types.js';
 import type { ServerFetchResult, ServerFetcher } from './types.js';
+import type { DeadLetterEvent, QueueTableName } from '../queue/types.js';
 
 interface ParsedEntityRef {
   table: QueueTableName;

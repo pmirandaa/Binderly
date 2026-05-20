@@ -957,14 +957,14 @@ tasks:
     stage: 08-shareables
     title: Dynamic OG image generation (Vercel OG / Satori)
     agent_role: frontend-web
-    status: pending
+    status: merged
     depends_on: [T-W-SHAREABLE-PUBLIC]
     parallel_safe_with: [T-SH-CONFIG-MODEL]
     provides: [shareables:og]
-    owns_paths: [apps/web/app/api/og/]
+    owns_paths: [apps/web/app/api/og/, apps/web/lib/og/]
     task_file: tasks/08-shareables/T-SH-OG-IMAGES.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-SH-THEMES
     stage: 08-shareables
@@ -1028,14 +1028,13 @@ tasks:
     stage: 10-paywall-billing
     title: RevenueCat SDK integration (mobile)
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-M-AUTH]
     parallel_safe_with: [T-PB-PADDLE]
     provides: [billing:revenuecat]
     owns_paths: [apps/mobile/src/billing/]
     task_file: tasks/10-paywall-billing/T-PB-REVENUECAT.md
     est_effort: M
-    stub: true
 
   - id: T-PB-PADDLE
     stage: 10-paywall-billing

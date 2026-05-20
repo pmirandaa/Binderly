@@ -84,11 +84,13 @@ even though the cross-repo convention
 (`context/secrets-and-env.md`) uses `<SCOPE>_<SERVICE>_<NAME>`
 elsewhere. Both can coexist in `.env.local`.
 
-| Required? | Var                             | Source                                                                       |
-| --------- | ------------------------------- | ---------------------------------------------------------------------------- |
-| ✓         | `EXPO_PUBLIC_SUPABASE_URL`      | Supabase project URL — `https://<ref>.supabase.co` or local CLI              |
-| ✓         | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (public-by-design)                                         |
-|           | `EXPO_PUBLIC_API_URL`           | Override for the Binderly backend base URL when it differs from Supabase URL |
+| Required? | Var                                  | Source                                                                                                                                |
+| --------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| ✓         | `EXPO_PUBLIC_SUPABASE_URL`           | Supabase project URL — `https://<ref>.supabase.co` or local CLI                                                                       |
+| ✓         | `EXPO_PUBLIC_SUPABASE_ANON_KEY`      | Supabase anon key (public-by-design)                                                                                                  |
+|           | `EXPO_PUBLIC_API_URL`                | Override for the Binderly backend base URL when it differs from Supabase URL                                                          |
+|           | `EXPO_PUBLIC_REVENUECAT_IOS_KEY`     | RevenueCat iOS public API key. Absence triggers the dev-mode billing stub (see [`src/billing/`](./src/billing/) — free tier, no IAP). |
+|           | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | RevenueCat Android public API key. Same dev-mode behaviour as the iOS key when unset.                                                 |
 
 Missing required keys throw a `MobileEnvError` on first import,
 caught by `<EnvGate>` in `app/_layout.tsx` and rendered as a

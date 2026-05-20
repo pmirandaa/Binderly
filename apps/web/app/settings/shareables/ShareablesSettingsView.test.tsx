@@ -1,9 +1,9 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { renderWithProviders } from '../../../test-utils/render';
 import { createFakeSettingsApi, FAKE_SHAREABLE } from './fixtures';
 import { ShareablesSettingsView } from './ShareablesSettingsView';
+import { renderWithProviders } from '../../../test-utils/render';
 
 describe('ShareablesSettingsView', () => {
   it('renders the page shell after loading the profile + shareables', async () => {
