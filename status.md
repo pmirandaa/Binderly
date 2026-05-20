@@ -1,7 +1,7 @@
-# Build status — Iter 23 closed. Scanner stage opened (camera + embed model) + Q-013 backend perf cleanup landed in one sweep.
+# Build status — Iter 24 closed. One-line REVOKE migration fixed 2 pre-existing verify-rls failures on the admin debug view (#FU-28 → ✅ CLOSED).
 
 **Phase 0:** Complete (10/10 merged).
-**Phase 1:** Complete (23/23 merged) — closed at iter 11.
+**Phase 1:** Complete (23/23 merged) — closed at iter 11; +1 in iter 24 (T-DL-RLS-PG-STAT-REVOKE backend-hygiene chore, #FU-28).
 **Phase 2 backend (Stage 02):** **Complete (5/5 merged)** — closed at iter 16; +1 in iter 21 (T-BE-EDGE-FUNCTIONS-V2); +1 in iter 23 (T-BE-Q013-CLEANUP).
 **Phase 3 shared packages (Stage 03):** **Complete (4/4 merged)** — closed at iter 17.
 **Phase 4 web (Stage 04):** **Complete (8/8 merged)** — closed at iter 20; +1 in iter 22 (T-W-API-V2-WIRING).
@@ -49,6 +49,22 @@ The data layer is **done end-to-end** on main:
   image pipeline + parsers + jobs + repos).
 
 ## Dispatch loop status
+
+**Iter 24 CLOSED 2026-05-20 ~11:51 UTC-4. Single-worker
+backend-hygiene chore: T-DL-RLS-PG-STAT-REVOKE shipped one
+additive REVOKE migration (`0020_revoke_admin_debug_view_grants.sql`)
+that strips the surviving `anon` / `authenticated` privileges on
+`public.v_pg_stat_statements_top_queries`. verify-rls moved from
+**123 passed / 2 failed** on `main` @ `761c254` to **125 passed /
+0 failed** post-fix (both reds — anon + authenticated — clearing
+exactly as predicted). Pre-existing failures; predate iter-23 close,
+introduced way back on `b13d3ed` (T-DL-ADMIN-DEBUG-SURFACES, iter 11).
+**#FU-28 closed.** Merged via `gh pr merge --squash --delete-branch`
+without CI gate (GitHub Actions at ~90% monthly quota — full
+CI-equivalent battery exercised locally in the worktree before push:
+lint 0 warnings / typecheck 0 errors / test 3443 passed across
+10 packages / build success / verify-rls 125/0). Q-007 (admin role
+provisioning) intentionally untouched — separate open question.**
 
 **Iter 23 CLOSED 2026-05-20 ~11:00 UTC-4. Three-worker iter:
 scanner stage opened (T-SC-CAMERA + T-SC-EMBED-MODEL) +
@@ -240,6 +256,57 @@ mobile vs packages) is reliably mergeable in parallel.
 
 Final migration sequence on main: monotonic 0000-0017 (no new
 migrations in iter 19).
+
+## Iter 24 close summary (one-line REVOKE migration; #FU-28 closed)
+
+Single-worker backend-hygiene chore. Clean ship, no surprises.
+
+| Task | Status | PR / commit | Tests | Highlight |
+|---|---|---|---|---|
+| T-DL-RLS-PG-STAT-REVOKE | merged | #75 (`f1c4d7c`) | verify-rls 123/2 → 125/0 (full workspace `pnpm test`: 3443 passed across 10 packages, unchanged) | One additive migration `0020_revoke_admin_debug_view_grants.sql` with a single `REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM anon, authenticated;` plus a header comment explaining the cause. Pattern mirrors `0012_profile_grants_fix.sql` (Q-003 / Option 1): additive corrective, no edits to the originating migration, idempotent REVOKE, journal append. Hard rule for the PR was "one migration, only the REVOKE statements"; verified via `verify-rls` that no other view needed REVOKEing — only `v_pg_stat_statements_top_queries` was observably red because its underlying object (`extensions.pg_stat_statements`) is an extension view with no RLS. **Merged without CI gate** due to GH Actions at ~90% monthly quota; full CI-equivalent battery exercised locally in the worktree before push (lint 0 warnings / typecheck 0 errors / test 3443 passed / build success / verify-rls 125/0). |
+
+**Why only `v_pg_stat_statements_top_queries` was red.** All five views
+in `0016_admin_debug_views.sql` acquire the same surviving `anon` /
+`authenticated` grants from Supabase's `ALTER DEFAULT PRIVILEGES` on
+`CREATE VIEW`. Four of them (`v_data_conflict_top`,
+`v_data_conflict_by_source`, `v_image_pipeline_coverage_gaps`,
+`v_fx_rate_freshness`) pass verify-rls because their underlying tables
+(`data_conflict`, `printing`, `printing_image`, `fx_rate`) RLS-gate
+`anon`/`authenticated` to zero rows under the PG 17 `security_invoker
+= false` default — the wrapper view, owned by `postgres`, still reads
+the underlying with postgres's privileges but the RLS predicates run
+against the caller and elide every row. The pg_stat_statements wrapper
+is the lone red because `extensions.pg_stat_statements` is an extension
+view with no RLS — there's nothing to gate the rows once SQL-grant
+access is allowed. Hardening the other four (defense in depth — they
+could leak if a future migration disabled RLS on their underlying
+tables) is intentionally **out of scope for this PR** per the
+one-migration-only rule; can ride along with the next non-trivial
+0016-adjacent change.
+
+**Q-007 (admin role provisioning) intentionally untouched.** That's an
+open product question — separate scope.
+
+Final migration sequence on main: monotonic 0000-0020.
+
+  0020_revoke_admin_debug_view_grants   (T-DL-RLS-PG-STAT-REVOKE, hand-authored; closes #FU-28)
+
+HEAD: `f1c4d7c` (PR #75 squash). Open questions: 2 (Q-007 admin role,
+Q-011 TCGplayer URL); both non-blocking.
+
+**Next iter candidates (ranked):**
+
+1. **Scanner stage continuation: T-SC-DETECT.** Card detection
+   (frame → crop → quality gate) on top of T-SC-CAMERA's frame
+   processor + T-SC-EMBED-MODEL's manifest. Standalone; no
+   dependency outside the scanner subtree.
+2. **T-SC-ANN-INDEX.** Approximate nearest-neighbor index over
+   the embedding bank; pairs with the model from T-SC-EMBED-MODEL.
+3. **T-SC-MATCH.** End-to-end match pipeline that stitches
+   T-SC-DETECT → T-SC-EMBED → T-SC-ANN-INDEX into a recognised
+   printing. Closes the scanner read path.
+4. **Open the grading stage** (T-GR-CAPTURE-UX depends on
+   T-SC-CAMERA — now unblocked).
 
 ## Iter 23 close summary (scanner stage opened + Q-013 backend perf cleanup; #FU-26 + #FU-27 closed)
 
@@ -759,11 +826,11 @@ placeholders untouched.
 
 ## Last 5 merges
 
-- T-SC-EMBED-MODEL — `122e879` (MobileNetV3-Small TFLite + Python embedding pipeline + `react-native-fast-tflite@3.0.1` on-device wrapper + `metro.config.js` `.tflite` asset bundling + new `ci-python.yml` GH Action; `pnpm-workspace.yaml` negates `apps/api-python`; manifest validation; reference embeddings shipped) — **iter 23 cap**
+- T-DL-RLS-PG-STAT-REVOKE — `f1c4d7c` (one additive migration `0020_revoke_admin_debug_view_grants.sql` REVOKEs the surviving `anon` / `authenticated` privileges on `public.v_pg_stat_statements_top_queries`; restores service-role-only posture promised by 0016; root cause: Supabase project-init `ALTER DEFAULT PRIVILEGES ... GRANT ALL ... TO anon, authenticated` fires on `CREATE VIEW` before the 0016 `REVOKE ALL FROM PUBLIC` which only strips PUBLIC ≠ union-of-all-roles; only 5/5 views are observably red because `extensions.pg_stat_statements` is the lone underlying object without RLS to gate anon/authenticated to zero rows; verify-rls 123/2 → 125/0; **closes #FU-28**; merged without CI gate due to GH Actions quota, full CI-equivalent battery exercised locally) — **iter 24 cap**
+- T-SC-EMBED-MODEL — `122e879` (MobileNetV3-Small TFLite + Python embedding pipeline + `react-native-fast-tflite@3.0.1` on-device wrapper + `metro.config.js` `.tflite` asset bundling + new `ci-python.yml` GH Action; `pnpm-workspace.yaml` negates `apps/api-python`; manifest validation; reference embeddings shipped) — iter 23 cap
 - T-SC-CAMERA — `56aaa82` (vision-camera@4.6.4 + worklets-core@1.5.0; iOS NSCameraUsageDescription + Android camera permission + vision-camera config plugin with `enableFrameProcessors: true`; worklet-thread frame processor capped at 10 FPS; permission flow + Scan screen host; **in-PR `fix(mobile)` hotfix removed a stale `expo-web-browser` plugin entry (T-M-AUTH leftover; broke `expo prebuild` on Node 20+ via `require(ESM)` → `expo-modules-core/src/index.ts`) and switched mobile npm scripts to `expo run:ios/android` because vision-camera is native, not in Expo Go**) — iter 23
 - T-BE-Q013-CLEANUP — `ac01201` (migration `0018_mv_user_completion.sql` ships `mv_user_set_completion` + `mv_user_global_completion` MVs + wrapper views + refresh function; migration `0019_smart_preview_rpc.sql` ships `smart_collection_preview()` Postgres RPC + 4 PL/pgSQL helpers porting `expressionToSql()`; completion handler swapped to MV SELECT; smart-preview swapped to `client.rpc()`; refresh hooks wired into every collection mutation; +10 edge-fn tests (303→313); **closes Q-013 + #FU-26 + #FU-27**) — iter 23
 - T-W-API-V2-WIRING — `d45b9d4` (web wires 4 V2 endpoints into Collection/Card/Shareable/Smart-Editor surfaces; +51 tests → 499 total; `CardPriceBlock` new component; `apiToShareApi` swaps degraded synthesis → `getPublicShareablePayload()` (Q-012 fully closed end-to-end); `MatchGrid` widened via `runMatchToView` / `previewItemToView`; local DSL `evaluate()` kept as `collection.*` fallback + typing/explainer preview; 5xx-propagates posture on shareable; `catalogRoster()` retained for per-set Owned/Missing grids) — iter 22 cap
-- T-M-API-V2-WIRING — `6186ef3` (mobile wires 3 V2 endpoints into Collection/Card/SmartEditor surfaces; +28 tests → 460 / 48 files; Master% real on first paint; `useMutation` not `useQuery` for smart preview; 404 → `data: null` sentinel; **#FU-22 closed as side effect** pinned by regression test rendering unowned printing tile)
 
 ## Known follow-ups (logged, non-blocking; Phase 1 left them deliberately)
 
@@ -814,7 +881,7 @@ placeholders untouched.
 25. **Server-side public shareable read endpoint (Q-012).** ✅ **CLOSED iter 21** — `T-BE-EDGE-FUNCTIONS-V2` shipped `GET /v1/c/{handle}/{slug}` anonymous with `Accept: application/vnd.binderly.share+json` opting into the richer `publicShareableDto`. T-W-SHAREABLE-PUBLIC's runtime adapter can swap its degraded synthesis for `getPublicShareablePayload(...)` in a small follow-up; the data layer was designed as the seam for exactly this.
 26. **Land `mv_user_set_completion` + `mv_user_global_completion` materialised views (Q-013, half 1).** ✅ **CLOSED iter 23** — T-BE-Q013-CLEANUP shipped both mvs + `UNIQUE` indexes (for `REFRESH CONCURRENTLY`) + `security_barrier = true` wrapper views `v_my_set_completion` / `v_my_global_completion` filtered by `(SELECT auth.uid())` (PG17 lacks RLS on MVs) + `refresh_user_completion()` `SECURITY DEFINER` function in migration `0018_mv_user_completion.sql`. Completion handler swapped from on-the-fly compute → MV SELECT; `completionDto` wire shape unchanged. Best-effort `supabase.rpc()` refresh hook wired into every collection mutation (strong-consistency UX in the typical case, eventually-consistent fallback on failure; documented pivot to `pg_cron` if it scales badly). `lastUpdatedAt` temporarily `null` (MV doesn't carry `max(updated_at)`); widening is a tiny follow-up if the UI ever needs it. `bigint` may serialize as string over PostgREST; `coerceCount` handles both shapes. **Closed as #FU-26.**
 27. **Smart-preview DSL-to-SQL via Postgres RPC (Q-013, half 2).** ✅ **CLOSED iter 23** — T-BE-Q013-CLEANUP shipped `smart_collection_preview(ast, p_user_id, p_limit, p_offset)` `SECURITY DEFINER` RPC + 4 PL/pgSQL helpers that port `expressionToSql()` faithfully in migration `0019_smart_preview_rpc.sql`. Smart-preview handler swapped to `client.rpc()`; `previewExpressionSchema` widened to accept `collection.*` (non-breaking). RPC security: `SECURITY DEFINER` + explicit `auth.uid() = p_user_id` guard + `SET search_path = ''` + `quote_literal()`-quoted values + static `CASE` allowlist for column refs. **Closed as #FU-27.**
-28. **One-line REVOKE migration for `v_pg_stat_statements_top_queries` (`T-DL-RLS-PG-STAT-REVOKE` proposed).** `pnpm --filter @binderly/db verify-rls` reports 2 pre-existing failures on this view (anon + authenticated can read it). Cause: Supabase's default `ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO anon, authenticated` fires on view creation **before** migration `0016_admin_debug_views.sql`'s `REVOKE ALL FROM PUBLIC` runs (`PUBLIC` ≠ the union of all roles). Fix: ship `0020_*.sql` with `REVOKE ALL ON public.v_pg_stat_statements_top_queries FROM anon, authenticated;`. Surfaced by the T-BE-Q013-CLEANUP worker (PR #73). **Not introduced by #73** — predates branch base on main commit `b13d3ed` (T-DL-ADMIN-DEBUG-SURFACES, iter 11). Trivial to land. **Logged as #FU-28.**
+28. **One-line REVOKE migration for `v_pg_stat_statements_top_queries`.** ✅ **CLOSED iter 24** — `T-DL-RLS-PG-STAT-REVOKE` shipped `0020_revoke_admin_debug_view_grants.sql` (PR #75 → `f1c4d7c`). One REVOKE statement strips the surviving `anon` / `authenticated` privileges left in place by Supabase's project-init `ALTER DEFAULT PRIVILEGES` firing on `CREATE VIEW` before 0016's `REVOKE ALL FROM PUBLIC` (PUBLIC ≠ union of all roles for REVOKE semantics). verify-rls 123/2 → 125/0. Other 4 views in 0016 acquire the same surviving grants but pass verify-rls today because their underlying tables RLS-gate `anon`/`authenticated` to zero rows under PG 17's `security_invoker = false` default — hardening those left as a defense-in-depth follow-up if needed. **Closed as #FU-28.**
 29. **Cosmetic chore for Pablo: orphan worktree dirs at `/Users/pmiranda/Stuff/binderly-wt-T-*`.** Git no longer tracks them as worktrees; safe to `rm -rf`. pnpm-store residue blocks sandbox `rm`. Affected: T-DL-SEED-INGEST, T-FN-LINT-CONFIG, T-M-COLLECTION, T-W-BROWSE, T-W-COLLECTION, T-W-CUSTOM, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING, T-SC-CAMERA, T-SC-EMBED-MODEL, T-BE-Q013-CLEANUP.
 
 ## Phase 0 ledger (closed; 10/10 merged)

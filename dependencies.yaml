@@ -451,6 +451,19 @@ tasks:
     est_effort: S
     stub: true
 
+  - id: T-DL-RLS-PG-STAT-REVOKE
+    stage: 01-data-layer
+    title: REVOKE anon/authenticated grants on v_pg_stat_statements_top_queries (#FU-28)
+    agent_role: backend
+    status: merged
+    depends_on: [T-DL-ADMIN-DEBUG-SURFACES]
+    parallel_safe_with: []
+    provides: [security:pg-stat-statements-revoke]
+    owns_paths: [packages/db/src/migrations/]
+    task_file: tasks/01-data-layer/T-DL-RLS-PG-STAT-REVOKE.md
+    est_effort: S
+    stub: false
+
   # ============================================================
   # PHASE 2 — BACKEND CORE
   # ============================================================
