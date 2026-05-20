@@ -836,14 +836,14 @@ tasks:
     stage: 06-scanner
     title: ANN index build (server) + on-device load
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-SC-EMBED-MODEL]
     parallel_safe_with: []
     provides: [scanner:ann-index]
     owns_paths: [apps/api-python/ann/, apps/mobile/src/scanner/ann/]
     task_file: tasks/06-scanner/T-SC-ANN-INDEX.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-SC-MATCH
     stage: 06-scanner
