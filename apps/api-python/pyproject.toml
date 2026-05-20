@@ -93,6 +93,7 @@ testpaths = [
   "grading/centering/tests",
   "grading/ml_common/tests",
   "grading/corners/tests",
+  "grading/surface/tests",
   "grading/scrapers/psa/tests",
   "grading/scrapers/ebay/tests",
   "grading/scrapers/auctions/tests",
