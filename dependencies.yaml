@@ -808,16 +808,16 @@ tasks:
 
   - id: T-SC-DETECT
     stage: 06-scanner
-    title: Card rectangle detection + perspective correction
+    title: Card detection + quality gate
     agent_role: ml
-    status: pending
+    status: merged
     depends_on: [T-SC-CAMERA]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:detect]
     owns_paths: [apps/mobile/src/scanner/detect/]
     task_file: tasks/06-scanner/T-SC-DETECT.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-SC-EMBED-MODEL
     stage: 06-scanner
