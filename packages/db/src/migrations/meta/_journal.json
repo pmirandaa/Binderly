@@ -152,8 +152,15 @@
     {
       "idx": 21,
       "version": "7",
+      "when": 1779310800000,
+      "tag": "0021_ebay_graded_listing_observation",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
       "when": 1779314400000,
-      "tag": "0021_auction_lot_observation",
+      "tag": "0022_auction_lot_observation",
       "breakpoints": true
     }
   ]

@@ -1,0 +1,236 @@
+{
+  "id": "a3f71cc2-8b4d-4e21-9d3a-5c8f2b1e0d47",
+  "prevId": "6a18cafc-764e-403a-823d-2886aea6fe1e",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.auction_lot_observation": {
+      "name": "auction_lot_observation",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "lot_id": {
+          "name": "lot_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auction_house": {
+          "name": "auction_house",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "auction_id": {
+          "name": "auction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "auction_name": {
+          "name": "auction_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lot_title": {
+          "name": "lot_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "parsed_grading_company": {
+          "name": "parsed_grading_company",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parsed_overall_grade": {
+          "name": "parsed_overall_grade",
+          "type": "numeric(3, 1)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parsed_sub_grades": {
+          "name": "parsed_sub_grades",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "realised_price_cents": {
+          "name": "realised_price_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "currency_code": {
+          "name": "currency_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "realised_premium_cents": {
+          "name": "realised_premium_cents",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "printing_id": {
+          "name": "printing_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lot_image_urls": {
+          "name": "lot_image_urls",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::text[]"
+        },
+        "raw_html_sha256": {
+          "name": "raw_html_sha256",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parser_version": {
+          "name": "parser_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fetched_at": {
+          "name": "fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auction_lot_observation_printing_id_idx": {
+          "name": "auction_lot_observation_printing_id_idx",
+          "columns": [
+            {
+              "expression": "printing_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auction_lot_observation_house_grade_idx": {
+          "name": "auction_lot_observation_house_grade_idx",
+          "columns": [
+            {
+              "expression": "auction_house",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "parsed_grading_company",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "parsed_overall_grade",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auction_lot_observation_closed_at_idx": {
+          "name": "auction_lot_observation_closed_at_idx",
+          "columns": [
+            {
+              "expression": "closed_at",
+              "isExpression": false,
+              "asc": false,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auction_lot_observation_printing_id_printing_id_fk": {
+          "name": "auction_lot_observation_printing_id_printing_id_fk",
+          "tableFrom": "auction_lot_observation",
+          "tableTo": "printing",
+          "columnsFrom": ["printing_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "auction_lot_observation_house_lot_unique": {
+          "name": "auction_lot_observation_house_lot_unique",
+          "nullsNotDistinct": false,
+          "columns": ["auction_house", "lot_id"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "auction_lot_observation_auction_house_check": {
+          "name": "auction_lot_observation_auction_house_check",
+          "value": "\"auction_lot_observation\".\"auction_house\" IN ('pwcc', 'goldin')"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

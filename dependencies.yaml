@@ -865,14 +865,14 @@ tasks:
     stage: 07-grading
     title: PWCC + Goldin auction archive scrapers
     agent_role: data
-    status: pending
+    status: merged
     depends_on: [T-DL-SCHEMA-GRADING]
     parallel_safe_with: [T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-CAPTURE-UX]
     provides: [grading:data-auctions]
     owns_paths: [apps/api-python/grading/scrapers/auctions/]
     task_file: tasks/07-grading/T-GR-DATA-AUCTIONS.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-GR-CORNERS
     stage: 07-grading
