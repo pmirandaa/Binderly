@@ -451,19 +451,6 @@ tasks:
     est_effort: S
     stub: true
 
-  - id: T-DL-RLS-PG-STAT-REVOKE
-    stage: 01-data-layer
-    title: REVOKE anon/authenticated grants on v_pg_stat_statements_top_queries (#FU-28)
-    agent_role: backend
-    status: merged
-    depends_on: [T-DL-ADMIN-DEBUG-SURFACES]
-    parallel_safe_with: []
-    provides: [security:pg-stat-statements-revoke]
-    owns_paths: [packages/db/src/migrations/]
-    task_file: tasks/01-data-layer/T-DL-RLS-PG-STAT-REVOKE.md
-    est_effort: S
-    stub: false
-
   # ============================================================
   # PHASE 2 — BACKEND CORE
   # ============================================================
@@ -520,58 +507,6 @@ tasks:
     task_file: tasks/02-backend/T-BE-EDGE-FUNCTIONS.md
     est_effort: L
     stub: true
-
-  - id: T-BE-EDGE-FUNCTIONS-V2
-    stage: 02-backend
-    title: Edge Functions V2 — 4 additive read endpoints unblocking frontend follow-ups
-    agent_role: backend
-    status: merged
-    depends_on: [T-BE-EDGE-FUNCTIONS, T-DL-PRICING-CURRENT-VIEW, T-SP-SET-COMPLETION, T-SP-SMART-DSL, T-W-SHAREABLE-PUBLIC]
-    parallel_safe_with: []
-    provides: [api:edge-v2]
-    owns_paths: [infra/supabase/functions/, packages/api-contracts/src/, packages/api-client/src/]
-    task_file: tasks/02-backend/T-BE-EDGE-FUNCTIONS-V2.md
-    est_effort: L
-    stub: false
-
-  - id: T-W-API-V2-WIRING
-    stage: 04-web
-    title: Wire V2 read endpoints into web surfaces (completion, current-price, shareable, smart-preview)
-    agent_role: frontend-web
-    status: merged
-    depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-COLLECTION, T-W-BROWSE, T-W-SHAREABLE-PUBLIC, T-W-SMART, T-SP-PRICING-DISPLAY]
-    parallel_safe_with: [T-M-API-V2-WIRING]
-    provides: [web:v2-wiring]
-    owns_paths: [apps/web/app/, apps/web/components/, apps/web/lib/]
-    task_file: tasks/04-web/T-W-API-V2-WIRING.md
-    est_effort: L
-    stub: false
-
-  - id: T-M-API-V2-WIRING
-    stage: 05-mobile
-    title: Wire V2 read endpoints into mobile surfaces (completion, current-price, smart-preview)
-    agent_role: frontend-mobile
-    status: merged
-    depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-M-COLLECTION, T-M-BROWSE, T-M-CUSTOM, T-SP-PRICING-DISPLAY]
-    parallel_safe_with: [T-W-API-V2-WIRING]
-    provides: [mobile:v2-wiring]
-    owns_paths: [apps/mobile/src/]
-    task_file: tasks/05-mobile/T-M-API-V2-WIRING.md
-    est_effort: M
-    stub: false
-
-  - id: T-BE-Q013-CLEANUP
-    stage: 02-backend
-    title: Q-013 backend perf cleanup — land missing MVs + smart-preview Postgres RPC
-    agent_role: backend
-    status: merged
-    depends_on: [T-BE-EDGE-FUNCTIONS-V2, T-W-API-V2-WIRING, T-M-API-V2-WIRING]
-    parallel_safe_with: []
-    provides: [api:edge-v3]
-    owns_paths: [packages/db/src/migrations/, packages/db/src/schema/, infra/supabase/functions/_shared/handlers/, infra/supabase/functions/_shared/contracts.ts, infra/supabase/functions/_shared/test-helpers.ts]
-    task_file: tasks/02-backend/T-BE-Q013-CLEANUP.md
-    est_effort: L
-    stub: false
 
   # ============================================================
   # PHASE 3 — SHARED PACKAGES
@@ -700,27 +635,27 @@ tasks:
     stage: 04-web
     title: Public shareable pages (SSR, OG images)
     agent_role: frontend-web
-    status: merged
+    status: pending
     depends_on: [T-W-COLLECTION]
     parallel_safe_with: []
     provides: [web:public-shareable]
     owns_paths: [apps/web/app/c/]
     task_file: tasks/04-web/T-W-SHAREABLE-PUBLIC.md
     est_effort: L
-    stub: false
+    stub: true
 
   - id: T-W-AFFILIATE-LINKS
     stage: 04-web
     title: TCGplayer affiliate "Buy" CTAs on card detail (web + mobile)
     agent_role: frontend-web
-    status: merged
+    status: pending
     depends_on: [T-W-BROWSE]
     parallel_safe_with: []
     provides: [web:affiliate-links]
     owns_paths: [apps/web/lib/affiliate/, apps/web/components/buy-cta/, apps/mobile/src/components/buy-cta/]
     task_file: tasks/04-web/T-W-AFFILIATE-LINKS.md
     est_effort: S
-    stub: false
+    stub: true
 
   # ============================================================
   # PHASE 5 — MOBILE APP
@@ -797,79 +732,79 @@ tasks:
     stage: 06-scanner
     title: Camera + frame processor infrastructure (vision-camera)
     agent_role: frontend-mobile
-    status: merged
+    status: pending
     depends_on: [T-M-SHELL]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:camera]
     owns_paths: [apps/mobile/src/scanner/camera/]
     task_file: tasks/06-scanner/T-SC-CAMERA.md
     est_effort: M
-    stub: false
+    stub: true
 
   - id: T-SC-DETECT
     stage: 06-scanner
-    title: Card detection + quality gate
+    title: Card rectangle detection + perspective correction
     agent_role: ml
-    status: merged
+    status: pending
     depends_on: [T-SC-CAMERA]
     parallel_safe_with: [T-SC-EMBED-MODEL]
     provides: [scanner:detect]
     owns_paths: [apps/mobile/src/scanner/detect/]
     task_file: tasks/06-scanner/T-SC-DETECT.md
     est_effort: L
-    stub: false
+    stub: true
 
   - id: T-SC-EMBED-MODEL
     stage: 06-scanner
     title: Choose + bundle embedding model (TFLite)
     agent_role: ml
-    status: merged
+    status: pending
     depends_on: [T-DL-IMAGE-PIPELINE]
     parallel_safe_with: [T-SC-CAMERA, T-SC-DETECT]
     provides: [scanner:embed-model]
     owns_paths: [apps/api-python/embeddings/, apps/mobile/src/scanner/embed/]
     task_file: tasks/06-scanner/T-SC-EMBED-MODEL.md
     est_effort: L
-    stub: false
+    stub: true
 
   - id: T-SC-ANN-INDEX
     stage: 06-scanner
     title: ANN index build (server) + on-device load
     agent_role: ml
-    status: merged
+    status: pending
     depends_on: [T-SC-EMBED-MODEL]
     parallel_safe_with: []
     provides: [scanner:ann-index]
     owns_paths: [apps/api-python/ann/, apps/mobile/src/scanner/ann/]
     task_file: tasks/06-scanner/T-SC-ANN-INDEX.md
     est_effort: L
-    stub: false
+    stub: true
 
   - id: T-SC-MATCH
     stage: 06-scanner
     title: On-device match pipeline + confidence calibration
     agent_role: ml
-    status: merged
+    status: pending
     depends_on: [T-SC-DETECT, T-SC-ANN-INDEX]
     parallel_safe_with: []
     provides: [scanner:match]
     owns_paths: [apps/mobile/src/scanner/match/]
     task_file: tasks/06-scanner/T-SC-MATCH.md
     est_effort: L
-    stub: false
+    stub: true
 
   - id: T-SC-UX
     stage: 06-scanner
     title: Continuous scan UX — auto-add, disambiguation, undo, session footer
     agent_role: frontend-mobile
-    status: pending
+    status: merged
     depends_on: [T-SC-MATCH, T-M-COLLECTION]
     parallel_safe_with: []
     provides: [scanner:ux]
     owns_paths: [apps/mobile/src/scanner/ui/, apps/mobile/src/screens/scan/]
     task_file: tasks/06-scanner/T-SC-UX.md
     est_effort: L
-    stub: true
+    stub: false
 
   # ============================================================
   # PHASE 7 — GRADING
@@ -878,14 +813,14 @@ tasks:
     stage: 07-grading
     title: Multi-shot guided capture flow
     agent_role: frontend-mobile
-    status: merged
+    status: pending
     depends_on: [T-SC-CAMERA]
     parallel_safe_with: [T-GR-CENTERING, T-GR-DATA-PSA, T-GR-DATA-EBAY, T-GR-DATA-AUCTIONS]
     provides: [grading:capture-ux]
     owns_paths: [apps/mobile/src/grading/capture/]
     task_file: tasks/07-grading/T-GR-CAPTURE-UX.md
     est_effort: L
-    stub: false
+    stub: true
 
   - id: T-GR-CENTERING
     stage: 07-grading
