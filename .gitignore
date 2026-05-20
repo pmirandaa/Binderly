@@ -56,6 +56,20 @@ __pycache__/
 .venv/
 venv/
 .python-version
+*.egg-info/
+
+# Embedding pipeline build artefacts (apps/api-python/embeddings).
+# Production .tflite models go to R2, not into git. The test fixture
+# at apps/api-python/embeddings/tests/fixtures/tiny_embedder.tflite is
+# committed and is exempted by the `!` rules below.
+apps/api-python/embeddings/build/
+apps/api-python/embeddings/dist/
+apps/api-python/embeddings/out/
+apps/api-python/embeddings/**/*.npz
+*.tflite
+*.tflite.bin
+!apps/api-python/embeddings/tests/fixtures/tiny_embedder.tflite
+!apps/api-python/embeddings/tests/fixtures/tiny_embedder.manifest.json
 
 # Mobile (Expo / EAS) — secrets and signing material
 *.jks

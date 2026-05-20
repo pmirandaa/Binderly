@@ -1,0 +1,15 @@
+{
+  "name": "tiny-embedder",
+  "version": "1.0.0-fixture",
+  "modelHash": "ae821f7a9d48341e52bbb22401f882f8fbf647e294b64fd97db44b4e4105cb2a",
+  "inputShape": [
+    1,
+    224,
+    224,
+    3
+  ],
+  "embeddingDim": 32,
+  "normalization": "zero_one",
+  "createdAt": "2026-05-20T00:00:00.000Z",
+  "sourceUrl": null
+}

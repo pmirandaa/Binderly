@@ -530,6 +530,18 @@ export async function refocusNavigation(): Promise<void> {
   router.__refocus?.();
 }
 
+// ---- react-native-fast-tflite ---------------------------------------
+// Default mock used by every test that imports the embed loader. The
+// per-test suites in `apps/mobile/src/scanner/embed/__tests__/` set
+// their own behaviour via `(loadTensorflowModel as Mock).mockImpl…`.
+//
+// Tests that exercise the *real* mock-state-management surface should
+// re-mock the module locally with their own `vi.mock(...)` call.
+vi.mock('react-native-fast-tflite', () => ({
+  loadTensorflowModel: vi.fn(),
+  useTensorflowModel: vi.fn(),
+}));
+
 // ---- cleanup --------------------------------------------------------
 //
 // The dynamic-import guards below tolerate test files that

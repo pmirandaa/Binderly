@@ -235,15 +235,17 @@ well enough for v1; revisit if JP scans underperform).
   tests can run without TensorFlow, which keeps the CI install
   light. The fixture is byte-for-byte deterministic (same seed,
   same converter, repeatable build via `tests/fixtures/build.py`).
-- **`react-native-fast-tflite` version**: pinned `1.6.1` — latest
-  stable as of 2026-05, supports vision-camera v4 `Frame` API + the
-  GPU delegate try/init path the stage rules require.
+- **`react-native-fast-tflite` version**: pinned `3.0.1` (Nitro-
+  Modules-based rewrite, published 2026-04-21) — the current
+  generation of the binding. v3 takes an *array* of delegate names
+  (e.g. `['core-ml']`); empty array means CPU. We also pin
+  `react-native-nitro-modules@0.35.7` because v3 depends on it.
 - **GPU delegate fallback**: react-native-fast-tflite throws
   synchronously when GPU init fails on some Android devices; the
-  loader wraps `loadTensorflowModel(uri, 'core-ml' | 'android-gpu')`
-  in a try/catch, falls back to `'default'` (CPU) and reports the
-  chosen delegate in the returned handle (T-SC-MATCH consumes this
-  for telemetry).
+  loader iterates `['core-ml']` then `['android-gpu']`, catching each
+  throw, and finally falls back to `[]` (CPU) — reporting the chosen
+  delegate in the returned handle so T-SC-MATCH can include it in
+  scan telemetry.
 - **Latency claim**: theoretical only for now (no device in the
   worktree). Published MobileNetV3-Small inference on a Pixel 6 CPU
   is ~12 ms, ~5 ms on the GPU delegate; well under the 100 ms

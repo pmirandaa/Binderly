@@ -810,14 +810,14 @@ tasks:
     stage: 06-scanner
     title: Choose + bundle embedding model (TFLite)
     agent_role: ml
-    status: pending
+    status: review
     depends_on: [T-DL-IMAGE-PIPELINE]
     parallel_safe_with: [T-SC-CAMERA, T-SC-DETECT]
     provides: [scanner:embed-model]
     owns_paths: [apps/api-python/embeddings/, apps/mobile/src/scanner/embed/]
     task_file: tasks/06-scanner/T-SC-EMBED-MODEL.md
     est_effort: L
-    stub: true
+    stub: false
 
   - id: T-SC-ANN-INDEX
     stage: 06-scanner
