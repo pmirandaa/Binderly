@@ -30,7 +30,7 @@
   "dependencies": {
     "@binderly/api-contracts": "workspace:*",
     "@binderly/auth": "workspace:*",
-    "@supabase/supabase-js": "2.105.3",
+    "@supabase/supabase-js": "2.106.1",
     "zod": "3.25.76"
   },
   "devDependencies": {
