@@ -11,7 +11,7 @@ exist so that downstream code (flywheel aggregation, pricing comparisons) has a
 single scale to work on *today*, with a clearly-marked seam for the learned
 version.
 
-Replacement path → #FU-59 (learned calibration):
+Replacement path → #FU-60 (learned calibration):
     Once the flywheel accumulates labelled cross-company pairs — the same
     physical card graded by ≥2 companies, or strong card-identity matches via
     #FU-40's printing match — fit per-company (or per-company-per-grade-tier)

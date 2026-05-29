@@ -11,7 +11,7 @@ onto a single **normalised internal scale**.
 | **Internal scale** | PSA-equivalent `[1.0, 10.0]` (PSA is the anchor) |
 | **Status** | **Scaffold** — placeholder linear map, not a trained calibration |
 | **Source of truth** | This Python module |
-| **Follow-up** | #FU-59 (learned calibration); see Q-023 |
+| **Follow-up** | #FU-60 (learned calibration); see Q-023 |
 
 ## Placeholder mapping table
 
@@ -28,7 +28,7 @@ cross-grade lore, NOT a data fit:
 | SGC  | 1.0 | +0.2 | 0.5 | Slightly stricter than PSA mid-scale. |
 | OTHER| 1.0 | 0.0 | 0.2 | Unknown house — identity, low confidence. |
 
-## Replacing the placeholder (#FU-59)
+## Replacing the placeholder (#FU-60)
 
 The affine map is expressed as a dot product so a learned weight vector drops in
 without changing call sites. Once the flywheel accumulates labelled

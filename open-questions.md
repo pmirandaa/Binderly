@@ -1066,6 +1066,6 @@ The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`)
 2. Granularity: is a single per-company affine enough, or do we need per-company-**per-grade-tier** constants (cross-grade equivalence is non-linear at the very top — the 9.5↔10 band behaves differently from the mid-scale)?
 3. Should the normalised scale stay PSA-anchored, or move to a company-neutral latent scale once learned?
 
-**Proposed resolution → #FU-59 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-59 in `status.md`'s Known Follow-ups.
+**Proposed resolution → #FU-60 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-60 in `status.md`'s Known Follow-ups.
 
 **Status: open** (non-blocking; placeholder scaffold is sufficient until labelled cross-company data exists).
