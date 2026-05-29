@@ -44,3 +44,10 @@ export type {
 } from './types.js';
 
 export { SESSION_ITEM_CAP, UNDO_TIMEOUT_MS } from './types.js';
+
+// FU-57 — free single-card-scan mode + Pro stack-scanner gate.
+export { ScanModeToggle } from './ScanModeToggle.js';
+export type { ScanModeToggleProps } from './ScanModeToggle.js';
+export { SingleCardConfirm } from './SingleCardConfirm.js';
+export type { SingleCardConfirmProps } from './SingleCardConfirm.js';
+export type { ScanMode } from './types.js';

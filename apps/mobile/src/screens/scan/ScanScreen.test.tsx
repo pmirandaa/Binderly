@@ -24,6 +24,14 @@ vi.mock('../../lib/auth/index.js', () => ({
   useRequireAuth: vi.fn(() => ({ loading: false, authenticated: true })),
 }));
 
+// FU-57: `useGate('stack_scanner')` reads the RC entitlement snapshot.
+// Default to Pro here so these tests exercise the continuous-scan flow
+// they were originally written against (mode-specific behaviour is
+// covered in `__tests__/ScanScreen.gating.test.tsx`).
+vi.mock('../../billing/index.js', () => ({
+  useEntitlementsQuery: () => ({ data: { tier: 'pro' }, isPending: false }),
+}));
+
 // ============================================================
 // Mock useApiClient to return a stub client
 // ============================================================

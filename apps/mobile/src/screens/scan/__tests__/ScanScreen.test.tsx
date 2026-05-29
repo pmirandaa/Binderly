@@ -27,6 +27,13 @@ vi.mock('../../../lib/auth/index.js', () => ({
   useRequireAuth: vi.fn(() => ({ loading: false, authenticated: true })),
 }));
 
+// FU-57: `useGate('stack_scanner')` reads the RC entitlement snapshot.
+// Default to Pro so the continuous-scan session footer / stack-review
+// path these tests cover stays active.
+vi.mock('../../../billing/index.js', () => ({
+  useEntitlementsQuery: () => ({ data: { tier: 'pro' }, isPending: false }),
+}));
+
 vi.mock('../../../lib/api-client.js', () => ({
   useApiClient: vi.fn(() => ({
     collection: {

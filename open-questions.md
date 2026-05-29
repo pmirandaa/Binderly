@@ -1361,3 +1361,53 @@ won't deliver RGB. The graceful no-op makes shipping the scaffold safe
 in the meantime.
 
 **Pablo's answer:** _(empty until answered)_
+
+## Q-030 — Scanner mode toggle (Single ↔ Stack) contradicts rules/06's "no user toggle"; is a visible toggle the right free/Pro UX? (T-SC-FREE-SINGLE / #FU-57)
+
+**Context.** #FU-57 builds the **free single-card-scan mode** and gates the
+**continuous/stack scanner behind Pro** (`useGate('stack_scanner')`), per
+PROJECT.md §16's plan matrix ("Single-card scanner — free + pro; Stack
+scanner (continuous) — pro only"). But `rules/06-scanner.md` was written
+for a single unified experience and explicitly says:
+
+> "Stack mode = continuous mode with reset heuristic. … **No user toggle
+> needed.**"
+
+These two are in tension: §16 (the monetization plan) needs a *seam*
+between the free single-card flow and the Pro continuous flow, which the
+"one fluid auto-detected mode, no toggle" posture of rules/06 doesn't
+provide.
+
+**Decision shipped (reasonable default, documented so it's revisitable).**
+`<ScanScreen>` now exposes a visible **`<ScanModeToggle>` (Single | Stack)**
+in the camera top bar:
+- **Free** users are pinned to **single-card mode** (one capture → one
+  match → explicit `<SingleCardConfirm>` → add one card; no auto-add loop,
+  no session footer, no stack-review). The "Stack" segment is labelled
+  "Stack · Pro" and tapping it surfaces `<UpgradePrompt feature="stack_scanner">`
+  instead of switching.
+- **Pro** users default to the **continuous/stack** experience (the
+  original auto-add + undo + session footer + stack-review, unchanged) and
+  can toggle down to single-card.
+
+**Why a toggle (vs rules/06's "no toggle").** Once continuous is a paid
+tier, a free user *must* have a distinct, non-accumulating mode, and a Pro
+user benefits from being able to deliberately scan a single card without
+the stack heuristic firing. A toggle is the simplest legible seam. The
+cost is that it contradicts the "no toggle" line in rules/06, which should
+be reconciled.
+
+**Open questions for Pablo:**
+1. Is a **visible mode toggle** the desired UX, or should free silently
+   default to single-card with the stack upsell living elsewhere (e.g. the
+   paywall/offerings sheet, or a one-time "Scanning stacks? Go Pro" nudge)?
+2. For **Pro**, keep the explicit toggle, or honour rules/06 and have one
+   auto-detecting continuous mode (no single-card option for Pro at all)?
+3. Should `rules/06-scanner.md`'s "No user toggle needed" line be updated
+   to reflect the free/Pro split, so the rule and §16 stop disagreeing?
+
+**Recommendation.** Keep the toggle as shipped for the beta (clearest seam,
+fully tested both tiers), and update rules/06 to note the free/Pro split.
+Revisit (1)/(2) after the first round of scanner user-testing.
+
+**Pablo's answer:** _(empty until answered)_
