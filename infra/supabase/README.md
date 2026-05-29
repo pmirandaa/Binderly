@@ -130,19 +130,36 @@ emails are captured by Inbucket on `localhost:54324`.
 
 ## Migrations and seeds
 
-Migrations are managed by `T-FN-DB-MIGRATIONS` (deferred). The seed
-file is `seed.sql` and is empty — fixture tasks in stage 01 will
-populate it.
+Migration tooling has landed (`T-FN-DB-MIGRATIONS`). Binderly's schema
+migrations are **plain SQL files committed under
+`packages/db/src/migrations/`** and applied by the Drizzle migrator
+(`packages/db/scripts/migrate.mjs`), **not** by `supabase migration
+up`. We deliberately do not keep a second copy of the SQL under
+`infra/supabase/migrations/` — `packages/db` is the single source of
+truth, and the migrator targets whatever Postgres URL it is given.
 
-Once migrations land, the typical loop is:
+The canonical local loop, against the Supabase CLI Postgres on `54322`:
 
 ```bash
-# Apply pending migrations (no destruction).
-pnpm exec supabase migration up --workdir infra
-
-# Drop everything, reapply all migrations + seed.sql.
-pnpm db:reset
+pnpm db:start          # bring up local Supabase (Postgres on 54322)
+pnpm db:migrate:local  # apply packages/db/src/migrations/*.sql to $SUPABASE_DB_URL
 ```
+
+`db:migrate:local` resolves the target URL from `SUPABASE_DB_URL`
+(pre-populated in `.env.example`); pass `--url <postgres://…>` to point
+elsewhere (e.g. CI hitting cloud Supabase, or the Compose Postgres on
+5433 for a one-off). The migrator degrades gracefully: if the journal
+(`packages/db/src/migrations/meta/_journal.json`) is missing, empty, or
+unparseable it logs a clear message and exits 0 rather than throwing, so
+a fresh checkout with no migrations is a no-op rather than an error. See
+[`packages/db/README.md`](../../packages/db/README.md) for the full
+generate → review → apply workflow.
+
+The seed file is `seed.sql` and is currently empty — fixture tasks in
+stage 01 populate it. `pnpm db:reset` drops the database, reapplies the
+Supabase CLI's own migration directory (intentionally empty here), and
+reruns `seed.sql`; it does **not** apply the `packages/db` SQL, so after
+a reset re-run `pnpm db:migrate:local` to restore the app schema.
 
 > **Why `--workdir infra` and not `--workdir infra/supabase`?** The
 > Supabase CLI expects a project layout where `<workdir>/supabase/`

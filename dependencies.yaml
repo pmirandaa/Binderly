@@ -81,20 +81,19 @@ tasks:
     stage: 00-foundation
     title: Docker Compose for local dev (Postgres, MinIO, Mailpit)
     agent_role: devops
-    status: blocked
+    status: merged
     depends_on: [T-FN-MONOREPO]
     parallel_safe_with: [T-FN-TS-CONFIG, T-FN-LINT-CONFIG, T-FN-GITHUB]
     provides: [infra:local-docker]
     owns_paths: [infra/docker-compose.yml, infra/docker/, .env.example]
     task_file: tasks/00-foundation/T-FN-DOCKER.md
     est_effort: M
-    blocked_on: Q-002
 
   - id: T-FN-SUPABASE-LOCAL
     stage: 00-foundation
     title: Supabase local dev via supabase-cli
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: []
     provides: [infra:supabase-local]
@@ -106,7 +105,7 @@ tasks:
     stage: 00-foundation
     title: Drizzle ORM + migration tooling
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-FN-SUPABASE-LOCAL, T-FN-TS-CONFIG]
     parallel_safe_with: []
     provides: [db:migrations]
@@ -130,7 +129,7 @@ tasks:
     stage: 00-foundation
     title: Environment variable conventions and .env.example
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-FN-DOCKER]
     parallel_safe_with: [T-FN-SUPABASE-LOCAL, T-FN-ORCHESTRATOR-SCRIPTS]
     provides: [config:env]

@@ -3,7 +3,7 @@
 **Stage:** 00-foundation
 **Agent role:** backend
 **Effort:** M
-**Status:** pending
+**Status:** merged
 
 ## Hard dependencies
 

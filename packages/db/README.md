@@ -29,9 +29,13 @@ packages/db/
       meta/_journal.json     # drizzle-managed metadata (committed)
       0001_*.sql             # generated SQL, committed and reviewed by humans
   scripts/
-    generate.ts              # wraps drizzle-kit generate + convention checks
-    migrate.ts               # applies migrations to a target Postgres URL
+    generate.mjs             # wraps drizzle-kit generate + convention checks
+    migrate.mjs              # applies migrations to a target Postgres URL
 ```
+
+> The generate/migrate scripts are plain ESM (`.mjs`, run with `node`,
+> not `tsx`) so they never depend on the tsx transpile runtime — see
+> `scripts/migrate.mjs` header and #FU-1 / #FU-7 for the rationale.
 
 ## Targets
 
@@ -91,7 +95,7 @@ production CI pointing at the cloud Supabase Postgres.
 ## Naming convention
 
 Sequential numeric: `NNNN_<snake_case_summary>.sql`. Drizzle-kit's
-default output already uses this shape; `scripts/generate.ts`
+default output already uses this shape; `scripts/generate.mjs`
 asserts so a future drizzle-kit upgrade can't silently change it.
 
 If you need to author a non-Drizzle migration (e.g. an RLS-only
@@ -101,7 +105,7 @@ free number and add a SQL file by hand. Keep the journal in sync.
 ## Migration files vs the journal
 
 - **`src/migrations/<NNNN>_<name>.sql`** — the migration. SQL.
-  Reviewed in PRs. Applied to Postgres by `migrate.ts`.
+  Reviewed in PRs. Applied to Postgres by `migrate.mjs`.
 - **`src/migrations/meta/_journal.json`** — drizzle-managed metadata
   tracking which migrations exist and when they were generated. Also
   committed (it's how drizzle knows what's been generated locally) but
@@ -113,7 +117,7 @@ free number and add a SQL file by hand. Keep the journal in sync.
 applies changes directly — convenient in dev, dangerous in prod
 (silent data loss, hidden index drops, no review surface). In Binderly
 we **always** generate SQL, review the SQL in a PR, and apply via
-`migrate.ts`. `push` is an emergency dev tool, not a deploy mechanism.
+`migrate.mjs`. `push` is an emergency dev tool, not a deploy mechanism.
 
 ## Driver: postgres-js (not pg)
 
