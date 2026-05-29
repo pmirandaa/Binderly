@@ -7,9 +7,7 @@
 
 import { useState } from 'react';
 
-import { Button, Text, XStack, YStack } from '@binderly/ui';
-
-import { Modal } from './Modal';
+import { Button, Modal, Text, XStack, YStack } from '@binderly/ui';
 
 import type { CustomCollectionApi } from '../../../lib/collections/custom/api';
 
@@ -61,7 +59,7 @@ export function DeleteCustomCollectionModal({
       open={open && collection !== null}
       onClose={handleClose}
       title="Delete custom collection?"
-      testId="delete-custom-collection-modal"
+      testID="delete-custom-collection-modal"
     >
       <Text variant="body">
         This will permanently delete{' '}
