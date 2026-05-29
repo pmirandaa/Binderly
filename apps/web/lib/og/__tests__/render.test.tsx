@@ -182,6 +182,7 @@ describe('renderOgImage — content', () => {
         avatarUrl: null,
         bio: null,
         socialLinks: [],
+        tier: 'pro',
       },
     });
     const html = renderToStaticMarkup(

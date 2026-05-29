@@ -24,6 +24,7 @@ import type {
   PublicShareableDto,
   ShareableDto,
   SocialLink,
+  SubscriptionTier,
 } from '@binderly/api-contracts';
 
 /**
@@ -38,6 +39,14 @@ export interface PublicShareOwner {
   readonly bio: string | null;
   /** Owner social links rendered in the page header (#FU-51). */
   readonly socialLinks: ReadonlyArray<SocialLink>;
+  /**
+   * Owner's subscription tier (#FU-61 / Q-024). The public render
+   * path uses this to enforce the free-tier theme downgrade
+   * server-side: a free owner's stored Pro theme is not honored on
+   * the public page (their stored choice is preserved, just not
+   * rendered). Resolved fail-closed by the edge handler → `'free'`.
+   */
+  readonly tier: SubscriptionTier;
 }
 
 /**
@@ -170,6 +179,7 @@ function publicShareableDtoToPayload(dto: PublicShareableDto): PublicSharePayloa
       avatarUrl: dto.owner.avatarUrl,
       bio: dto.owner.bio,
       socialLinks: dto.owner.socialLinks,
+      tier: dto.owner.tier,
     },
     collectionTitle: dto.collectionTitle,
     description: dto.description,

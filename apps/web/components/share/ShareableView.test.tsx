@@ -396,4 +396,35 @@ describe('ShareableView — theming', () => {
     });
     expect(screen.queryByTestId('share-theme-band')).toBeNull();
   });
+
+  // #FU-61 / Q-024: free owner's stored Pro theme is downgraded
+  // server-side enforced on the public render path.
+  it('downgrades a free owner to the default theme regardless of stored id', async () => {
+    const api = createFakeShareApi({
+      payload: makePublicSharePayload({
+        shareable: makeShareableDto({ theme: 'gold' }),
+        owner: makePublicShareOwner({ tier: 'free' }),
+      }),
+    });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(document.querySelector('[data-share-theme="default"]')).not.toBeNull();
+    expect(document.querySelector('[data-share-theme="gold"]')).toBeNull();
+  });
+
+  it('honors a pro owner\'s stored theme on the public page', async () => {
+    const api = createFakeShareApi({
+      payload: makePublicSharePayload({
+        shareable: makeShareableDto({ theme: 'gold' }),
+        owner: makePublicShareOwner({ tier: 'pro' }),
+      }),
+    });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(document.querySelector('[data-share-theme="gold"]')).not.toBeNull();
+  });
 });

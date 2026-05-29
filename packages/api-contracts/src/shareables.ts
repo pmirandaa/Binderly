@@ -15,7 +15,7 @@
 
 import { z } from 'zod';
 
-import { socialLinksSchema } from './auth.js';
+import { socialLinksSchema, subscriptionTierSchema } from './auth.js';
 import { slugSchema } from './collection.js';
 import { isoDateTimeSchema, uuidSchema } from './common.js';
 
@@ -171,6 +171,15 @@ export const publicShareOwnerDto = z
      * `getPublicShareable` path) parse without the key.
      */
     socialLinks: socialLinksSchema.default([]),
+    /**
+     * Owner's subscription tier, surfaced so the public render path
+     * can enforce the free-tier theme downgrade SERVER-SIDE (#FU-61 /
+     * Q-024): a free owner's stored Pro theme is not honored on the
+     * public page (`resolvePublicTheme`). The edge handler resolves
+     * this fail-closed (RC down / unknown → `'free'`). Defaults to
+     * `'free'` so older payloads parse and degrade safely closed.
+     */
+    tier: subscriptionTierSchema.default('free'),
   })
   .strict();
 export type PublicShareOwnerDto = z.infer<typeof publicShareOwnerDto>;

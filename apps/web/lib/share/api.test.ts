@@ -38,6 +38,7 @@ function makeRichPayload(
       avatarUrl: 'https://images.binderly.app/avatars/pablo.webp',
       bio: 'Collecting since Base Set.',
       socialLinks: [],
+      tier: 'pro',
     },
     collectionTitle: "Pablo's collection",
     description: 'My all-time favourites.',
@@ -151,6 +152,7 @@ describe('apiToShareApi — payload pass-through', () => {
       'https://images.binderly.app/avatars/pablo.webp',
     );
     expect(out!.owner.bio).toBe('Collecting since Base Set.');
+    expect(out!.owner.tier).toBe('pro');
     expect(out!.collectionTitle).toBe("Pablo's collection");
     expect(out!.description).toBe('My all-time favourites.');
     expect(out!.counts).toEqual({
