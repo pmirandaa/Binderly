@@ -35,6 +35,9 @@ function stubCollection(overrides: Record<string, unknown> = {}): CollectionReso
   // Same posture T-OF-QUEUE's tests take.
   const base: Record<string, unknown> = {
     listCollectionItems: vi.fn(async () => ({ items: [], nextCursor: null })),
+    getCollectionItem: vi.fn(async () => {
+      throw new ApiNotFoundError('not found');
+    }),
     getCompletion: vi.fn(),
     addCollectionItem: vi.fn(),
     updateCollectionItem: vi.fn(),
@@ -45,6 +48,9 @@ function stubCollection(overrides: Record<string, unknown> = {}): CollectionReso
     updateCustomCollection: vi.fn(),
     deleteCustomCollection: vi.fn(),
     listCustomCollectionItems: vi.fn(async () => []),
+    getCustomCollectionItem: vi.fn(async () => {
+      throw new ApiNotFoundError('not found');
+    }),
     addPrintingToCustomCollection: vi.fn(),
     removePrintingFromCustomCollection: vi.fn(),
     getSmartCollectionRule: vi.fn(),
@@ -132,14 +138,10 @@ describe('canonicalEntityId', () => {
 });
 
 describe('makeDefaultServerFetcher — user_collection_item', () => {
-  it('found: returns the matching item on the first page', async () => {
+  it('found: returns the single-GET item (#FU-59)', async () => {
     const target = serverUci({ id: 'uci-1', updatedAt: '2026-06-01T12:00:00.000Z' });
-    const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => ({
-        items: [target],
-        nextCursor: null,
-      })),
-    });
+    const getCollectionItem = vi.fn(async () => target);
+    const collection = stubCollection({ getCollectionItem });
     const fetcher = makeDefaultServerFetcher(collection);
     const result = await fetcher.fetch(
       makeDeadLetterEvent({
@@ -152,39 +154,15 @@ describe('makeDefaultServerFetcher — user_collection_item', () => {
       payload: target,
       updatedAt: '2026-06-01T12:00:00.000Z',
     });
+    // Direct single-GET keyed on the id — no page-walk.
+    expect(getCollectionItem).toHaveBeenCalledWith({ id: 'uci-1' });
   });
 
-  it('walks pages until the row is found', async () => {
-    const target = serverUci({ id: 'uci-deep' });
-    let calls = 0;
-    const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => {
-        calls += 1;
-        if (calls === 1) return { items: [serverUci({ id: 'other' })], nextCursor: 'c1' };
-        if (calls === 2) return { items: [target], nextCursor: 'c2' };
-        return { items: [], nextCursor: null };
-      }),
+  it('not_found: maps ApiNotFoundError (404) → not_found', async () => {
+    const getCollectionItem = vi.fn(async () => {
+      throw new ApiNotFoundError('not found');
     });
-    const fetcher = makeDefaultServerFetcher(collection);
-    const result = await fetcher.fetch(
-      makeDeadLetterEvent({
-        tableName: 'user_collection_item',
-        payloadJson: JSON.stringify(uciPayload({ id: 'uci-deep' })),
-      }),
-    );
-    expect(result.kind).toBe('found');
-    expect(calls).toBe(2);
-  });
-
-  it('not_found: walks all pages then returns not_found', async () => {
-    let calls = 0;
-    const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => {
-        calls += 1;
-        if (calls < 3) return { items: [], nextCursor: `c${calls}` };
-        return { items: [], nextCursor: null };
-      }),
-    });
+    const collection = stubCollection({ getCollectionItem });
     const fetcher = makeDefaultServerFetcher(collection);
     const result = await fetcher.fetch(
       makeDeadLetterEvent({
@@ -193,12 +171,12 @@ describe('makeDefaultServerFetcher — user_collection_item', () => {
       }),
     );
     expect(result).toEqual({ kind: 'not_found' });
-    expect(calls).toBe(3);
+    expect(getCollectionItem).toHaveBeenCalledWith({ id: 'uci-missing' });
   });
 
   it('transient_error: classifies ApiNetworkError as transient', async () => {
     const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => {
+      getCollectionItem: vi.fn(async () => {
         throw new ApiNetworkError('connect ECONNREFUSED');
       }),
     });
@@ -217,7 +195,7 @@ describe('makeDefaultServerFetcher — user_collection_item', () => {
 
   it('transient_error: classifies ApiServerError (5xx) as transient', async () => {
     const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => {
+      getCollectionItem: vi.fn(async () => {
         throw new ApiServerError('upstream 503');
       }),
     });
@@ -233,7 +211,7 @@ describe('makeDefaultServerFetcher — user_collection_item', () => {
 
   it('transient_error: classifies ApiRateLimitError (429) as transient', async () => {
     const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => {
+      getCollectionItem: vi.fn(async () => {
         throw new ApiRateLimitError('rate limited');
       }),
     });
@@ -249,7 +227,7 @@ describe('makeDefaultServerFetcher — user_collection_item', () => {
 
   it('transient_error: classifies unexpected ApiValidationError defensively as transient', async () => {
     const collection = stubCollection({
-      listCollectionItems: vi.fn(async () => {
+      getCollectionItem: vi.fn(async () => {
         throw new ApiValidationError('bad shape');
       }),
     });
@@ -258,23 +236,6 @@ describe('makeDefaultServerFetcher — user_collection_item', () => {
       makeDeadLetterEvent({
         tableName: 'user_collection_item',
         payloadJson: JSON.stringify(uciPayload()),
-      }),
-    );
-    expect(result.kind).toBe('transient_error');
-  });
-
-  it('walk-limit exceeded returns transient_error (conservative)', async () => {
-    const collection = stubCollection({
-      listCollectionItems: vi.fn(async (opts?: { cursor?: string }) => ({
-        items: [],
-        nextCursor: `c-${opts?.cursor ?? 'init'}-${Math.random()}`,
-      })),
-    });
-    const fetcher = makeDefaultServerFetcher(collection, { walkLimit: 3 });
-    const result = await fetcher.fetch(
-      makeDeadLetterEvent({
-        tableName: 'user_collection_item',
-        payloadJson: JSON.stringify(uciPayload({ id: 'never-found' })),
       }),
     );
     expect(result.kind).toBe('transient_error');
@@ -354,14 +315,10 @@ describe('makeDefaultServerFetcher — smart_collection', () => {
 });
 
 describe('makeDefaultServerFetcher — custom_collection_item', () => {
-  it('found: matches the printing_id in the membership list', async () => {
+  it('found: single-GET by (customCollectionId, printingId) (#FU-59)', async () => {
     const target = serverCci({ customCollectionId: 'cc-1', printingId: 'p-target' });
-    const collection = stubCollection({
-      listCustomCollectionItems: vi.fn(async () => [
-        serverCci({ customCollectionId: 'cc-1', printingId: 'p-other' }),
-        target,
-      ]),
-    });
+    const getCustomCollectionItem = vi.fn(async () => target);
+    const collection = stubCollection({ getCustomCollectionItem });
     const fetcher = makeDefaultServerFetcher(collection);
     const result = await fetcher.fetch(
       makeDeadLetterEvent({
@@ -374,16 +331,20 @@ describe('makeDefaultServerFetcher — custom_collection_item', () => {
     expect(result.kind).toBe('found');
     if (result.kind === 'found') {
       expect(result.payload).toEqual(target);
+      // No `updated_at` on the membership row → null.
       expect(result.updatedAt).toBeNull();
     }
+    expect(getCustomCollectionItem).toHaveBeenCalledWith({
+      customCollectionId: 'cc-1',
+      printingId: 'p-target',
+    });
   });
 
-  it('not_found: no row with the target printing_id', async () => {
-    const collection = stubCollection({
-      listCustomCollectionItems: vi.fn(async () => [
-        serverCci({ customCollectionId: 'cc-1', printingId: 'p-x' }),
-      ]),
+  it('not_found: maps ApiNotFoundError (404) → not_found', async () => {
+    const getCustomCollectionItem = vi.fn(async () => {
+      throw new ApiNotFoundError('not found');
     });
+    const collection = stubCollection({ getCustomCollectionItem });
     const fetcher = makeDefaultServerFetcher(collection);
     const result = await fetcher.fetch(
       makeDeadLetterEvent({
@@ -394,11 +355,15 @@ describe('makeDefaultServerFetcher — custom_collection_item', () => {
       }),
     );
     expect(result).toEqual({ kind: 'not_found' });
+    expect(getCustomCollectionItem).toHaveBeenCalledWith({
+      customCollectionId: 'cc-1',
+      printingId: 'p-missing',
+    });
   });
 
-  it('transient_error on listCustomCollectionItems failure', async () => {
+  it('transient_error on getCustomCollectionItem failure', async () => {
     const collection = stubCollection({
-      listCustomCollectionItems: vi.fn(async () => {
+      getCustomCollectionItem: vi.fn(async () => {
         throw new ApiServerError('boom');
       }),
     });

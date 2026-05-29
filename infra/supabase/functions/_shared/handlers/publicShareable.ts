@@ -46,6 +46,7 @@
 
 import { ApiError, apiOk } from '../errors.ts';
 import { createServiceRoleClient, translatePostgrestError } from '../db.ts';
+import { resolveEntitlements } from './entitlements.ts';
 
 import type { CorsConfig } from '../cors.ts';
 import type { ClientFactoryDeps, EdgeFunctionEnv } from '../db.ts';
@@ -167,6 +168,12 @@ interface PublicShareableWire {
     avatarUrl: string | null;
     bio: string | null;
     socialLinks: readonly SocialLinkWire[];
+    /**
+     * Owner's subscription tier (#FU-61 / Q-024). Surfaced so the
+     * public render path can enforce the free-tier theme downgrade
+     * server-side. Resolved fail-closed (RC down / unset → 'free').
+     */
+    tier: 'free' | 'pro';
   };
   collectionTitle: string;
   description: string | null;
@@ -248,9 +255,24 @@ export async function handleGetPublicShareable(
     return apiOk(request, ctx.cors, ctx.requestId, shareableWire);
   }
 
+  // 3b) Resolve the owner's subscription tier (#FU-61 / Q-024) so the
+  //     public render can enforce the free-tier theme downgrade
+  //     server-side. `resolveEntitlements` already fail-closes to
+  //     'free' on any RC problem (unset key, network, non-200), which
+  //     is the safe direction here — a free owner's stored Pro theme
+  //     is simply not honored on the public page.
+  const ownerEntitlements = await resolveEntitlements(profile.user_id, ctx);
+  const ownerTier = ownerEntitlements.tier;
+
   // 4) Build the rich payload. The DB queries here are the load-
   //    bearing work and live in `buildPublicSharePayload`.
-  const richPayload = await buildPublicSharePayload(supabase, profile, shareable, shareableWire);
+  const richPayload = await buildPublicSharePayload(
+    supabase,
+    profile,
+    shareable,
+    shareableWire,
+    ownerTier,
+  );
   return apiOk(request, ctx.cors, ctx.requestId, richPayload);
 }
 
@@ -275,6 +297,7 @@ async function buildPublicSharePayload(
   profile: ProfileRow,
   shareable: ShareableRow,
   shareableWire: ShareableWire,
+  ownerTier: 'free' | 'pro',
 ): Promise<PublicShareableWire> {
   const target = parseTarget(shareable.target);
 
@@ -369,6 +392,7 @@ async function buildPublicSharePayload(
       avatarUrl: profile.avatar_url,
       bio: profile.bio,
       socialLinks: parseSocialLinks(profile.social_links_json),
+      tier: ownerTier,
     },
     collectionTitle,
     description,

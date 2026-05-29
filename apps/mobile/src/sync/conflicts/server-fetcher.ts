@@ -3,10 +3,15 @@
 //
 // Why an adapter? Because:
 //
-//  1. The `@binderly/api-client` `CollectionResource` does NOT expose a
-//     single-fetch `getCollectionItem(id)` for `user_collection_item`;
-//     callers either paginate `listCollectionItems` or wait for a
-//     server-side route addition. See Q-019 in `open-questions.md`.
+//  1. Each conflicting table maps to a different `CollectionResource`
+//     call, and the result must be normalised into the resolver's
+//     `ServerFetchResult` union (`found` / `not_found` /
+//     `transient_error`). The adapter owns that mapping. Single-row
+//     reads use the dedicated single-GETs shipped by #FU-49
+//     (`getCollectionItem({id})` /
+//     `getCustomCollectionItem({customCollectionId, printingId})`),
+//     which closed the Q-019 gap — so there is no page-walk anymore
+//     (#FU-59).
 //  2. `custom_collection_item` has no `updated_at` column on the wire
 //     (it's an immutable membership row); LWW comparison doesn't
 //     apply. The adapter still reports `found` / `not_found` so the
@@ -109,59 +114,29 @@ function classifyError(err: unknown): ServerFetchResult {
 
 /**
  * Default fetcher built on top of the live `CollectionResource`. Each
- * branch maps the queued table to the right api-client call:
+ * branch maps the queued table to the right api-client single-GET
+ * (#FU-49 / #FU-59 — no client-side page-walk):
  *
- *   - user_collection_item:    paginated `listCollectionItems` walk
- *                              until id match. Bounded by `walkLimit`
- *                              (default 25 pages × server-default 50 =
- *                              1250 rows — well above realistic
- *                              offline-edit volumes).
+ *   - user_collection_item:    `getCollectionItem({id})` → 404 → not_found.
  *   - custom_collection:       `getCustomCollection({id})` → 404 → not_found.
  *   - smart_collection:        same — server stores both as
  *                              `custom_collection` rows.
- *   - custom_collection_item:  `listCustomCollectionItems({customCollectionId})`
- *                              then linear scan for `printingId`.
- *                              No updatedAt → `updatedAt: null`.
+ *   - custom_collection_item:  `getCustomCollectionItem({customCollectionId,
+ *                              printingId})` → 404 → not_found. No
+ *                              updatedAt on the wire → `updatedAt: null`.
  */
-export function makeDefaultServerFetcher(
-  collection: CollectionResource,
-  options: { walkLimit?: number } = {},
-): ServerFetcher {
-  const walkLimit = options.walkLimit ?? 25;
-
+export function makeDefaultServerFetcher(collection: CollectionResource): ServerFetcher {
   async function fetchUserCollectionItem(id: string): Promise<ServerFetchResult> {
-    let cursor: string | undefined = undefined;
-    for (let page = 0; page < walkLimit; page += 1) {
-      try {
-        const res: Awaited<ReturnType<typeof collection.listCollectionItems>> =
-          cursor !== undefined
-            ? await collection.listCollectionItems({ cursor })
-            : await collection.listCollectionItems({});
-        const match = res.items.find(
-          (item: { id: string; updatedAt: string }) => item.id === id,
-        );
-        if (match !== undefined) {
-          return {
-            kind: 'found',
-            payload: match,
-            updatedAt: match.updatedAt,
-          };
-        }
-        if (res.nextCursor === null || res.nextCursor === undefined) {
-          return { kind: 'not_found' };
-        }
-        cursor = res.nextCursor;
-      } catch (err) {
-        return classifyError(err);
-      }
+    try {
+      const item = await collection.getCollectionItem({ id });
+      return {
+        kind: 'found',
+        payload: item,
+        updatedAt: item.updatedAt,
+      };
+    } catch (err) {
+      return classifyError(err);
     }
-    // Hit the page cap without finding the row. Conservative: treat
-    // as transient so we don't apply server-wins on a possibly-stale
-    // pagination walk.
-    return {
-      kind: 'transient_error',
-      error: `listCollectionItems pagination exceeded ${walkLimit} pages`,
-    };
   }
 
   async function fetchCustomCollection(id: string): Promise<ServerFetchResult> {
@@ -182,16 +157,10 @@ export function makeDefaultServerFetcher(
     printingId: string,
   ): Promise<ServerFetchResult> {
     try {
-      const items = await collection.listCustomCollectionItems({ customCollectionId });
-      const match = items.find(
-        (item: { printingId: string }) => item.printingId === printingId,
-      );
-      if (match === undefined) {
-        return { kind: 'not_found' };
-      }
+      const item = await collection.getCustomCollectionItem({ customCollectionId, printingId });
       return {
         kind: 'found',
-        payload: match,
+        payload: item,
         updatedAt: null,
       };
     } catch (err) {

@@ -49,6 +49,7 @@ export function makePublicShareOwner(
     avatarUrl: null,
     bio: 'Collecting since Base Set.',
     socialLinks: [],
+    tier: 'pro',
     ...overrides,
   };
 }

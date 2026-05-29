@@ -187,13 +187,13 @@ export function ShareableView({
   const { owner, counts, members, collectionTitle, description, lastUpdatedAt } = payload;
   const ownerLabel = owner.displayName ?? `@${owner.handle}`;
   const hasCounts = counts.catalogTotal > 0;
-  // Free-tier enforcement lives in `resolvePublicTheme`. INTERIM
-  // (Q-022 / FU T-BE-SHAREABLE-OWNER-TIER): the public payload does
-  // not yet carry the owner's tier, so we pass `ownerIsPro = null`
-  // and render the stored theme for everyone. The downgrade branch
-  // already fires for `ownerIsPro === false`, so the day the backend
-  // surfaces that field this enforces itself with no change here.
-  const theme: Theme = resolvePublicTheme(payload.shareable.theme, null);
+  // Free-tier enforcement lives in `resolvePublicTheme` (#FU-61 /
+  // Q-024 resolved). The payload now carries the owner's tier
+  // (resolved fail-closed server-side), so a free owner's stored Pro
+  // theme is NOT honored on the public page — it falls back to the
+  // default theme. Their stored choice is preserved server-side; it's
+  // simply not rendered while they're free.
+  const theme: Theme = resolvePublicTheme(payload.shareable.theme, owner.tier === 'pro');
 
   return (
     <ShareableThemeProvider theme={theme}>

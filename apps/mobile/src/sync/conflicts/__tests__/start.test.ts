@@ -29,6 +29,9 @@ installFreshDb();
 function stubCollection(overrides: Record<string, unknown> = {}): CollectionResource {
   const base: Record<string, unknown> = {
     listCollectionItems: vi.fn(async () => ({ items: [], nextCursor: null })),
+    getCollectionItem: vi.fn(async () => {
+      throw new ApiNotFoundError('not found');
+    }),
     getCompletion: vi.fn(),
     addCollectionItem: vi.fn(),
     updateCollectionItem: vi.fn(),
@@ -39,6 +42,9 @@ function stubCollection(overrides: Record<string, unknown> = {}): CollectionReso
     updateCustomCollection: vi.fn(),
     deleteCustomCollection: vi.fn(),
     listCustomCollectionItems: vi.fn(async () => []),
+    getCustomCollectionItem: vi.fn(async () => {
+      throw new ApiNotFoundError('not found');
+    }),
     addPrintingToCustomCollection: vi.fn(),
     removePrintingFromCustomCollection: vi.fn(),
     getSmartCollectionRule: vi.fn(),
@@ -116,7 +122,7 @@ describe('startConflictResolver — dead-letter subscription', () => {
     // server_won_deleted for an `updated` op.
     const stop = startConflictResolver({
       apiClient: stubCollection({
-        listCollectionItems: vi.fn(async () => {
+        getCollectionItem: vi.fn(async () => {
           throw new ApiNotFoundError('not found');
         }),
       }),

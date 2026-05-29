@@ -6,11 +6,13 @@
 // `application/vnd.binderly.share+json` returns the richer
 // `publicShareableDto` payload the SSR page reads.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { makeHandler } from '../dispatch.ts';
 import { ROUTES } from '../routes-table.ts';
 import { createFakeSupabase, readErrorBody, readSuccessBody } from '../test-helpers.ts';
+
+import type { EdgeFetch } from '../db.ts';
 
 const ENV_GETTER = (name: string): string | undefined => {
   switch (name) {
@@ -154,6 +156,23 @@ function makeHandlerWithFake(fake: ReturnType<typeof createFakeSupabase>) {
   });
 }
 
+const ENV_GETTER_WITH_RC = (name: string): string | undefined => {
+  if (name === 'REVENUECAT_SECRET_API_KEY') return 'sk_test_secret';
+  return ENV_GETTER(name);
+};
+
+// A RevenueCat subscriber payload with an active, non-expiring pro
+// entitlement (mirrors the shape `resolveEntitlements` parses).
+const PRO_SUBSCRIBER = { subscriber: { entitlements: { pro: { expires_date: null } } } };
+
+function makeHandlerWithRc(fake: ReturnType<typeof createFakeSupabase>, fetchImpl: EdgeFetch) {
+  return makeHandler({
+    getEnv: ENV_GETTER_WITH_RC,
+    routes: ROUTES,
+    deps: { createClient: () => fake.client, fetch: fetchImpl },
+  });
+}
+
 interface ShareableWire {
   id: string;
   userId: string;
@@ -169,6 +188,7 @@ interface PublicShareableWire {
     avatarUrl: string | null;
     bio: string | null;
     socialLinks: ReadonlyArray<{ label: string; url: string }>;
+    tier: 'free' | 'pro';
   };
   collectionTitle: string;
   description: string | null;
@@ -498,6 +518,59 @@ describe('GET /v1/c/:handle/:slug (rich Accept header)', () => {
       }),
     );
     expect(response.status).toBe(500);
+  });
+
+  // ── Owner tier for server-side free-theme enforcement (#FU-61 / Q-024) ──
+
+  it('surfaces owner.tier = "free" (fail-closed) when RC is not configured', async () => {
+    const fake = makeFullShareFake();
+    const response = await makeHandlerWithFake(fake)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, {
+        method: 'GET',
+        headers: { accept: RICH_ACCEPT },
+      }),
+    );
+    const body = await readSuccessBody<PublicShareableWire>(response);
+    expect(body.owner.tier).toBe('free');
+  });
+
+  it('surfaces owner.tier = "pro" when the owner has an active RC pro entitlement', async () => {
+    const fake = makeFullShareFake();
+    const fetchImpl: EdgeFetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify(PRO_SUBSCRIBER),
+    }));
+    const response = await makeHandlerWithRc(fake, fetchImpl)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, {
+        method: 'GET',
+        headers: { accept: RICH_ACCEPT },
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = await readSuccessBody<PublicShareableWire>(response);
+    expect(body.owner.tier).toBe('pro');
+    // The tier read is keyed on the resolved OWNER's user id, not the
+    // (anonymous) caller — so a free visitor still sees the pro theme.
+    const calledUrl = (fetchImpl as unknown as { mock: { calls: unknown[][] } }).mock.calls[0]?.[0];
+    expect(String(calledUrl)).toContain(OWNER_USER_ID);
+  });
+
+  it('falls back to owner.tier = "free" when the RC read fails (non-200)', async () => {
+    const fake = makeFullShareFake();
+    const fetchImpl: EdgeFetch = vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      text: async () => 'unavailable',
+    }));
+    const response = await makeHandlerWithRc(fake, fetchImpl)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, {
+        method: 'GET',
+        headers: { accept: RICH_ACCEPT },
+      }),
+    );
+    const body = await readSuccessBody<PublicShareableWire>(response);
+    expect(body.owner.tier).toBe('free');
   });
 });
 

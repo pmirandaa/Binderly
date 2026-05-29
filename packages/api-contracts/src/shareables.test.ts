@@ -341,4 +341,25 @@ describe('publicShareableDto', () => {
   it('rejects unknown extra keys (strict)', () => {
     expect(publicShareableDto.safeParse({ ...VALID, surplus: 1 }).success).toBe(false);
   });
+
+  it('defaults owner.tier to "free" when omitted (fail-closed, #FU-61)', () => {
+    expect(publicShareableDto.parse(VALID).owner.tier).toBe('free');
+  });
+
+  it('parses an explicit pro owner tier (#FU-61)', () => {
+    const parsed = publicShareableDto.parse({
+      ...VALID,
+      owner: { ...VALID.owner, tier: 'pro' },
+    });
+    expect(parsed.owner.tier).toBe('pro');
+  });
+
+  it('rejects an unknown owner tier (#FU-61)', () => {
+    expect(
+      publicShareableDto.safeParse({
+        ...VALID,
+        owner: { ...VALID.owner, tier: 'platinum' },
+      }).success,
+    ).toBe(false);
+  });
 });
