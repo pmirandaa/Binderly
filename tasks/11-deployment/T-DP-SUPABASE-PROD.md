@@ -3,83 +3,69 @@
 **Stage:** 11-deployment
 **Agent role:** devops
 **Effort:** M
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** merged
 
----
+## Hard dependencies
+- T-DL-RLS-POLICIES (merged — the RLS posture the prod DB must enforce)
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 4 (Infra & Deployment), § 17 (Build Phases)) and any
->    referenced sections.
-> 2. Read `rules/11-deployment.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-DP-SUPABASE-PROD`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+## Soft dependencies
+- All schema/migration tasks (the 25 migrations in `packages/db/src/migrations/`)
 
----
+## Required reading
+- PROJECT.md § 4 (Infra & Deployment), § 5 (Auth)
+- rules/11-deployment.md (esp. "Migrations run before app deploy", rollback rules)
+- infra/supabase/config.toml, infra/supabase/README.md (local config to diff from)
+- packages/db/scripts/migrate.ts, packages/db/package.json (`db:migrate` path)
 
-## Provisional metadata (from `dependencies.yaml`)
+## Goal
+Stand up the production Supabase project documentation + the
+migration-apply CI. On merge to `main` that touches
+`packages/db/migrations/**` (and on manual dispatch), apply pending Drizzle
+SQL migrations to the production Postgres via the repo's `db:migrate` script
+against `$PROD_DATABASE_URL`. Must be **idempotent and non-destructive** (no
+auto-reset). Guarded on the prod DB secret so it no-ops until provisioned.
 
-**Hard dependencies:**
+## Deliverables
+- `infra/supabase/production/README.md` — prod project linking flow
+  (`supabase link --project-ref`), the prod-vs-local `config.toml` diff
+  (SMTP, OAuth secrets, network restrictions, SSL enforcement), and how
+  prod differs from local dev.
+- `infra/supabase/production/config.notes.md` — annotated diff of which
+  `config.toml` blocks change for production and why (no second live config
+  file — the CLI uses the single `infra/supabase/config.toml`; prod overrides
+  are dashboard + env-driven).
+- `infra/supabase/production/migration-runbook.md` — apply flow, rollback
+  story (down-migration file or PITR restore), staging-first guidance.
+- `.github/workflows/deploy-db.yml` — push-to-`main`
+  (`packages/db/migrations/**` + the migrate script + workflow) +
+  `workflow_dispatch`; runs `pnpm db:migrate` against `PROD_DATABASE_URL`,
+  guarded on the secret.
 
-- T-DL-RLS-POLICIES
+## Acceptance criteria
+- [ ] `deploy-db.yml` is valid YAML, path-filtered to the migration sources,
+      reuses the repo's pnpm/corepack setup block, and runs `pnpm db:migrate`.
+- [ ] The migrate step is skipped (not failed) when `PROD_DATABASE_URL` is absent.
+- [ ] The workflow uses the additive `db:migrate` (drizzle migrator) path —
+      never `db reset` / `drizzle-kit push` — so it is idempotent + non-destructive.
+- [ ] Rollback + staging-first guidance documented in the runbook.
+- [ ] The prod project linking flow + config diff are documented.
+- [ ] No changes outside `owns_paths` (+ shared `infra/DEPLOYMENT_SECRETS.md`).
 
-**Parallel-safe with:** T-DP-VERCEL, T-DP-FLY, T-DP-R2-PROD
-
-**Owns paths:**
-
-- `infra/supabase/production/`
-- `.github/workflows/deploy-db.yml`
-
-## Provisional goal
-
-Supabase production project + migrations CI.
-
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
-
-## Provisional reading list
-
-- PROJECT.md § 4 (Infra & Deployment), § 17 (Build Phases)
-- rules/11-deployment.md
-- (context files added at elaboration time based on the stage rules)
+## Out of scope
+- Provisioning the real prod Supabase project / DB password (Pablo, go-live).
+- Edge Function deploys (separate; the functions tree is owned elsewhere).
+- Migration ordering vs app deploy at the org level beyond documenting it.
 
 ## Branch & PR
-
-- Branch: `agent/T-DP-SUPABASE-PROD`
-- PR title: `T-DP-SUPABASE-PROD: Supabase production project + migrations CI`
+- Branch: `agent/T-DP-INFRA`
+- PR title: `feat(deploy): T-DP-VERCEL/FLY/SUPABASE-PROD/R2-PROD — Stage 11 deployment scaffolding (secrets pending)`
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+The repo applies migrations with `drizzle-orm/postgres-js/migrator` via
+`packages/db/scripts/migrate.ts`, which resolves the target from `--url` >
+`DATABASE_URL` > `SUPABASE_DB_URL`. The workflow sets `DATABASE_URL` to the
+`PROD_DATABASE_URL` secret. The drizzle migrator tracks applied migrations in
+its journal table, so re-runs are no-ops on already-applied migrations
+(idempotent). The migrations live at `packages/db/src/migrations/` (the
+dependencies.yaml `owns_paths` says `packages/db/migrations/**`; the workflow
+path filter matches both spellings defensively).
