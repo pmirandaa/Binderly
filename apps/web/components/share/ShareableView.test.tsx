@@ -1,6 +1,8 @@
 import { act, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { ShareableTheme } from '@binderly/api-contracts';
+
 import { ShareableView } from './ShareableView';
 import {
   FIXTURE_MEMBERS,
@@ -8,6 +10,7 @@ import {
   createFakeShareApi,
   makePublicShareOwner,
   makePublicSharePayload,
+  makeShareableDto,
 } from '../../lib/share/fixtures';
 import { renderWithProviders } from '../../test-utils/render';
 
@@ -304,5 +307,59 @@ describe('ShareableView — api wiring', () => {
     const call = api.getPublicSharePayload.mock.calls[0]?.[0];
     expect(call).toMatchObject({ handle: 'with-dash', slug: 'cool-slug' });
     expect(call?.signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('ShareableView — theming', () => {
+  function renderThemed(theme: ShareableTheme): void {
+    const api = createFakeShareApi({
+      payload: makePublicSharePayload({ shareable: makeShareableDto({ theme }) }),
+    });
+    renderView(api);
+  }
+
+  it('renders the resolved theme root for the stored theme id', async () => {
+    renderThemed('gold');
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(document.querySelector('[data-share-theme="gold"]')).not.toBeNull();
+  });
+
+  it('renders the default theme root for the default id', async () => {
+    renderThemed('default');
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(document.querySelector('[data-share-theme="default"]')).not.toBeNull();
+  });
+
+  it('falls back to the default theme root for an unknown stored id', async () => {
+    const api = createFakeShareApi({
+      payload: makePublicSharePayload({
+        shareable: makeShareableDto({ theme: 'holo' as unknown as ShareableTheme }),
+      }),
+    });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(document.querySelector('[data-share-theme="default"]')).not.toBeNull();
+    expect(document.querySelector('[data-share-theme="holo"]')).toBeNull();
+  });
+
+  it('renders the accent band for a band-header theme', async () => {
+    renderThemed('dark');
+    await waitFor(() => {
+      expect(screen.getByTestId('share-theme-band')).toBeInTheDocument();
+    });
+  });
+
+  it('omits the accent band for the default (plain-header) theme', async () => {
+    renderThemed('default');
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('share-theme-band')).toBeNull();
   });
 });
