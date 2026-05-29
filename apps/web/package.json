@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:no-env": "node scripts/build-no-env.mjs",
     "start": "next start",
     "typecheck": "tsc -p . --noEmit",
     "lint": "eslint --max-warnings=0 .",

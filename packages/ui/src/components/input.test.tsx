@@ -58,6 +58,49 @@ describe('<Input>', () => {
     });
   });
 
+  describe('blur / end-editing', () => {
+    it('calls onBlur when the input loses focus', () => {
+      const handler = vi.fn();
+      const { container } = renderWithProvider(<Input aria-label="email" onBlur={handler} />);
+      const input = container.querySelector('input');
+      expect(input).not.toBeNull();
+      fireEvent.blur(input!);
+      expect(handler).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onEndEditing with the current value on blur', () => {
+      const handler = vi.fn();
+      const { container } = renderWithProvider(
+        <Input aria-label="email" defaultValue="hello" onEndEditing={handler} />,
+      );
+      const input = container.querySelector('input');
+      expect(input).not.toBeNull();
+      fireEvent.blur(input!, { target: { value: 'hello' } });
+      expect(handler).toHaveBeenCalledWith('hello');
+    });
+
+    it('fires both onBlur and onEndEditing from a single blur', () => {
+      const onBlur = vi.fn();
+      const onEndEditing = vi.fn();
+      const { container } = renderWithProvider(
+        <Input aria-label="email" onBlur={onBlur} onEndEditing={onEndEditing} />,
+      );
+      const input = container.querySelector('input');
+      expect(input).not.toBeNull();
+      fireEvent.blur(input!);
+      expect(onBlur).toHaveBeenCalledTimes(1);
+      expect(onEndEditing).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not attach a blur handler when neither prop is provided', () => {
+      const { container } = renderWithProvider(<Input aria-label="email" />);
+      const input = container.querySelector('input');
+      expect(input).not.toBeNull();
+      // Should not throw when blurred without handlers wired.
+      expect(() => fireEvent.blur(input!)).not.toThrow();
+    });
+  });
+
   describe('a11y', () => {
     it('forwards aria-label', () => {
       const { getByLabelText } = renderWithProvider(<Input aria-label="email address" />);

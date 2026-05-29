@@ -85,4 +85,28 @@ stage.)
 - PR title: `T-DP-MONITORING: Sentry + PostHog wiring across web/mobile/python`
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+
+Shipped as inert-until-secrets observability scaffolding (closes Stage 11
+→ 6/6). Sentry + PostHog init seams wired per-app with injectable hooks
+(no-op until a DSN/key is set AND the SDK initializer is injected at
+go-live), so no provider SDK is a dependency yet (dependency-light per
+brief):
+
+- **Web** `apps/web/lib/observability/` (`initWebObservability`, mounted
+  via `<ObservabilityInit/>` in the root layout) + `GET /api/health`
+  liveness route.
+- **Mobile** `apps/mobile/src/lib/observability/` (`initMobileObservability`,
+  called from `app/_layout.tsx`).
+- **Python** `apps/api-python/observability/` (`init_sentry`,
+  lazy-imports `sentry-sdk` only at go-live; degrades to a no-op when the
+  SDK is absent). Effective once the Q-021 HTTP entrypoint lands.
+- **CI** `.github/workflows/deploy-monitoring.yml` — Sentry release
+  tracking guarded on `SENTRY_AUTH_TOKEN` (skipped, not failed, when
+  absent; mirrors deploy-web/fly/db/mobile).
+- **Docs** `infra/monitoring/README.md` runbook +
+  `infra/DEPLOYMENT_SECRETS.md` §6 + per-app `.env.example` monitoring
+  blocks.
+
+No DB migrations. Raised **Q-025** (production deep-health-check + pager
+is scaffolded but not operational) → **#FU-63** (T-DP-HEALTH-CHECK).
+Python error ingestion stays gated on Q-021 / #FU-53.

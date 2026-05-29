@@ -12,9 +12,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import type { CardWithPrintingsDto, PrintingDto, SetDto } from '@binderly/api-contracts';
-import { Button, Card, Input, Spinner, Text, XStack, YStack } from '@binderly/ui';
+import { Button, Card, Input, Modal, Spinner, Text, XStack, YStack } from '@binderly/ui';
 
-import { Modal } from './Modal';
 import { sortSetsByReleaseDateDesc } from '../../../lib/browse/format';
 
 import type { CustomCollectionApi } from '../../../lib/collections/custom/api';
@@ -178,7 +177,7 @@ export function AddCardsModal({
       onClose={handleClose}
       title="Add cards"
       maxWidth={780}
-      testId="add-cards-modal"
+      testID="add-cards-modal"
     >
       <Text variant="body" tone="muted">
         Pick a set, then choose the printings you want to add to this collection.

@@ -13,9 +13,8 @@
 import { useState } from 'react';
 
 import type { CustomCollectionDto } from '@binderly/api-contracts';
-import { Button, Input, Text, XStack, YStack } from '@binderly/ui';
+import { Button, Input, Modal, Text, XStack, YStack } from '@binderly/ui';
 
-import { Modal } from './Modal';
 import { slugify } from '../../../lib/collections/custom/format';
 
 import type { CustomCollectionApi } from '../../../lib/collections/custom/api';
@@ -85,7 +84,7 @@ export function NewCustomCollectionModal({
       open={open}
       onClose={handleClose}
       title="New custom collection"
-      testId="new-custom-collection-modal"
+      testID="new-custom-collection-modal"
     >
       <Text variant="body" tone="muted">
         Group a hand-picked set of cards. You can rename it or add cards anytime.

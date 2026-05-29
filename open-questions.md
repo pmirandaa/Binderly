@@ -1115,9 +1115,123 @@ OG-theming wire-up is **#FU-62**, T-SH-OG-THEME-WIRE.)
 
 **Pablo's answer:** _(empty until answered)_
 
-## Q-025 — Social links scoped to the profile (owner-level "link in bio"), not per-shareable (T-SH-OWNER-CONFIG / #FU-51)
+---
 
-**Status:** decided — shipped per-profile; flag for product review (non-blocking)
+## Q-025 — Production health-check + alerting story is scaffolded but not yet operational (T-DP-MONITORING)
+
+**Status:** open — scaffold shipped, follow-up logged (#FU-63), non-blocking
+
+**Context.** `rules/11-deployment.md` ("Done when") calls for a
+5-minute production health check (curl + DB ping + R2 read) that runs on
+a cron and **pages on failure**, plus cost/budget alerts at 50% on
+Supabase / Fly / R2 / Vercel. T-DP-MONITORING scaffolds the observability
+init seams (Sentry/PostHog, inert until secrets) and a cheap liveness
+endpoint (`GET /api/health` on web), but stops short of an active
+synthetic monitor + pager.
+
+**What's missing (the actual follow-up, #FU-63):**
+
+1. **A deep health check, not just liveness.** `GET /api/health` is a
+   dependency-free 200 (proves the Next.js server is up). The "Done when"
+   check additionally pings Postgres and reads from R2 — that needs a
+   small authenticated route (or an external synthetic monitor running
+   the three probes) so a degraded-but-up backend is caught.
+2. **The Python service has no HTTP entrypoint (Q-021 / #FU-53),** so its
+   `/healthz` can't be probed until that lands. The monitor's
+   Python target is blocked on Q-021.
+3. **Pager wiring.** Which on-call channel (Sentry alerts → Slack/email,
+   or an uptime provider's incident flow)? No paging integration exists.
+4. **Cost/budget alerts** (Supabase/Fly/R2/Vercel at 50%) are a
+   dashboard-config task on each platform — owned by Pablo's go-live, not
+   code.
+
+**Options for the synthetic monitor:**
+- (a) External uptime SaaS (Better Stack / UptimeRobot) hitting
+  `/api/health` + a future deep-check route. Lowest effort; off-platform.
+- (b) A scheduled GitHub Actions cron (`workflow_dispatch` + `schedule`)
+  running the three probes and opening an incident / pinging a webhook on
+  failure. Keeps it in-repo but burns Actions minutes (currently at
+  ~90% quota — see `status.md`).
+- (c) Supabase scheduled Edge Function (pg_cron / `cron.schedule`) doing
+  the DB+R2 probe close to the data.
+
+**Recommendation.** Defer to **#FU-63 (T-DP-HEALTH-CHECK)** post-secrets:
+the inert scaffolding (liveness endpoint + Sentry error capture) is
+enough to detect hard-down + crashes once DSNs are set; the cron+pager
+synthetic check is a go-live hardening step that depends on the Q-021
+Python entrypoint and on Pablo choosing a pager channel.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-026 — `/cards/[*]` detail entity: printing-centric (web) vs card-centric (mobile)?
+
+**Status:** open — raised by T-POLISH-SWEEP while consolidating #FU-18.
+(Numbering: authored as Q-025, renumbered to **Q-026** at merge — a
+sibling T-DP-MONITORING claimed Q-025 + #FU-63; this FU is **#FU-64**.)
+
+**Context.** #FU-18 asked to consolidate the web-vs-mobile URL
+convention for `/sets/[*]` and `/cards/[*]`. Investigation found two
+*independent* divergences:
+
+1. **`/sets/[*]`** — web uses the set **UUID** (`set.id`); mobile uses
+   the **slug** (`set.canonicalKey`, e.g. `en-base1`) and resolves it
+   client-side by scanning the `/v1/sets` list. Both DTOs already carry
+   `id` *and* `canonicalKey`, so this one is mechanically alignable
+   without a new endpoint or migration. **Chosen target convention:
+   slug (`canonicalKey`)** — friendlier URLs, matches mobile today, and
+   the long-term plan in status.md follow-up #18 ("probably slug, after
+   a `getSetBySlug` endpoint lands").
+
+2. **`/cards/[*]`** — *not* a slug-vs-id swap. The web route `/cards/[id]`
+   takes a **printing** UUID and calls `cards.getPrinting()` (renders
+   set + card + variant context in one fetch). The mobile route
+   `/cards/[id]` takes a **card** UUID and calls `cards.getCard()`. Same
+   path, different entity. There is no `getCardBySlug` / `getPrintingBySlug`
+   in `@binderly/api-client`, and no "list all cards" cache analogous to
+   `/v1/sets`.
+
+**Problem (the actual open question).** Unifying `/cards/[*]` requires a
+**product + API decision**, not a string tweak: should the canonical
+card-detail surface be **printing-centric** (a specific printing/variant,
+as web does) or **card-centric** (the card, with a printing picker, as
+mobile leans)? The answer dictates whether we need a `getCardBySlug`
+and/or `getPrintingBySlug` endpoint and which platform migrates. This is
+out of scope for a polish sweep and genuinely ambiguous.
+
+**Options.**
+1. **Printing-centric everywhere** (web wins): mobile card taps resolve
+   to a printing and call `getPrinting`; `/cards/[id]` is always a
+   printing id. Needs mobile nav + screen rework.
+2. **Card-centric everywhere** (mobile wins): web `/cards/[id]` becomes
+   a card id + on-page printing picker; needs a web rework + likely a
+   `getCardBySlug` for nice URLs.
+3. **Two routes** (`/printings/[id]` + `/cards/[id]`) with explicit
+   semantics on both platforms.
+
+**Interim shipped.** Nothing changed in this sweep — the divergence is
+SSR-hidden (routes aren't linked from primary nav in a user-visible way
+yet) and low-priority per status.md follow-up #18. The sets-alignment
+half and the cards entity-decision half are logged together as **#FU-64**.
+
+**Recommendation.** Pablo (or a product owner) picks the card-detail
+entity model (Option 1 vs 2 vs 3). Once decided, #FU-64 does the sets
+slug-alignment (safe, client-only) **and** the chosen card migration in
+one cross-platform pass (likely adding `getSetBySlug` / `getCardBySlug`
+endpoints — a backend task, no migration needed since `canonical_key`
+columns already exist + are unique).
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-027 — Social links scoped to the profile (owner-level "link in bio"), not per-shareable (T-SH-OWNER-CONFIG / #FU-51)
+
+**Status:** decided — shipped per-profile; flag for product review (non-blocking).
+(Numbering: authored as Q-025, renumbered to **Q-027** at merge — siblings
+T-DP-MONITORING claimed Q-025 + #FU-63 and T-POLISH-SWEEP claimed Q-026 +
+#FU-64; this follow-up is **#FU-65**.)
 
 **Context.** #FU-51 asked for a "social links" add/remove editor in owner
 settings, rendered on the public shareable page. The scope line read
@@ -1145,7 +1259,7 @@ duplicate data with little user benefit.
 **Open question for product.** If we later want per-binder link sets
 (e.g. a "buy/trade" binder linking to a marketplace vs a showcase binder
 linking to socials), we would add an optional per-shareable override that
-falls back to the profile list. Tracked as **#FU-63
+falls back to the profile list. Tracked as **#FU-65
 (T-SH-PER-SHAREABLE-LINKS)** — not built; raise priority only if product
 wants per-binder overrides.
 

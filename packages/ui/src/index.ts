@@ -38,6 +38,9 @@ export type { CardProps, CardVariant } from './components/card.js';
 export { INPUT_SIZES, INPUT_SIZE_METRICS, Input } from './components/input.js';
 export type { InputProps, InputSize } from './components/input.js';
 
+export { Modal } from './components/modal.js';
+export type { ModalProps } from './components/modal.js';
+
 export { SPINNER_SIZE_PX, Spinner } from './components/spinner.js';
 export type { SpinnerProps } from './components/spinner.js';
 

@@ -157,3 +157,11 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
+      - name: Build web with no env (smoke guard, #FU-11)
+        # Reproduce the env-less production build deterministically: the
+        # web app must build with zero NEXT_PUBLIC_* / SUPABASE_* vars
+        # (lazy-init pattern). Catches eager module/render-time env reads
+        # before they break a real deploy. Workspace deps are already
+        # built by the `Build` step above, so this only re-runs `next
+        # build` for apps/web with a stripped environment.
+        run: pnpm --filter @binderly/web build:no-env

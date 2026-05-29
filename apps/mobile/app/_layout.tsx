@@ -16,7 +16,7 @@
 
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '../src/components/error/ErrorBoundary';
@@ -27,11 +27,18 @@ import {
   ThemeOverrideProvider,
 } from '../src/components/providers';
 import { ApiClientProvider, createMobileApiClient } from '../src/lib/api-client';
+import { initMobileObservability } from '../src/lib/observability/index.js';
 import { createSupabaseMobileClient } from '../src/lib/supabase-mobile';
 
 import type { MobileEnv } from '../src/lib/env';
 
 export default function RootLayout(): ReactNode {
+  // Observability bootstrap. Inert until a DSN/key is provisioned and
+  // the real SDK hooks are wired at go-live (see infra/monitoring/README.md).
+  useEffect(() => {
+    initMobileObservability();
+  }, []);
+
   return (
     <ThemeOverrideProvider>
       <ErrorBoundary>
