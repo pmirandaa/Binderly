@@ -1264,3 +1264,55 @@ falls back to the profile list. Tracked as **#FU-65
 wants per-binder overrides.
 
 **Pablo's answer:** _(empty until answered)_
+
+## Q-028 — `mv_current_price` v2 trend/freshness display semantics + freshness source (T-DL-PRICING-CURRENT-VIEW-V2 / #FU-5; pairs with T-SP-PRICING-DISPLAY)
+
+**Status:** additive defaults shipped (backward-compatible); the display
+semantics + the freshness-source switch are flagged for T-SP-PRICING-DISPLAY
+(non-blocking). (Numbering: authored as **Q-028**.)
+
+**Context.** Migration `0028_pricing_current_view_v2.sql` enriched the
+`mv_current_price` materialized view with the richer shape from
+`context/data-model.md` § `mv_current_price`: `current_price` (median of the
+last 30 days of daily medians), `trend_30d_pct` / `trend_90d_pct` /
+`trend_all_time_pct`, a derived `trend_direction`, `sample_count_30d`, and
+`last_observation_at` (`MAX(observed_at)` from the raw observation log). All
+columns are appended additively (every v1 column preserved) and surfaced as
+**optional** fields on `currentPriceDto` + `printingCurrentPriceDto`; the
+`GET /v1/printings/:id/current-price` handler now returns them.
+
+**Decisions baked into the migration (review when wiring the headline arrow):**
+1. **Trend base.** Each trend % is `(latest daily median − reference median) /
+   reference median`, where the reference is the most recent daily median at or
+   before the 30- / 90- / all-time look-back, calendar-anchored on the slice's
+   own latest `period_start` (not `now()`, so the view is deterministic between
+   refreshes). Alternative worth weighing: base the trend on `current_price`
+   (the 30-day median) instead of the single latest daily median for a smoother,
+   less spiky headline number.
+2. **`trend_direction` dead-band.** `±1%` on the 30-day trend (`>= +1%` → `up`,
+   `<= −1%` → `down`, else `flat`; `unknown` when no 30-day reference exists).
+   The 1% band is a first-principles guess — calibrate against real price series.
+3. **Freshness source.** The headline `freshness` band is still derived from
+   `computedAt` (rollup recency) for backward-compatibility, NOT the new
+   `lastObservationAt` (true observation recency). `lastObservationAt` is exposed
+   alongside so the handler/UI can switch later. Question: should `freshness`
+   move to `lastObservationAt` (a truer "is this price current?") — and if so,
+   the existing 7d/30d bucket thresholds likely need re-tuning against the real
+   observation cadence.
+
+**Also noted (resolved in this PR).** `0028` tightened the view's SQL grants to
+SELECT-only (`REVOKE ALL … FROM PUBLIC, anon, authenticated, service_role;`
+then `GRANT SELECT …`) to realize the v1 `0013_mv_current_price.sql` migration's
+documented "SELECT only" intent. Same root cause as **#FU-28 / `0020`**:
+Supabase's project-init `ALTER DEFAULT PRIVILEGES … GRANT ALL ON TABLES TO
+anon, authenticated, service_role` fires on `CREATE MATERIALIZED VIEW`, and a
+bare `REVOKE … FROM PUBLIC` does not strip the per-role grants — so v1 carried
+surplus (inert, since a MV is unwritable via PostgREST and refreshed only by its
+owner) `anon`/`authenticated` ALL grants. Now SELECT-only and matching intent;
+`verify-rls` stays 137/0.
+
+**Consumer-side wiring** (render the trend arrow + % change + "last seen" on
+card detail; decide whether to flip `freshness` to `lastObservationAt`) is
+tracked as **#FU-66 (T-SP-PRICING-DISPLAY-TRENDS)**.
+
+**Pablo's answer:** _(empty until answered)_

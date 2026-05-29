@@ -11,6 +11,7 @@ import {
   priceAggregateDto,
   priceHistoryQuery,
   priceObservationKindSchema,
+  priceTrendDirectionSchema,
   printingCurrentPriceDto,
   printingCurrentPriceFreshnessSchema,
 } from './pricing.js';
@@ -124,10 +125,60 @@ describe('currentPriceDto', () => {
     expect(currentPriceDto.parse(VALID).gradeTier).toBe('PSA_10');
   });
 
+  it('parses a current-price row with the v2 trend enrichment', () => {
+    const parsed = currentPriceDto.parse({
+      ...VALID,
+      currentPrice: '1235.00',
+      trend30dPct: '-4.20',
+      trend90dPct: '12.50',
+      trendAllTimePct: '120.00',
+      trendDirection: 'down',
+      sampleCount30d: 88,
+      lastObservationAt: NOW,
+    });
+    expect(parsed.trendDirection).toBe('down');
+    expect(parsed.trend30dPct).toBe('-4.20');
+    expect(parsed.sampleCount30d).toBe(88);
+  });
+
+  it('parses a v1 row without the v2 trend fields (backward compatible)', () => {
+    const parsed = currentPriceDto.parse(VALID);
+    expect(parsed.currentPrice).toBeUndefined();
+    expect(parsed.trendDirection).toBeUndefined();
+  });
+
+  it('accepts null trend fields (too little history to compute)', () => {
+    const parsed = currentPriceDto.parse({
+      ...VALID,
+      currentPrice: null,
+      trend30dPct: null,
+      lastObservationAt: null,
+    });
+    expect(parsed.currentPrice).toBeNull();
+    expect(parsed.trend30dPct).toBeNull();
+  });
+
+  it('rejects an unknown trend direction', () => {
+    expect(currentPriceDto.safeParse({ ...VALID, trendDirection: 'sideways' }).success).toBe(false);
+  });
+
   it('rejects a row with missing computedAt', () => {
     const { computedAt, ...without } = VALID;
     void computedAt;
     expect(currentPriceDto.safeParse(without).success).toBe(false);
+  });
+});
+
+describe('priceTrendDirectionSchema', () => {
+  it('accepts every documented direction', () => {
+    expect(priceTrendDirectionSchema.parse('up')).toBe('up');
+    expect(priceTrendDirectionSchema.parse('down')).toBe('down');
+    expect(priceTrendDirectionSchema.parse('flat')).toBe('flat');
+    expect(priceTrendDirectionSchema.parse('unknown')).toBe('unknown');
+  });
+
+  it('rejects an unknown direction', () => {
+    expect(priceTrendDirectionSchema.safeParse('sideways').success).toBe(false);
   });
 });
 
@@ -224,6 +275,21 @@ describe('printingCurrentPriceDto', () => {
     expect(printingCurrentPriceDto.parse(VALID).freshness).toBe('fresh');
   });
 
+  it('parses a row carrying the v2 trend enrichment', () => {
+    const parsed = printingCurrentPriceDto.parse({
+      ...VALID,
+      currentPrice: '118.00',
+      trend30dPct: '8.40',
+      trend90dPct: '-2.00',
+      trendAllTimePct: '60.00',
+      trendDirection: 'up',
+      sampleCount30d: 30,
+      lastObservationAt: NOW,
+    });
+    expect(parsed.trendDirection).toBe('up');
+    expect(parsed.lastObservationAt).toBe(NOW);
+  });
+
   it('parses a row with null price fields (no recent observations)', () => {
     expect(
       printingCurrentPriceDto.parse({
@@ -251,7 +317,7 @@ describe('printingCurrentPriceDto', () => {
 
   it('rejects unknown extra keys (strict)', () => {
     expect(
-      printingCurrentPriceDto.safeParse({ ...VALID, trend30d: 0.04 }).success,
+      printingCurrentPriceDto.safeParse({ ...VALID, definitelyNotAField: 0.04 }).success,
     ).toBe(false);
   });
 });

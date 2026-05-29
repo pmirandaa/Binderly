@@ -103,6 +103,17 @@ interface MvCurrentPriceRow {
   readonly high_price: string | null;
   readonly sample_count: number;
   readonly computed_at: string;
+  // v2 trend + freshness enrichment (migration
+  // `0028_pricing_current_view_v2.sql`, #FU-5). `numeric` columns
+  // arrive as decimal strings over PostgREST; `sample_count_30d` is an
+  // `integer`; `trend_direction` is always populated server-side.
+  readonly current_price: string | null;
+  readonly trend_30d_pct: string | null;
+  readonly trend_90d_pct: string | null;
+  readonly trend_all_time_pct: string | null;
+  readonly trend_direction: 'up' | 'down' | 'flat' | 'unknown';
+  readonly sample_count_30d: number;
+  readonly last_observation_at: string | null;
 }
 
 export async function handleGetPrintingCurrentPrice(
@@ -127,7 +138,7 @@ export async function handleGetPrintingCurrentPrice(
   const { data, error } = await session.supabase
     .from(MV_CURRENT_PRICE)
     .select(
-      'printing_id, grade_tier, market, currency, period_start, median_price, mean_price, low_price, high_price, sample_count, computed_at',
+      'printing_id, grade_tier, market, currency, period_start, median_price, mean_price, low_price, high_price, sample_count, computed_at, current_price, trend_30d_pct, trend_90d_pct, trend_all_time_pct, trend_direction, sample_count_30d, last_observation_at',
     )
     .eq('printing_id', printingId)
     .eq('grade_tier', gradeTier)
@@ -158,6 +169,17 @@ export async function handleGetPrintingCurrentPrice(
     sampleCount: row.sample_count,
     computedAt: row.computed_at,
     freshness: computeFreshness(row.computed_at, () => Date.now()),
+    // v2 trend + freshness enrichment, surfaced straight from the
+    // materialized view (migration `0028`, #FU-5). `freshness` above
+    // keeps its `computedAt`-derived semantics; `lastObservationAt`
+    // exposes the raw last-seen timestamp alongside it.
+    currentPrice: row.current_price,
+    trend30dPct: row.trend_30d_pct,
+    trend90dPct: row.trend_90d_pct,
+    trendAllTimePct: row.trend_all_time_pct,
+    trendDirection: row.trend_direction,
+    sampleCount30d: row.sample_count_30d,
+    lastObservationAt: row.last_observation_at,
   };
 
   return apiOk(request, ctx.cors, ctx.requestId, wire);
