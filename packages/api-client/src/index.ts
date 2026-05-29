@@ -25,6 +25,10 @@ import { HttpClient, type FetchLike, type JwtProvider } from './client.js';
 import { makeAuthResource, type AuthResource } from './resources/auth.js';
 import { makeCardsResource, type CardsResource } from './resources/cards.js';
 import { makeCollectionResource, type CollectionResource } from './resources/collection.js';
+import {
+  makeCommunitySubmissionsResource,
+  type CommunitySubmissionsResource,
+} from './resources/communitySubmissions.js';
 import { makeEntitlementsResource, type EntitlementsResource } from './resources/entitlements.js';
 import { makeGradingResource, type GradingResource } from './resources/grading.js';
 import { makePricingResource, type PricingResource } from './resources/pricing.js';
@@ -84,6 +88,7 @@ export interface BinderlyClient {
   readonly auth: AuthResource;
   readonly smartCollections: SmartCollectionsResource;
   readonly entitlements: EntitlementsResource;
+  readonly communitySubmissions: CommunitySubmissionsResource;
   /**
    * Escape hatch: the underlying `HttpClient` for callers that
    * need to issue ad-hoc requests against an endpoint this
@@ -128,6 +133,7 @@ export function createClient(config: CreateClientConfig): BinderlyClient {
     auth: authResource,
     smartCollections: makeSmartCollectionsResource(http),
     entitlements: makeEntitlementsResource(http),
+    communitySubmissions: makeCommunitySubmissionsResource(http),
   });
 }
 
@@ -179,6 +185,7 @@ export type {
   ListSetsOptions,
 } from './resources/cards.js';
 export type { CollectionResource, ListCollectionItemsOptions } from './resources/collection.js';
+export type { CommunitySubmissionsResource } from './resources/communitySubmissions.js';
 export type { EntitlementsResource } from './resources/entitlements.js';
 export type { GradingResource, ListGradingSubmissionsOptions } from './resources/grading.js';
 export type {
