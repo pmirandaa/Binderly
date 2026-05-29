@@ -13,7 +13,7 @@ onto a PSA-equivalent [1, 10] internal scale.  The constants are heuristic and
 explicitly interim — see ``calibration.PLACEHOLDER_CALIBRATIONS`` and
 ``README.md``.
 
-Follow-up: #FU-59 (learned cross-company calibration) replaces the placeholder
+Follow-up: #FU-60 (learned cross-company calibration) replaces the placeholder
 constants with a fit over labelled cross-company pairs (the same card graded by
 multiple companies) once that data exists in the flywheel — see Q-023.
 

@@ -1066,7 +1066,7 @@ The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`)
 2. Granularity: is a single per-company affine enough, or do we need per-company-**per-grade-tier** constants (cross-grade equivalence is non-linear at the very top — the 9.5↔10 band behaves differently from the mid-scale)?
 3. Should the normalised scale stay PSA-anchored, or move to a company-neutral latent scale once learned?
 
-**Proposed resolution → #FU-59 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-59 in `status.md`'s Known Follow-ups.
+**Proposed resolution → #FU-60 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-60 in `status.md`'s Known Follow-ups.
 
 **Status: open** (non-blocking; placeholder scaffold is sufficient until labelled cross-company data exists).
 
@@ -1074,7 +1074,7 @@ The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`)
 
 ## Q-024 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
 
-**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-60)
+**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-61)
 
 **Context.** T-SH-THEMES must force-render the `default` theme on the
 public page `/c/{handle}/{slug}` when the shareable's owner is NOT pro
@@ -1105,12 +1105,12 @@ so once the payload carries the tier, flipping `null → ownerIsPro`
 enforces the downgrade with no further change to the theme system.
 
 **Recommendation.** Option 1, tracked by **T-BE-SHAREABLE-OWNER-TIER**
-(#FU-60). Settings-side gating (persisting a non-default theme) is
+(#FU-61). Settings-side gating (persisting a non-default theme) is
 already enforced via the `shareable_themes` gate, so the only gap is the
 public-render downgrade for an already-persisted theme after a
 downgrade. (Numbering: authored as Q-022, renumbered to **Q-024** at
 merge — Q-022 + #FU-58 were claimed by T-DP-EAS, #FU-59 by
-T-BE-READS-WRITES, and Q-023 by T-GR-GRADE-CALIBRATION at iter 34/35; the
-OG-theming wire-up is **#FU-61**, T-SH-OG-THEME-WIRE.)
+T-BE-READS-WRITES, Q-023 + #FU-60 by T-GR-DATA-HYGIENE at iter 34/35; the
+OG-theming wire-up is **#FU-62**, T-SH-OG-THEME-WIRE.)
 
 **Pablo's answer:** _(empty until answered)_

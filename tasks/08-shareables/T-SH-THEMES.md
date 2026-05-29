@@ -67,12 +67,12 @@ upsell.
 ## Out of scope / follow-ups
 
 - **Server-side free-tier enforcement** depends on the owner's tier,
-  which the public share payload does not expose (see **Q-023**).
+  which the public share payload does not expose (see **Q-024**).
   Interim: `resolvePublicTheme(id, null)` renders the stored theme for
   everyone; the downgrade branch is already wired for `ownerIsPro ===
-  false`. Tracked by **T-BE-SHAREABLE-OWNER-TIER** (#FU-60).
+  false`. Tracked by **T-BE-SHAREABLE-OWNER-TIER** (#FU-61).
 - **OG image theming** — palette is exported but not yet wired into
-  the OG hero. Tracked by **T-SH-OG-THEME-WIRE** (#FU-61).
+  the OG hero. Tracked by **T-SH-OG-THEME-WIRE** (#FU-62).
 
 ## Branch & PR
 
