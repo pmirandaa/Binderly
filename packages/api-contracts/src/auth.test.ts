@@ -12,6 +12,9 @@ import {
   profileThemeSchema,
   sessionDto,
   shareableHandleSchema,
+  socialLinkSchema,
+  socialLinksSchema,
+  SOCIAL_LINKS_MAX,
   subscriptionDto,
   subscriptionSourceSchema,
   subscriptionTierSchema,
@@ -139,6 +142,19 @@ describe('profileDto', () => {
     ).toBeNull();
   });
 
+  it('defaults socialLinks to [] when the key is absent', () => {
+    expect(profileDto.parse(VALID).socialLinks).toEqual([]);
+  });
+
+  it('parses a profile carrying social links', () => {
+    const parsed = profileDto.parse({
+      ...VALID,
+      socialLinks: [{ label: 'Twitter', url: 'https://twitter.com/pablo' }],
+    });
+    expect(parsed.socialLinks).toHaveLength(1);
+    expect(parsed.socialLinks[0]?.url).toBe('https://twitter.com/pablo');
+  });
+
   it('rejects a too-short handle', () => {
     expect(profileDto.safeParse({ ...VALID, handle: 'pa' }).success).toBe(false);
   });
@@ -159,6 +175,53 @@ describe('updateProfileRequest', () => {
 
   it('rejects a handle with a hyphen (alphanumeric or underscore only)', () => {
     expect(updateProfileRequest.safeParse({ handle: 'my-handle' }).success).toBe(false);
+  });
+
+  it('accepts a socialLinks-only PATCH', () => {
+    expect(
+      updateProfileRequest.parse({
+        socialLinks: [{ label: 'Shop', url: 'https://shop.example.com' }],
+      }).socialLinks,
+    ).toHaveLength(1);
+  });
+});
+
+describe('socialLinkSchema / socialLinksSchema (#FU-51)', () => {
+  it('parses a valid label + url pair', () => {
+    expect(socialLinkSchema.parse({ label: 'Twitch', url: 'https://twitch.tv/pablo' }).label).toBe(
+      'Twitch',
+    );
+  });
+
+  it('rejects a non-URL', () => {
+    expect(socialLinkSchema.safeParse({ label: 'Bad', url: 'not-a-url' }).success).toBe(false);
+  });
+
+  it('rejects an empty label', () => {
+    expect(socialLinkSchema.safeParse({ label: '', url: 'https://x.test' }).success).toBe(false);
+  });
+
+  it('rejects unknown extra keys (strict)', () => {
+    expect(
+      socialLinkSchema.safeParse({ label: 'X', url: 'https://x.test', icon: 'x' }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an empty list and a maxed-out list', () => {
+    expect(socialLinksSchema.parse([])).toEqual([]);
+    const maxed = Array.from({ length: SOCIAL_LINKS_MAX }, (_v, i) => ({
+      label: `L${i}`,
+      url: `https://x${i}.test`,
+    }));
+    expect(socialLinksSchema.parse(maxed)).toHaveLength(SOCIAL_LINKS_MAX);
+  });
+
+  it('rejects a list longer than the cap', () => {
+    const tooMany = Array.from({ length: SOCIAL_LINKS_MAX + 1 }, (_v, i) => ({
+      label: `L${i}`,
+      url: `https://x${i}.test`,
+    }));
+    expect(socialLinksSchema.safeParse(tooMany).success).toBe(false);
   });
 });
 

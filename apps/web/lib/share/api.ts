@@ -23,6 +23,7 @@ import type { BinderlyClient } from '@binderly/api-client';
 import type {
   PublicShareableDto,
   ShareableDto,
+  SocialLink,
 } from '@binderly/api-contracts';
 
 /**
@@ -35,6 +36,8 @@ export interface PublicShareOwner {
   readonly displayName: string | null;
   readonly avatarUrl: string | null;
   readonly bio: string | null;
+  /** Owner social links rendered in the page header (#FU-51). */
+  readonly socialLinks: ReadonlyArray<SocialLink>;
 }
 
 /**
@@ -166,6 +169,7 @@ function publicShareableDtoToPayload(dto: PublicShareableDto): PublicSharePayloa
       displayName: dto.owner.displayName,
       avatarUrl: dto.owner.avatarUrl,
       bio: dto.owner.bio,
+      socialLinks: dto.owner.socialLinks,
     },
     collectionTitle: dto.collectionTitle,
     description: dto.description,

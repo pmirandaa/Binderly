@@ -4,10 +4,14 @@ import {
   MAX_BIO_LENGTH,
   MAX_DISPLAY_NAME_LENGTH,
   MAX_SLUG_LENGTH,
+  SOCIAL_LINK_LABEL_MAX,
+  SOCIAL_LINK_URL_MAX,
   validateBio,
   validateDisplayName,
   validateHandle,
   validateSlug,
+  validateSocialLinkLabel,
+  validateSocialLinkUrl,
 } from './validation';
 
 describe('validateHandle (mobile)', () => {
@@ -91,5 +95,41 @@ describe('validateDisplayName (mobile)', () => {
 
   it('rejects a display name one char past the upper bound', () => {
     expect(validateDisplayName('x'.repeat(MAX_DISPLAY_NAME_LENGTH + 1)).kind).toBe('too-long');
+  });
+});
+
+describe('validateSocialLinkUrl (mobile #FU-51)', () => {
+  it('treats blank input as incomplete', () => {
+    expect(validateSocialLinkUrl('  ').kind).toBe('empty');
+  });
+
+  it('accepts http(s) URLs', () => {
+    expect(validateSocialLinkUrl('https://example.com').kind).toBe('ok');
+    expect(validateSocialLinkUrl('http://example.com').kind).toBe('ok');
+  });
+
+  it('rejects a bare word and non-http schemes', () => {
+    expect(validateSocialLinkUrl('nope').kind).toBe('invalid');
+    expect(validateSocialLinkUrl('ftp://example.com').kind).toBe('invalid');
+  });
+
+  it('rejects a URL past the length cap', () => {
+    expect(
+      validateSocialLinkUrl(`https://example.com/${'a'.repeat(SOCIAL_LINK_URL_MAX)}`).kind,
+    ).toBe('too-long');
+  });
+});
+
+describe('validateSocialLinkLabel (mobile #FU-51)', () => {
+  it('treats blank input as incomplete', () => {
+    expect(validateSocialLinkLabel('').kind).toBe('empty');
+  });
+
+  it('accepts a label at the upper bound', () => {
+    expect(validateSocialLinkLabel('x'.repeat(SOCIAL_LINK_LABEL_MAX)).kind).toBe('ok');
+  });
+
+  it('rejects a label past the upper bound', () => {
+    expect(validateSocialLinkLabel('x'.repeat(SOCIAL_LINK_LABEL_MAX + 1)).kind).toBe('too-long');
   });
 });

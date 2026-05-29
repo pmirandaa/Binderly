@@ -31,6 +31,7 @@ export interface ShareableRowEditorProps {
 interface RowState {
   slug: string;
   theme: ShareableTheme;
+  isActive: boolean;
   showValues: boolean;
   showMissing: boolean;
   showPhotos: boolean;
@@ -40,6 +41,7 @@ function readInitial(s: ShareableDto): RowState {
   return {
     slug: s.slug,
     theme: s.theme,
+    isActive: s.isActive,
     showValues: s.showValues,
     showMissing: s.showMissing,
     showPhotos: s.showPhotos,
@@ -50,6 +52,7 @@ function diffPatch(initial: ShareableDto, current: RowState): UpdateShareableReq
   const patch: UpdateShareableRequest = {};
   if (current.slug !== initial.slug) patch.slug = current.slug;
   if (current.theme !== initial.theme) patch.theme = current.theme;
+  if (current.isActive !== initial.isActive) patch.isActive = current.isActive;
   if (current.showValues !== initial.showValues) patch.showValues = current.showValues;
   if (current.showMissing !== initial.showMissing) patch.showMissing = current.showMissing;
   if (current.showPhotos !== initial.showPhotos) patch.showPhotos = current.showPhotos;
@@ -154,6 +157,18 @@ export function ShareableRowEditor({
       </YStack>
 
       <YStack gap="$2" testID="m-shareable-row-toggles">
+        <MobileToggleRow
+          label="Published (visible to the public)"
+          locked={false}
+          value={draft.isActive}
+          onChange={(next: boolean) => setDraft((cur) => ({ ...cur, isActive: next }))}
+          testId="m-shareable-row-is-active"
+        />
+        {!draft.isActive ? (
+          <Text variant="bodySmall" tone="muted" testID="m-shareable-row-unpublished-hint">
+            Unpublished links return a 404 to anyone who opens them.
+          </Text>
+        ) : null}
         <MobileToggleRow
           label="Show collection value"
           locked={!isPro}

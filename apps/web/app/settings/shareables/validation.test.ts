@@ -4,10 +4,14 @@ import {
   MAX_BIO_LENGTH,
   MAX_DISPLAY_NAME_LENGTH,
   MAX_SLUG_LENGTH,
+  SOCIAL_LINK_LABEL_MAX,
+  SOCIAL_LINK_URL_MAX,
   validateBio,
   validateDisplayName,
   validateHandle,
   validateSlug,
+  validateSocialLinkLabel,
+  validateSocialLinkUrl,
 } from './validation';
 
 describe('validateHandle', () => {
@@ -105,5 +109,47 @@ describe('validateDisplayName', () => {
 
   it('rejects a display name one char past the upper bound', () => {
     expect(validateDisplayName('x'.repeat(MAX_DISPLAY_NAME_LENGTH + 1)).kind).toBe('too-long');
+  });
+});
+
+describe('validateSocialLinkUrl (#FU-51)', () => {
+  it('treats empty input as an incomplete row, not an error', () => {
+    expect(validateSocialLinkUrl('   ').kind).toBe('empty');
+  });
+
+  it('accepts an https URL', () => {
+    expect(validateSocialLinkUrl('https://example.com/path').kind).toBe('ok');
+  });
+
+  it('accepts an http URL', () => {
+    expect(validateSocialLinkUrl('http://example.com').kind).toBe('ok');
+  });
+
+  it('rejects a bare word', () => {
+    expect(validateSocialLinkUrl('notaurl').kind).toBe('invalid');
+  });
+
+  it('rejects a non-http(s) scheme', () => {
+    expect(validateSocialLinkUrl('javascript:alert(1)').kind).toBe('invalid');
+  });
+
+  it('rejects a URL past the length cap', () => {
+    expect(
+      validateSocialLinkUrl(`https://example.com/${'a'.repeat(SOCIAL_LINK_URL_MAX)}`).kind,
+    ).toBe('too-long');
+  });
+});
+
+describe('validateSocialLinkLabel (#FU-51)', () => {
+  it('treats empty input as incomplete', () => {
+    expect(validateSocialLinkLabel('').kind).toBe('empty');
+  });
+
+  it('accepts a label at the upper bound', () => {
+    expect(validateSocialLinkLabel('x'.repeat(SOCIAL_LINK_LABEL_MAX)).kind).toBe('ok');
+  });
+
+  it('rejects a label past the upper bound', () => {
+    expect(validateSocialLinkLabel('x'.repeat(SOCIAL_LINK_LABEL_MAX + 1)).kind).toBe('too-long');
   });
 });

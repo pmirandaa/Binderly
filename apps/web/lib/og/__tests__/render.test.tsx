@@ -181,6 +181,7 @@ describe('renderOgImage — content', () => {
         displayName: null,
         avatarUrl: null,
         bio: null,
+        socialLinks: [],
       },
     });
     const html = renderToStaticMarkup(

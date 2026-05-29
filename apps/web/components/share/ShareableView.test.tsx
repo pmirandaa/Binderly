@@ -166,6 +166,40 @@ describe('ShareableView — header', () => {
       expect(screen.getByTestId('share-header-updated')).toHaveTextContent('2 days ago');
     });
   });
+
+  it('renders owner social links when present (#FU-51)', async () => {
+    const api = createFakeShareApi({
+      payload: makePublicSharePayload({
+        owner: makePublicShareOwner({
+          socialLinks: [
+            { label: 'Twitter', url: 'https://twitter.com/pablo' },
+            { label: 'Website', url: 'https://pablo.dev' },
+          ],
+        }),
+      }),
+    });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header-social-links')).toBeInTheDocument();
+    });
+    const first = screen.getByTestId('share-social-link-0');
+    expect(first).toHaveTextContent('Twitter');
+    expect(first.closest('a')?.getAttribute('href')).toBe('https://twitter.com/pablo');
+    expect(screen.getByTestId('share-social-link-1')).toHaveTextContent('Website');
+  });
+
+  it('omits the social links block when the owner has none (#FU-51)', async () => {
+    const api = createFakeShareApi({
+      payload: makePublicSharePayload({
+        owner: makePublicShareOwner({ socialLinks: [] }),
+      }),
+    });
+    renderView(api);
+    await waitFor(() => {
+      expect(screen.getByTestId('share-header')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('share-header-social-links')).toBeNull();
+  });
 });
 
 describe('ShareableView — summary', () => {

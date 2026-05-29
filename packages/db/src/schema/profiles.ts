@@ -41,6 +41,12 @@ export const profile = pgTable('profile', {
   displayName: text('display_name'),
   avatarUrl: text('avatar_url'),
   bio: text('bio'),
+  // Owner "link in bio" list (#FU-51). Nullable jsonb storing an
+  // array of `{ label, url }` objects; the API layer
+  // (`socialLinksSchema` in `@binderly/api-contracts`) validates the
+  // shape and readers coerce NULL → `[]`. Added by the hand-authored
+  // `0027_shareable_owner_config.sql` migration.
+  socialLinksJson: jsonb('social_links_json'),
   // Shape contract: see `packages/shared-types/src/profile-preferences.ts`
   // (zod) and `context/data-model.md` § "profile.preferences shape".
   preferences: jsonb('preferences')

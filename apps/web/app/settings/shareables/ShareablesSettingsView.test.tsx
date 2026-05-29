@@ -13,7 +13,7 @@ vi.mock('../../../lib/gating/useGate', () => ({
   useLimitGate: () => hoisted.gate,
 }));
 
-import { createFakeSettingsApi, FAKE_SHAREABLE } from './fixtures';
+import { createFakeSettingsApi, FAKE_PROFILE, FAKE_SHAREABLE } from './fixtures';
 import { ShareablesSettingsView } from './ShareablesSettingsView';
 import { renderWithProviders } from '../../../test-utils/render';
 
@@ -195,6 +195,97 @@ describe('ShareablesSettingsView', () => {
     });
     await waitFor(() => {
       expect(api.state.shareables[0]?.showMissing).toBe(false);
+    });
+  });
+
+  it('toggles the kill switch off and persists isActive=false (#FU-50)', async () => {
+    const api = createFakeSettingsApi();
+    renderWithProviders(<ShareablesSettingsView api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('shareable-row-is-active')).toBeInTheDocument();
+    });
+    const toggle = screen.getByTestId('shareable-row-is-active') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    expect(screen.getByTestId('shareable-row-unpublished-hint')).toBeInTheDocument();
+    const save = screen.getByTestId('shareable-row-save');
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    await waitFor(() => {
+      expect(api.state.shareables[0]?.isActive).toBe(false);
+    });
+  });
+
+  it('adds a social link and persists it on the profile (#FU-51)', async () => {
+    const api = createFakeSettingsApi();
+    renderWithProviders(<ShareablesSettingsView api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-social-link-add')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('profile-social-link-add'));
+    });
+    const labelInput = screen.getByTestId('profile-social-link-label-0') as HTMLInputElement;
+    const urlInput = screen.getByTestId('profile-social-link-url-0') as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(labelInput, { target: { value: 'Twitter' } });
+      fireEvent.change(urlInput, { target: { value: 'https://twitter.com/pablo' } });
+    });
+    const saveBtn = screen.getByTestId('profile-fields-save');
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
+    await waitFor(() => {
+      expect(api.state.profile.socialLinks).toEqual([
+        { label: 'Twitter', url: 'https://twitter.com/pablo' },
+      ]);
+    });
+  });
+
+  it('blocks save while a social link has an invalid URL (#FU-51)', async () => {
+    const api = createFakeSettingsApi();
+    renderWithProviders(<ShareablesSettingsView api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-social-link-add')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('profile-social-link-add'));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('profile-social-link-label-0'), {
+        target: { value: 'Bad' },
+      });
+      fireEvent.change(screen.getByTestId('profile-social-link-url-0'), {
+        target: { value: 'not a url' },
+      });
+    });
+    const saveBtn = screen.getByTestId('profile-fields-save') as HTMLButtonElement;
+    expect(saveBtn.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('removes a social link from an owner who already has one (#FU-51)', async () => {
+    const api = createFakeSettingsApi({
+      profile: {
+        ...FAKE_PROFILE,
+        socialLinks: [{ label: 'Twitter', url: 'https://twitter.com/pablo' }],
+      },
+    });
+    renderWithProviders(<ShareablesSettingsView api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('profile-social-link-remove-0')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('profile-social-link-remove-0'));
+    });
+    const saveBtn = screen.getByTestId('profile-fields-save');
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
+    await waitFor(() => {
+      expect(api.state.profile.socialLinks).toEqual([]);
     });
   });
 
