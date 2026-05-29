@@ -1,8 +1,19 @@
-// `<ScanScreen>` — full continuous-scan UX.
+// `<ScanScreen>` — two-mode scan UX: free single-card + Pro stack scanner.
 //
-// Closes Stage 06 by composing every scanner sub-system into one
-// cohesive flow:
+// Per PROJECT.md § 16 the **single-card scan is free**; the **continuous
+// (stack) scanner is Pro-only**. The screen resolves the user's tier via
+// `useGate('stack_scanner')` (FU-57) and exposes a mode toggle:
 //
+//   - **Single (free, default for free users):** one capture → one match
+//     → explicit confirm → add one card. No auto-add loop, no session
+//     accumulation, no stack-review phase. This is the clean gating seam.
+//   - **Continuous / stack (Pro):** the original auto-add loop + undo +
+//     session footer + stack-review. Free users tapping the stack
+//     segment get an `<UpgradePrompt>` instead.
+//
+// Both modes share the same model/detect/embed/match/quality pipeline.
+//
+// Composition:
 //   1. Auth gate — <ProtectedScreen> redirects unauthenticated users
 //      to /auth/sign-in before any camera or model work happens.
 //   2. Model loader — `useModelLoader` async-loads the embedding model
@@ -15,10 +26,10 @@
 //      while permission is granted and the screen is focused.
 //   5. Matcher — `useScanner()` from T-SC-MATCH subscribed to the
 //      detect-stage detection sink; emits `MatchResult` events.
-//   6. Match overlay — auto-add confirmation or disambiguation picker
-//      depending on `disposition`.
-//   7. Undo toast — 5-second window to reverse any auto-add.
-//   8. Session footer — running count + "Done" button.
+//   6. Match handling — single mode → <SingleCardConfirm>; continuous
+//      mode → auto-add overlay / disambiguation picker per `disposition`.
+//   7. Undo toast — 5-second window to reverse any auto-add (continuous).
+//   8. Session footer — running count + "Done" button (continuous).
 //   9. Stack review — StackPanel shown when phase === 'stack-review'.
 //
 // The `loadModels` prop is dependency-injected so tests can stub the
@@ -46,6 +57,7 @@ import {
 import { useScannerSession } from './use-scanner-session.js';
 import { useApiClient } from '../../lib/api-client.js';
 import { ProtectedScreen } from '../../lib/auth/index.js';
+import { useGate, UpgradePrompt } from '../../lib/gating/index.js';
 import {
   CameraPermissionPrompt,
   CameraPreview,
@@ -60,9 +72,11 @@ import { useScanner } from '../../scanner/match/index.js';
 import {
   DisambigPicker,
   MatchOverlay,
+  ScanModeToggle,
   ScannerError,
   ScannerLoading,
   SessionFooter,
+  SingleCardConfirm,
   StackPanel,
   UndoToast,
   buildDisambigCandidates,
@@ -71,7 +85,7 @@ import { UNDO_TIMEOUT_MS } from '../../scanner/ui/types.js';
 
 
 import type { MatchResult } from '../../scanner/match/index.js';
-import type { SessionItem } from '../../scanner/ui/types.js';
+import type { ScanMode, SessionItem } from '../../scanner/ui/types.js';
 
 // ============================================================
 // Helpers
@@ -126,6 +140,19 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
 
   const router = useRouter();
   const client = useApiClient();
+
+  // ---------- mode + Pro gate (FU-57) ------------------------
+  // The continuous/stack scanner is Pro-only; the single-card scan is
+  // free. `useGate` fails closed (free while the RC read resolves), so
+  // the effective mode defaults to `single` until a Pro entitlement is
+  // confirmed — never over-granting the stack flow.
+  const stackGate = useGate('stack_scanner');
+  const stackAllowed = stackGate.result.allowed;
+  // Pro users default to the full continuous experience; the toggle lets
+  // them drop to single-card. Free users are pinned to single regardless.
+  const [requestedMode, setRequestedMode] = useState<ScanMode>('continuous');
+  const mode: ScanMode = stackAllowed ? requestedMode : 'single';
+  const [showStackUpsell, setShowStackUpsell] = useState(false);
 
   // ---------- infrastructure ---------------------------------
   const permission = useCameraPermissionFlow();
@@ -193,6 +220,28 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
   const [liveMatch, setLiveMatch] = useState<MatchResult | null>(null);
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ---------- single-card mode (FU-57) -----------------------
+  // The matched printing awaiting an explicit confirm, and the
+  // just-added success card. Both are null in continuous mode.
+  const [pendingSingle, setPendingSingle] = useState<MatchResult | null>(null);
+  const [singleAddedName, setSingleAddedName] = useState<string | null>(null);
+
+  const handleSelectMode = useCallback(
+    (next: ScanMode): void => {
+      if (next === 'continuous' && !stackAllowed) {
+        // Free user reaching for the stack scanner → show the upsell
+        // instead of switching. Stays in single mode.
+        setShowStackUpsell(true);
+        return;
+      }
+      setShowStackUpsell(false);
+      setPendingSingle(null);
+      setSingleAddedName(null);
+      setRequestedMode(next);
+    },
+    [stackAllowed],
+  );
+
   // Subscribe to match sink events.
   useEffect(() => {
     const unsubscribe = matchSink.subscribe((result) => {
@@ -257,6 +306,25 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
     }
   }, [client, session, sessionState.undoEntry]);
 
+  // ---------- single-card add (FU-57) -------------------------
+  // One capture → one add. No session enqueue, no undo entry, no
+  // stack-review — just commit the single card and surface a success
+  // card with a "Scan another" affordance.
+  const addSingleCard = useCallback(
+    async (printingId: string): Promise<void> => {
+      try {
+        await client.collection.addCollectionItem({
+          printingId,
+          source: 'scan',
+        });
+        setSingleAddedName(makeDisplayName(printingId));
+      } catch {
+        // Swallow — the confirm card stays so the user can retry.
+      }
+    },
+    [client],
+  );
+
   // ---------- disambiguate ------------------------------------
   const [pendingDisambig, setPendingDisambig] = useState<MatchResult | null>(null);
 
@@ -270,6 +338,9 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
       ? liveMatch.printingId
       : undefined;
   const matchPrinting = usePrinting(autoAddPrintingId);
+
+  // Single-card confirm thumbnail/names (FU-57).
+  const singlePrinting = usePrinting(pendingSingle?.printingId);
 
   const disambigCandidateMatches = pendingDisambig?.candidates ?? [];
   const candidate0 = usePrinting(disambigCandidateMatches[0]?.printingId);
@@ -290,6 +361,28 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
 
   useEffect(() => {
     if (liveMatch === null) return;
+
+    // Single-card mode (free): never auto-commit. A confident match goes
+    // to the confirm card; a low-confidence match still uses the picker
+    // so the user can pick the right card — but either way it commits a
+    // single card and stops (no accumulation, no stack-review).
+    if (mode === 'single') {
+      // Ignore new matches while a confirm / success card is up — the
+      // user is mid-decision on the previous capture.
+      if (pendingSingle !== null || singleAddedName !== null) {
+        setLiveMatch(null);
+        return;
+      }
+      if (liveMatch.disposition === 'disambiguate') {
+        setPendingDisambig(liveMatch);
+      } else {
+        setPendingSingle(liveMatch);
+      }
+      setLiveMatch(null);
+      return;
+    }
+
+    // Continuous / stack mode (Pro): the original auto-add loop.
     if (liveMatch.disposition === 'auto-add') {
       void handleAutoAdd(liveMatch.printingId, liveMatch);
       setLiveMatch(null);
@@ -297,16 +390,36 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
       setPendingDisambig(liveMatch);
       setLiveMatch(null);
     }
-  }, [liveMatch, handleAutoAdd]);
+  }, [liveMatch, handleAutoAdd, mode, pendingSingle, singleAddedName]);
 
   const handleDisambigConfirm = useCallback(
     (printingId: string): void => {
       if (pendingDisambig === null) return;
-      void handleAutoAdd(printingId, pendingDisambig);
+      if (mode === 'single') {
+        // Free single-card path — commit one card, no accumulation.
+        void addSingleCard(printingId);
+      } else {
+        void handleAutoAdd(printingId, pendingDisambig);
+      }
       setPendingDisambig(null);
     },
-    [pendingDisambig, handleAutoAdd],
+    [pendingDisambig, handleAutoAdd, addSingleCard, mode],
   );
+
+  // ---------- single-card confirm handlers (FU-57) -----------
+  const handleSingleConfirm = useCallback((): void => {
+    if (pendingSingle === null) return;
+    void addSingleCard(pendingSingle.printingId);
+    setPendingSingle(null);
+  }, [pendingSingle, addSingleCard]);
+
+  const handleSingleRescan = useCallback((): void => {
+    setPendingSingle(null);
+  }, []);
+
+  const handleSingleScanAnother = useCallback((): void => {
+    setSingleAddedName(null);
+  }, []);
 
   const handleDisambigDismiss = useCallback((): void => {
     setPendingDisambig(null);
@@ -430,7 +543,7 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
         stackModeDetector={stackModeDetector}
       />
 
-      {/* Top bar — close + FPS badge */}
+      {/* Top bar — close + mode toggle + FPS badge */}
       <XStack
         position="absolute"
         top={0}
@@ -450,11 +563,18 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
         >
           Close
         </Button>
+        <ScanModeToggle
+          mode={mode}
+          stackLocked={!stackAllowed}
+          onSelect={handleSelectMode}
+        />
         <FpsDebugBadge sink={telemetrySink} visible={FPS_BADGE_VISIBLE_IN_DEV} />
       </XStack>
 
-      {/* Match overlay — mid-screen when an auto-add just fired */}
-      {liveMatch !== null && liveMatch.disposition === 'auto-add' && (
+      {/* Match overlay — mid-screen when a continuous-mode auto-add fired */}
+      {mode === 'continuous' &&
+        liveMatch !== null &&
+        liveMatch.disposition === 'auto-add' && (
         <XStack
           position="absolute"
           top="$12"
@@ -476,8 +596,8 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
         </XStack>
       )}
 
-      {/* Undo toast — above the session footer */}
-      {sessionState.undoEntry !== null && (
+      {/* Undo toast — above the session footer (continuous only) */}
+      {mode === 'continuous' && sessionState.undoEntry !== null && (
         <XStack
           position="absolute"
           bottom="$16"
@@ -491,13 +611,81 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
         </XStack>
       )}
 
-      {/* Session footer — persists at the bottom */}
-      <YStack position="absolute" bottom={0} left={0} right={0}>
-        <SessionFooter
-          itemCount={sessionState.items.length}
-          onDone={() => session.enterStackReview()}
-        />
-      </YStack>
+      {/* Session footer — persists at the bottom (continuous only) */}
+      {mode === 'continuous' && (
+        <YStack position="absolute" bottom={0} left={0} right={0}>
+          <SessionFooter
+            itemCount={sessionState.items.length}
+            onDone={() => session.enterStackReview()}
+          />
+        </YStack>
+      )}
+
+      {/* Single-card confirm — bottom sheet (free single mode) */}
+      {mode === 'single' && pendingSingle !== null && (
+        <YStack position="absolute" bottom={0} left={0} right={0}>
+          <SingleCardConfirm
+            printingName={
+              singlePrinting.printing?.card.name ??
+              makeDisplayName(pendingSingle.printingId)
+            }
+            setName={singlePrinting.printing?.set.name ?? ''}
+            collectorNumber={singlePrinting.printing?.card.number ?? ''}
+            thumbnailUrl={thumbnailUrlForPrinting(singlePrinting.printing)}
+            confidence={pendingSingle.confidence}
+            onConfirm={handleSingleConfirm}
+            onRescan={handleSingleRescan}
+          />
+        </YStack>
+      )}
+
+      {/* Single-card success — one card added, offer another (free mode) */}
+      {mode === 'single' && singleAddedName !== null && (
+        <YStack position="absolute" bottom={0} left={0} right={0}>
+          <YStack
+            backgroundColor="$background"
+            borderTopLeftRadius="$6"
+            borderTopRightRadius="$6"
+            padding="$4"
+            gap="$3"
+            testID="single-card-success"
+            accessibilityLabel={`Added ${singleAddedName} to your collection.`}
+            accessible
+          >
+            <Text variant="subtitle" tone="success" testID="single-card-success-title">
+              Added to collection
+            </Text>
+            <Text variant="body" tone="muted" testID="single-card-success-name">
+              {singleAddedName}
+            </Text>
+            <Button
+              variant="primary"
+              label="Scan another"
+              onPress={handleSingleScanAnother}
+              testID="single-card-success-again"
+              accessibilityLabel="Scan another card"
+            />
+          </YStack>
+        </YStack>
+      )}
+
+      {/* Stack-scanner upsell — free user tapped the Pro stack toggle */}
+      {showStackUpsell && (
+        <YStack
+          position="absolute"
+          bottom={0}
+          left={0}
+          right={0}
+          padding="$3"
+          testID="stack-scanner-upsell"
+        >
+          <UpgradePrompt
+            feature="stack_scanner"
+            reason="requires_pro"
+            testID="stack-scanner-upgrade-prompt"
+          />
+        </YStack>
+      )}
 
       {/* Disambiguation picker — bottom sheet */}
       {pendingDisambig !== null && (

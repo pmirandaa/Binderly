@@ -9,6 +9,14 @@ import type { MatchResult } from '../match/index.js';
 /** Which broad phase the scanner screen is in. */
 export type ScannerPhase = 'scanning' | 'stack-review';
 
+/**
+ * Scanner capture mode (FU-57). `single` is the free experience —
+ * one capture → one match → confirm/add, no continuous accumulation.
+ * `continuous` is the Pro stack scanner (auto-add loop + stack-review),
+ * gated behind the `stack_scanner` paid feature.
+ */
+export type ScanMode = 'single' | 'continuous';
+
 /** Async load state for the embedding model + ANN index. */
 export type ModelLoadPhase = 'idle' | 'loading' | 'ready' | 'error';
 
