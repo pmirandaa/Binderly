@@ -1,5 +1,15 @@
-export { FPS_BADGE_VISIBLE_IN_DEV, ScanScreen } from './ScanScreen.js';
+export {
+  FPS_BADGE_VISIBLE_IN_DEV,
+  SCANNER_MODEL_CACHE_KEY,
+  ScanScreen,
+} from './ScanScreen.js';
 export type { ScanScreenProps } from './ScanScreen.js';
+export {
+  printingToDisambigLookup,
+  thumbnailUrlForPrinting,
+  usePrinting,
+} from './use-printing.js';
+export type { UsePrintingResult } from './use-printing.js';
 export { useScannerSession, scannerSessionReducer } from './use-scanner-session.js';
 export type {
   ScannerSessionAction,

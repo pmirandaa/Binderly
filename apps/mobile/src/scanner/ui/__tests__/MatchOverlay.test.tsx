@@ -1,8 +1,27 @@
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithProvider } from '../../../test-utils/render.js';
 import { HoldSteadyHint, MatchOverlay } from '../MatchOverlay.js';
+
+interface MockImageProps {
+  source?: { uri?: string };
+  onError?: () => void;
+  testID?: string;
+  accessibilityLabel?: string;
+}
+
+// Re-mock expo-image locally (the global setup renders it as `null`) so
+// the thumbnail `<img>` is queryable for the FU-34 assertions below.
+vi.mock('expo-image', () => ({
+  Image: ({ source, onError, testID, accessibilityLabel }: MockImageProps) =>
+    React.createElement('img', {
+      'data-testid': testID,
+      src: source?.uri,
+      'aria-label': accessibilityLabel,
+      onError: () => onError?.(),
+    }),
+}));
 
 describe('<MatchOverlay>', () => {
   it('renders the printing name', () => {
@@ -124,5 +143,38 @@ describe('<HoldSteadyHint>', () => {
   it('accepts custom testID', () => {
     const view = renderWithProvider(<HoldSteadyHint testID="my-hint" />);
     expect(view.queryByTestId('my-hint')).not.toBeNull();
+  });
+});
+
+describe('<MatchOverlay> thumbnail (FU-34)', () => {
+  it('shows the placeholder box while no thumbnail url is resolved', () => {
+    const view = renderWithProvider(
+      <MatchOverlay
+        printingName="Charizard"
+        setName="Base Set"
+        collectorNumber="4/102"
+        stabilityCount={3}
+        confidence={0.9}
+      />,
+    );
+    expect(view.queryByTestId('match-overlay-thumbnail-placeholder')).not.toBeNull();
+    expect(view.queryByTestId('match-overlay-thumbnail-image')).toBeNull();
+  });
+
+  it('renders the real thumbnail when a url is provided', () => {
+    const view = renderWithProvider(
+      <MatchOverlay
+        printingName="Charizard"
+        setName="Base Set"
+        collectorNumber="4/102"
+        stabilityCount={3}
+        confidence={0.9}
+        thumbnailUrl="https://img.example/charizard.png"
+      />,
+    );
+    const img = view.queryByTestId('match-overlay-thumbnail-image');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toBe('https://img.example/charizard.png');
+    expect(view.queryByTestId('match-overlay-thumbnail-placeholder')).toBeNull();
   });
 });

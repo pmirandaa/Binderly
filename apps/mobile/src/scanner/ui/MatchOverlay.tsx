@@ -15,6 +15,7 @@ import { type ReactNode } from 'react';
 
 import { Text, XStack, YStack } from '@binderly/ui';
 
+import { CardThumbnail } from './CardThumbnail.js';
 import { StabilityIndicator } from './StabilityIndicator.js';
 
 export interface MatchOverlayProps {
@@ -28,6 +29,12 @@ export interface MatchOverlayProps {
   readonly stabilityCount: number;
   /** Confidence score [0–1] for the debug label. */
   readonly confidence: number;
+  /**
+   * Resolved thumbnail URL for the matched printing (FU-34). `null` /
+   * `undefined` while the catalog lookup is in flight or when the
+   * printing has no image — the overlay shows a placeholder box.
+   */
+  readonly thumbnailUrl?: string | null;
   readonly testID?: string;
 }
 
@@ -38,6 +45,7 @@ export function MatchOverlay(props: MatchOverlayProps): ReactNode {
     collectorNumber,
     stabilityCount,
     confidence,
+    thumbnailUrl,
     testID,
   } = props;
 
@@ -56,6 +64,11 @@ export function MatchOverlay(props: MatchOverlayProps): ReactNode {
       accessible
     >
       <XStack gap="$2" alignItems="center" justifyContent="space-between">
+        <CardThumbnail
+          url={thumbnailUrl}
+          label={collectorNumber || printingName}
+          testID="match-overlay-thumbnail"
+        />
         <YStack flex={1} gap="$1">
           <Text
             variant="subtitle"
