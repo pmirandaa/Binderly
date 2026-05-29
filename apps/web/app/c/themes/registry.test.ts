@@ -1,5 +1,6 @@
-import { SHAREABLE_THEMES } from '@binderly/api-contracts';
 import { describe, expect, it } from 'vitest';
+
+import { SHAREABLE_THEMES } from '@binderly/api-contracts';
 
 import {
   DEFAULT_THEME,

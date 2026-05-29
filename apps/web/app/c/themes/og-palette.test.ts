@@ -1,5 +1,6 @@
-import { SHAREABLE_THEMES } from '@binderly/api-contracts';
 import { describe, expect, it } from 'vitest';
+
+import { SHAREABLE_THEMES } from '@binderly/api-contracts';
 
 import { ogPaletteForTheme, ogPaletteFromTheme } from './og-palette';
 import { DEFAULT_THEME, THEMES } from './registry';

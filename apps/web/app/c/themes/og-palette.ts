@@ -9,9 +9,9 @@
 // wired to respect a shareable's theme in a follow-up
 // (T-SH-OG-THEME-WIRE) without any registry churn.
 
-import { resolveTheme, type Theme } from './registry';
-
 import type { ShareableTheme } from '@binderly/api-contracts';
+
+import { resolveTheme, type Theme } from './registry';
 
 /** The minimal palette an OG card needs. Mirrors `lib/og/brand.ts`. */
 export interface OgPalette {

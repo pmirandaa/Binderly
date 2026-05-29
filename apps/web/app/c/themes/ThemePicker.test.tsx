@@ -10,8 +10,8 @@ vi.mock('../../../lib/gating/useGate', () => ({
   useLimitGate: () => hoisted.gate,
 }));
 
-import { ThemePicker } from './ThemePicker';
 import { THEME_LIST } from './registry';
+import { ThemePicker } from './ThemePicker';
 import { renderWithProviders } from '../../../test-utils/render';
 
 import type { GateState } from '../../../lib/gating/useGate';

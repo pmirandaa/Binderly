@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { ShareableThemeProvider, useShareableTheme } from './ShareableThemeProvider';
 import { DEFAULT_THEME, THEMES } from './registry';
+import { ShareableThemeProvider, useShareableTheme } from './ShareableThemeProvider';
 
 describe('<ShareableThemeProvider>', () => {
   it('renders a themed root carrying theme metadata data-attributes', () => {
