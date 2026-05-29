@@ -85,8 +85,8 @@ export function GateSkeleton({ testId = 'gate-skeleton' }: { readonly testId?: s
       backgroundColor="$surfaceMuted"
       borderRadius={12}
       data-testid={testId}
-      aria-busy="true"
-      aria-hidden="true"
+      aria-busy={true}
+      aria-hidden={true}
     >
       <Text variant="bodySmall" tone="muted">
         Checking your plan…

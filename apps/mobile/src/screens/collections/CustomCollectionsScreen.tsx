@@ -39,6 +39,7 @@ import {
   useCreateCustomCollectionMutation,
   useCustomCollectionsQuery,
 } from '../../lib/collections/index.js';
+import { useLimitGate } from '../../lib/gating/index.js';
 
 interface CreateFormState {
   readonly open: boolean;
@@ -73,7 +74,14 @@ export function CustomCollectionsScreen(): ReactNode {
     [collectionsQuery.data],
   );
   const manualCount = manualCollections.length;
-  const atCap = manualCount >= FREE_TIER_CUSTOM_LIMIT;
+  // Entitlement-aware create gate (T-PB-GATING): free is capped at
+  // FREE_TIER_CUSTOM_LIMIT, Pro is unlimited. Fail-closed — while the tier
+  // read is pending the user is treated as free, so the CTA only unlocks
+  // past the cap once Pro is confirmed (under the cap the verdict is
+  // identical for both tiers, so there's no flash). Called unconditionally
+  // above the auth/loading early returns to obey the rules of hooks.
+  const createGate = useLimitGate('customCollections', manualCount);
+  const atCap = !createGate.result.allowed;
 
   const handleSelect = useCallback(
     (collection: CustomCollectionDto) => {

@@ -35,6 +35,7 @@ import {
   formatUpdatedAt,
   memberCountLabel,
 } from '../../../lib/collections/custom/format';
+import { useLimitGate } from '../../../lib/gating';
 import { PageLoading } from '../../loading/PageLoading';
 
 export interface CustomCollectionsViewProps {
@@ -107,6 +108,16 @@ export function CustomCollectionsView({ api }: CustomCollectionsViewProps): Reac
     setReloadKey((n) => n + 1);
   }
 
+  // Entitlement-aware create gate (T-PB-GATING). Free is capped at 3
+  // manual custom collections; Pro is unlimited. Fail-closed: while the
+  // tier read is pending the user is treated as free, so the "New" button
+  // only unlocks past the cap once Pro is confirmed (under the cap the
+  // verdict is identical for both tiers, so there's no flash). The hook is
+  // called unconditionally before the loading/error early returns to obey
+  // the rules of hooks.
+  const manualCount = state.kind === 'ready' ? state.collections.length : 0;
+  const createGate = useLimitGate('customCollections', manualCount);
+
   if (state.kind === 'loading') {
     return (
       <YStack
@@ -150,7 +161,7 @@ export function CustomCollectionsView({ api }: CustomCollectionsViewProps): Reac
 
   const { collections, memberCounts } = state;
   const cap = computeCapStatus(collections.length, FREE_TIER_CUSTOM_COLLECTION_CAP);
-  const newButtonDisabled = cap.atCap;
+  const newButtonDisabled = !createGate.result.allowed;
 
   return (
     <YStack
