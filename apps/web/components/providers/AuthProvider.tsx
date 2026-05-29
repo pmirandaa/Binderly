@@ -8,14 +8,7 @@
 // magic-link, callback handling) live in T-W-AUTH; this provider
 // is the read-side surface every authenticated route reads from.
 
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { getBrowserSupabase } from '../../lib/supabase-browser';
 

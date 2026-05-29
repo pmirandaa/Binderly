@@ -10,14 +10,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { AuthCallbackScreen } from './AuthCallbackScreen';
 import { BrowseScreen } from './BrowseScreen';
 import { CollectionScreen } from './CollectionScreen';
 import { GradingScreen } from './GradingScreen';
 import { NotFoundScreen } from './NotFoundScreen';
 import { PlaceholderScreen } from './PlaceholderScreen';
 import { ProfileScreen } from './ProfileScreen';
-import { SignInScreen } from './SignInScreen';
 import { renderWithProvider } from '../test-utils/render';
 
 describe('placeholder screens', () => {
@@ -26,8 +24,6 @@ describe('placeholder screens', () => {
     { name: 'CollectionScreen', Comp: CollectionScreen, owner: 'T-M-COLLECTION' },
     { name: 'GradingScreen', Comp: GradingScreen, owner: 'T-GR-CAPTURE-FLOW' },
     { name: 'ProfileScreen', Comp: ProfileScreen, owner: 'T-M-AUTH' },
-    { name: 'SignInScreen', Comp: SignInScreen, owner: 'T-M-AUTH' },
-    { name: 'AuthCallbackScreen', Comp: AuthCallbackScreen, owner: 'T-M-AUTH' },
   ])('renders $name with the owning task footnote', ({ Comp, owner }) => {
     const result = renderWithProvider(<Comp />);
     expect(result.container.textContent).toContain(`Owned by ${owner}`);

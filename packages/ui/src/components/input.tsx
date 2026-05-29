@@ -82,6 +82,19 @@ export interface InputProps {
   defaultValue?: string;
   /** Change handler. Suppressed when `disabled === true`. */
   onChangeText?: (next: string) => void;
+  /**
+   * Blur handler. Fires on web `blur` and native `onBlur`. Surfaced
+   * as a no-arg callback (cross-platform); read the current value
+   * from your controlled `value` / `onChangeText` state.
+   */
+  onBlur?: () => void;
+  /**
+   * End-of-editing handler. Fires on native `onEndEditing` (submit /
+   * blur after edit); on web it is wired to the underlying primitive's
+   * blur so callers get the same "user finished editing" signal on
+   * both platforms. Receives the input's current string value.
+   */
+  onEndEditing?: (next: string) => void;
   /** Size — see `INPUT_SIZES`. */
   size?: InputSize;
   /** Disable the input; sets `aria-disabled` + `accessibilityState`. */
@@ -131,6 +144,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(pro
     value,
     defaultValue,
     onChangeText,
+    onBlur,
+    onEndEditing,
     size = 'md',
     disabled = false,
     error = false,
@@ -159,6 +174,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(pro
         onChangeText?.(extractValue(event));
       };
 
+  // Blur / end-editing are reported regardless of `disabled` — they
+  // are focus signals, not mutations, so suppressing them would drop
+  // a legitimate "user navigated away" event. `onBlur` is surfaced
+  // no-arg; `onEndEditing` reads the value off the active platform's
+  // event shape (native `nativeEvent.text`, web `target.value`).
+  const handleBlur =
+    onBlur === undefined && onEndEditing === undefined
+      ? undefined
+      : (event: ChangeEvt) => {
+          onBlur?.();
+          onEndEditing?.(extractValue(event));
+        };
+
   return (
     <Container>
       {label !== undefined && label !== null ? (
@@ -184,6 +212,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(pro
         opacity={disabled ? 0.5 : 1}
         readOnly={disabled || undefined}
         onChange={handleChange as never}
+        onBlur={handleBlur as never}
         aria-label={ariaLabel}
         aria-describedby={describedBy}
         aria-disabled={disabled || undefined}

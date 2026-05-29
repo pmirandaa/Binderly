@@ -1162,3 +1162,64 @@ synthetic check is a go-live hardening step that depends on the Q-021
 Python entrypoint and on Pablo choosing a pager channel.
 
 **Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-026 — `/cards/[*]` detail entity: printing-centric (web) vs card-centric (mobile)?
+
+**Status:** open — raised by T-POLISH-SWEEP while consolidating #FU-18.
+(Numbering: authored as Q-025, renumbered to **Q-026** at merge — a
+sibling T-DP-MONITORING claimed Q-025 + #FU-63; this FU is **#FU-64**.)
+
+**Context.** #FU-18 asked to consolidate the web-vs-mobile URL
+convention for `/sets/[*]` and `/cards/[*]`. Investigation found two
+*independent* divergences:
+
+1. **`/sets/[*]`** — web uses the set **UUID** (`set.id`); mobile uses
+   the **slug** (`set.canonicalKey`, e.g. `en-base1`) and resolves it
+   client-side by scanning the `/v1/sets` list. Both DTOs already carry
+   `id` *and* `canonicalKey`, so this one is mechanically alignable
+   without a new endpoint or migration. **Chosen target convention:
+   slug (`canonicalKey`)** — friendlier URLs, matches mobile today, and
+   the long-term plan in status.md follow-up #18 ("probably slug, after
+   a `getSetBySlug` endpoint lands").
+
+2. **`/cards/[*]`** — *not* a slug-vs-id swap. The web route `/cards/[id]`
+   takes a **printing** UUID and calls `cards.getPrinting()` (renders
+   set + card + variant context in one fetch). The mobile route
+   `/cards/[id]` takes a **card** UUID and calls `cards.getCard()`. Same
+   path, different entity. There is no `getCardBySlug` / `getPrintingBySlug`
+   in `@binderly/api-client`, and no "list all cards" cache analogous to
+   `/v1/sets`.
+
+**Problem (the actual open question).** Unifying `/cards/[*]` requires a
+**product + API decision**, not a string tweak: should the canonical
+card-detail surface be **printing-centric** (a specific printing/variant,
+as web does) or **card-centric** (the card, with a printing picker, as
+mobile leans)? The answer dictates whether we need a `getCardBySlug`
+and/or `getPrintingBySlug` endpoint and which platform migrates. This is
+out of scope for a polish sweep and genuinely ambiguous.
+
+**Options.**
+1. **Printing-centric everywhere** (web wins): mobile card taps resolve
+   to a printing and call `getPrinting`; `/cards/[id]` is always a
+   printing id. Needs mobile nav + screen rework.
+2. **Card-centric everywhere** (mobile wins): web `/cards/[id]` becomes
+   a card id + on-page printing picker; needs a web rework + likely a
+   `getCardBySlug` for nice URLs.
+3. **Two routes** (`/printings/[id]` + `/cards/[id]`) with explicit
+   semantics on both platforms.
+
+**Interim shipped.** Nothing changed in this sweep — the divergence is
+SSR-hidden (routes aren't linked from primary nav in a user-visible way
+yet) and low-priority per status.md follow-up #18. The sets-alignment
+half and the cards entity-decision half are logged together as **#FU-64**.
+
+**Recommendation.** Pablo (or a product owner) picks the card-detail
+entity model (Option 1 vs 2 vs 3). Once decided, #FU-64 does the sets
+slug-alignment (safe, client-only) **and** the chosen card migration in
+one cross-platform pass (likely adding `getSetBySlug` / `getCardBySlug`
+endpoints — a backend task, no migration needed since `canonical_key`
+columns already exist + are unique).
+
+**Pablo's answer:** _(empty until answered)_
