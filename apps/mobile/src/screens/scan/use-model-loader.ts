@@ -14,6 +14,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { getOrLoadWarmModels } from '../../scanner/model-cache.js';
+
 import type { AnnIndexHandle } from '../../scanner/ann/types.js';
 import type { EmbeddingModelHandle } from '../../scanner/embed/types.js';
 import type { ModelLoadState } from '../../scanner/ui/types.js';
@@ -37,6 +39,18 @@ export interface UseModelLoaderOptions {
    * `false` (loads immediately on mount).
    */
   readonly lazy?: boolean;
+  /**
+   * Opt into the module-level warm cache (FU-35). When set, the loaded
+   * handles are kept warm across `ScanScreen` remounts under this key
+   * (which should be derived from the model + index asset identity), so
+   * a tab switch / back-navigate skips the ~200–400 ms re-warm.
+   *
+   * When provided, the hook does **not** dispose the handles on unmount
+   * — the cache owns their (indefinite) lifetime. Omit it (the default)
+   * to keep the legacy per-mount load + dispose behaviour, which is what
+   * tests that inject a fresh stub loader per render want.
+   */
+  readonly warmCacheKey?: string;
 }
 
 export interface UseModelLoaderResult {
@@ -47,7 +61,7 @@ export interface UseModelLoaderResult {
 }
 
 export function useModelLoader(options: UseModelLoaderOptions): UseModelLoaderResult {
-  const { loadModels, lazy = false } = options;
+  const { loadModels, lazy = false, warmCacheKey } = options;
 
   const [loadState, setLoadState] = useState<ModelLoadState>(
     lazy ? { phase: 'idle', error: null } : { phase: 'loading', error: null },
@@ -72,10 +86,17 @@ export function useModelLoader(options: UseModelLoaderOptions): UseModelLoaderRe
 
     (async () => {
       try {
-        const loaded = await loadModels();
+        const loaded =
+          warmCacheKey !== undefined
+            ? await getOrLoadWarmModels(warmCacheKey, loadModels)
+            : await loadModels();
         if (cancelled) {
-          loaded.embedModel.dispose();
-          loaded.annIndex.dispose();
+          // The warm cache owns the handles' lifetime; only the
+          // non-cached path disposes a load that finished after unmount.
+          if (warmCacheKey === undefined) {
+            loaded.embedModel.dispose();
+            loaded.annIndex.dispose();
+          }
           return;
         }
         handlesRef.current = loaded;
@@ -93,16 +114,20 @@ export function useModelLoader(options: UseModelLoaderOptions): UseModelLoaderRe
     return () => {
       cancelled = true;
     };
-  }, [loadModels, retryToken]);
+  }, [loadModels, retryToken, warmCacheKey]);
 
-  // Dispose handles on unmount.
+  // Dispose handles on unmount — but only when this mount owns them.
+  // Warm-cached handles outlive the component by design (FU-35), so
+  // disposing them here would break the next mount that reuses them.
   useEffect(() => {
     return () => {
-      handlesRef.current?.embedModel.dispose();
-      handlesRef.current?.annIndex.dispose();
+      if (warmCacheKey === undefined) {
+        handlesRef.current?.embedModel.dispose();
+        handlesRef.current?.annIndex.dispose();
+      }
       handlesRef.current = null;
     };
-  }, []);
+  }, [warmCacheKey]);
 
   const retry = useCallback((): void => {
     setRetryToken((t) => (t < 0 ? 0 : t + 1));

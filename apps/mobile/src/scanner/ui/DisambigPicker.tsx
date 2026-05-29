@@ -12,6 +12,8 @@ import { type ReactNode } from 'react';
 
 import { Button, Text, XStack, YStack } from '@binderly/ui';
 
+import { CardThumbnail } from './CardThumbnail.js';
+
 import type { AnnSearchResult } from '../ann/types.js';
 
 export interface DisambigCandidate {
@@ -25,6 +27,20 @@ export interface DisambigCandidate {
   readonly setName: string;
   /** Collector number — may be empty. */
   readonly collectorNumber: string;
+  /**
+   * Thumbnail URL from the catalog lookup (FU-34). `null` / undefined
+   * while loading or when the printing has no image — the row shows a
+   * placeholder box.
+   */
+  readonly thumbnailUrl?: string | null;
+}
+
+/** Shape the catalog name/thumbnail lookup returns per printing id. */
+export interface DisambigLookupResult {
+  readonly displayName: string;
+  readonly setName: string;
+  readonly collectorNumber: string;
+  readonly thumbnailUrl?: string | null;
 }
 
 export interface DisambigPickerProps {
@@ -40,11 +56,12 @@ export interface DisambigPickerProps {
 /** Build `DisambigCandidate` list from raw ANN results (name lookup TBD). */
 export function buildDisambigCandidates(
   annResults: readonly AnnSearchResult[],
-  nameLookup: (printingId: string) => {
-    displayName: string;
-    setName: string;
-    collectorNumber: string;
-  } = (id) => ({ displayName: id, setName: '', collectorNumber: '' }),
+  nameLookup: (printingId: string) => DisambigLookupResult = (id) => ({
+    displayName: id,
+    setName: '',
+    collectorNumber: '',
+    thumbnailUrl: null,
+  }),
 ): DisambigCandidate[] {
   return annResults.slice(0, 3).map((r) => ({
     printingId: r.printingId,
@@ -127,7 +144,12 @@ function DisambigCandidateRow({
       accessibilityLabel={`Select ${candidate.displayName}`}
       accessibilityRole="button"
     >
-      <XStack flex={1} justifyContent="space-between" alignItems="center">
+      <XStack flex={1} gap="$2" justifyContent="space-between" alignItems="center">
+        <CardThumbnail
+          url={candidate.thumbnailUrl}
+          label={candidate.collectorNumber || candidate.displayName || candidate.printingId}
+          testID={`disambig-candidate-${index}-thumbnail`}
+        />
         <YStack flex={1} gap="$1" alignItems="flex-start">
           <Text variant="body" tone="default">
             {candidate.displayName || candidate.printingId}

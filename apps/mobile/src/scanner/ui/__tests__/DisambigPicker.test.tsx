@@ -11,6 +11,23 @@ import {
 import type { AnnSearchResult } from '../../ann/types.js';
 import type { DisambigCandidate } from '../DisambigPicker.js';
 
+interface MockImageProps {
+  source?: { uri?: string };
+  onError?: () => void;
+  testID?: string;
+  accessibilityLabel?: string;
+}
+
+vi.mock('expo-image', () => ({
+  Image: ({ source, onError, testID, accessibilityLabel }: MockImageProps) =>
+    React.createElement('img', {
+      'data-testid': testID,
+      src: source?.uri,
+      'aria-label': accessibilityLabel,
+      onError: () => onError?.(),
+    }),
+}));
+
 const CANDIDATES: DisambigCandidate[] = [
   { printingId: 'a1', score: 0.72, displayName: 'Charizard', setName: 'Base Set', collectorNumber: '4/102' },
   { printingId: 'a2', score: 0.68, displayName: 'Charmeleon', setName: 'Base Set', collectorNumber: '24/102' },
@@ -112,6 +129,29 @@ describe('<DisambigPicker>', () => {
     );
     expect(view.container.textContent).toContain('Which card is this?');
   });
+
+  it('renders a real thumbnail when a candidate carries a url (FU-34)', () => {
+    const withThumb: DisambigCandidate[] = [
+      { ...CANDIDATES[0]!, thumbnailUrl: 'https://img.example/a1.png' },
+    ];
+    const view = renderWithProvider(
+      <DisambigPicker candidates={withThumb} onConfirm={vi.fn()} onDismiss={vi.fn()} />,
+    );
+    const img = view.queryByTestId('disambig-candidate-0-thumbnail-image');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toBe('https://img.example/a1.png');
+  });
+
+  it('falls back to the placeholder box when a candidate has no thumbnail', () => {
+    const noThumb: DisambigCandidate[] = [{ ...CANDIDATES[0]!, thumbnailUrl: null }];
+    const view = renderWithProvider(
+      <DisambigPicker candidates={noThumb} onConfirm={vi.fn()} onDismiss={vi.fn()} />,
+    );
+    expect(
+      view.queryByTestId('disambig-candidate-0-thumbnail-placeholder'),
+    ).not.toBeNull();
+    expect(view.queryByTestId('disambig-candidate-0-thumbnail-image')).toBeNull();
+  });
 });
 
 describe('buildDisambigCandidates', () => {
@@ -146,6 +186,21 @@ describe('buildDisambigCandidates', () => {
     }));
     expect(result[0]?.displayName).toBe('Card(p1)');
     expect(result[0]?.setName).toBe('MySet');
+  });
+
+  it('threads a thumbnailUrl from the lookup through to the candidate', () => {
+    const result = buildDisambigCandidates(annResults, (id) => ({
+      displayName: id,
+      setName: '',
+      collectorNumber: '',
+      thumbnailUrl: `https://img.example/${id}.png`,
+    }));
+    expect(result[0]?.thumbnailUrl).toBe('https://img.example/p1.png');
+  });
+
+  it('defaults thumbnailUrl to null without a lookup', () => {
+    const result = buildDisambigCandidates(annResults);
+    expect(result[0]?.thumbnailUrl).toBeNull();
   });
 
   it('handles empty array', () => {

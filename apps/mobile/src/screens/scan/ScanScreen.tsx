@@ -38,6 +38,11 @@ import {
 import { Button, Text, XStack, YStack } from '@binderly/ui';
 
 import { useModelLoader, type LoadModelsFn } from './use-model-loader.js';
+import {
+  printingToDisambigLookup,
+  thumbnailUrlForPrinting,
+  usePrinting,
+} from './use-printing.js';
 import { useScannerSession } from './use-scanner-session.js';
 import { useApiClient } from '../../lib/api-client.js';
 import { ProtectedScreen } from '../../lib/auth/index.js';
@@ -76,10 +81,18 @@ import type { SessionItem } from '../../scanner/ui/types.js';
 export const FPS_BADGE_VISIBLE_IN_DEV: boolean =
   typeof __DEV__ === 'boolean' ? __DEV__ : false;
 
+/**
+ * Warm-cache key for the embedding model + ANN index (FU-35). Stable
+ * across `ScanScreen` remounts so a tab switch / back-navigate reuses
+ * the already-loaded handles instead of re-warming. Only the
+ * production path (no injected `loadModels`) opts in — see `ScanScreen`.
+ */
+export const SCANNER_MODEL_CACHE_KEY = 'scanner:embed+ann:bundled-v1';
+
 function makeDisplayName(printingId: string): string {
-  // In v1 beta we don't have a catalog name lookup at scan time;
-  // the printing ID is surfaced instead. Follow-up: FU-34
-  // (catalog name resolution in the scanner overlay).
+  // Fallback label when the catalog lookup hasn't resolved yet (or
+  // failed). The overlay + picker resolve the real name + thumbnail via
+  // `usePrinting()` (FU-34); this is the graceful placeholder text.
   return printingId;
 }
 
@@ -103,11 +116,13 @@ export interface ScanScreenProps {
 
 interface ScanScreenInnerProps {
   readonly loadModels: LoadModelsFn;
+  /** Warm-cache key for the model loader; undefined in tests (FU-35). */
+  readonly warmCacheKey?: string;
   readonly testID?: string;
 }
 
 function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
-  const { loadModels, testID } = props;
+  const { loadModels, warmCacheKey, testID } = props;
 
   const router = useRouter();
   const client = useApiClient();
@@ -127,7 +142,9 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
   });
 
   // ---------- model loader -----------------------------------
-  const { loadState, handles, retry: retryLoad } = useModelLoader({ loadModels });
+  const { loadState, handles, retry: retryLoad } = useModelLoader(
+    warmCacheKey !== undefined ? { loadModels, warmCacheKey } : { loadModels },
+  );
 
   // ---------- scanner hook -----------------------------------
   // Only wire when models are ready; pass stubs otherwise.
@@ -242,6 +259,34 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
 
   // ---------- disambiguate ------------------------------------
   const [pendingDisambig, setPendingDisambig] = useState<MatchResult | null>(null);
+
+  // ---------- catalog thumbnails (FU-34) ----------------------
+  // Resolve the matched printing for the auto-add overlay and the
+  // top-3 disambig candidates. Hooks are called unconditionally with a
+  // possibly-undefined id so they obey the rules of hooks across the
+  // screen's early returns; a null id keeps the fetch disabled.
+  const autoAddPrintingId =
+    liveMatch !== null && liveMatch.disposition === 'auto-add'
+      ? liveMatch.printingId
+      : undefined;
+  const matchPrinting = usePrinting(autoAddPrintingId);
+
+  const disambigCandidateMatches = pendingDisambig?.candidates ?? [];
+  const candidate0 = usePrinting(disambigCandidateMatches[0]?.printingId);
+  const candidate1 = usePrinting(disambigCandidateMatches[1]?.printingId);
+  const candidate2 = usePrinting(disambigCandidateMatches[2]?.printingId);
+
+  const disambigLookup = useCallback(
+    (printingId: string) => {
+      for (const c of [candidate0, candidate1, candidate2]) {
+        if (c.printing !== null && c.printing.id === printingId) {
+          return printingToDisambigLookup(printingId, c.printing);
+        }
+      }
+      return printingToDisambigLookup(printingId, null);
+    },
+    [candidate0, candidate1, candidate2],
+  );
 
   useEffect(() => {
     if (liveMatch === null) return;
@@ -373,7 +418,7 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
 
   const disambigCandidates =
     pendingDisambig !== null
-      ? buildDisambigCandidates(pendingDisambig.candidates)
+      ? buildDisambigCandidates(pendingDisambig.candidates, disambigLookup)
       : [];
 
   return (
@@ -418,9 +463,13 @@ function ScanScreenInner(props: ScanScreenInnerProps): ReactNode {
           pointerEvents="none"
         >
           <MatchOverlay
-            printingName={makeDisplayName(liveMatch.printingId)}
-            setName=""
-            collectorNumber=""
+            printingName={
+              matchPrinting.printing?.card.name ??
+              makeDisplayName(liveMatch.printingId)
+            }
+            setName={matchPrinting.printing?.set.name ?? ''}
+            collectorNumber={matchPrinting.printing?.card.number ?? ''}
+            thumbnailUrl={thumbnailUrlForPrinting(matchPrinting.printing)}
             stabilityCount={liveMatch.stabilityCount}
             confidence={liveMatch.confidence}
           />
@@ -517,15 +566,24 @@ function createStubLoadModels(): LoadModelsFn {
 }
 
 export function ScanScreen(props: ScanScreenProps): ReactNode {
+  const injectedLoadModels = props.loadModels;
   const loadModels = useMemo(
-    () => props.loadModels ?? createStubLoadModels(),
-    [props.loadModels],
+    () => injectedLoadModels ?? createStubLoadModels(),
+    [injectedLoadModels],
   );
+
+  // Only the production path (no injected loader) opts into the warm
+  // cache (FU-35). Tests inject a fresh stub loader per render and
+  // assert per-mount load / error behaviour, so caching them under a
+  // shared key would leak results across renders — keep them uncached.
+  const warmCacheKey =
+    injectedLoadModels === undefined ? SCANNER_MODEL_CACHE_KEY : undefined;
 
   return (
     <ProtectedScreen>
       <ScanScreenInner
         loadModels={loadModels}
+        {...(warmCacheKey !== undefined ? { warmCacheKey } : {})}
         testID={props.testID}
       />
     </ProtectedScreen>
