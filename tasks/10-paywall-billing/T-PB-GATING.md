@@ -3,84 +3,97 @@
 **Stage:** 10-paywall-billing
 **Agent role:** frontend-web
 **Effort:** M
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
 
----
+## Hard dependencies
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 16 (Freemium plan)) and any
->    referenced sections.
-> 2. Read `rules/10-paywall-billing.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-PB-GATING`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+- T-PB-ENTITLEMENTS (merged) — `@binderly/entitlements` (canonical `Tier`,
+  9-entry `PaidFeature`, `FREE_LIMITS`, `canUseFeature`, `withinFreeLimit`),
+  `GET /v1/me/entitlements` edge function, `entitlementsDto`, and the typed
+  api-client resource `client.entitlements.getMyEntitlements()`.
 
----
+## Soft dependencies / parallel-safe coordination
 
-## Provisional metadata (from `dependencies.yaml`)
+- **T-SH-THEMES** (iter 34, owns `apps/web/app/c/themes/`) and
+  **T-GR-COMMUNITY-FLYWHEEL** (iter 34, owns `apps/mobile/src/grading/community/`
+  + `apps/api-python/grading/flywheel/`) both consume the `@binderly/feature-flags`
+  gate hook. This task **exports a clean, documented hook** and does **not**
+  wire gates inside their owns_paths. They self-wire on their side.
 
-**Hard dependencies:**
+## Required reading
 
-- T-PB-ENTITLEMENTS
+- PROJECT.md § 16 (Freemium plan — the free/pro matrix)
+- rules/10-paywall-billing.md (gating semantics; server is source of truth,
+  client gates are UX, fail-closed)
+- packages/entitlements/README.md + src (the foundation to import, not redefine)
+- apps/mobile/src/billing/ (RC SDK hooks + 8-entry union to reconcile)
+- apps/web/lib/paddle/ + apps/web/app/billing/ (web upgrade-prompt destination)
 
-**Parallel-safe with:** _(none)_
+## Goal
 
-**Owns paths:**
+Ship enforced free-vs-paid feature gating across web and mobile, consuming the
+unified entitlement service. Every pro-only capability in the § 16 freemium
+matrix gets an enforced client gate with a consistent upgrade-prompt UX.
+RevenueCat is the source of truth; tier is read via
+`GET /v1/me/entitlements` and gating is **fail-closed** (unknown/loading/error
+→ treat as free, gates closed). This closes the functional side of Stage 10.
 
-- `packages/feature-flags/`
-- `apps/web/lib/gating/`
-- `apps/mobile/src/lib/gating/`
+## Deliverables
 
-## Provisional goal
+- `packages/feature-flags/` — new shared package `@binderly/feature-flags`.
+  Framework-agnostic pure decision core built on `@binderly/entitlements`:
+  - `evaluateGate(entitlement, feature): GateResult` where
+    `GateResult = { allowed: true } | { allowed: false, reason:
+    'requires_pro' | 'free_limit_reached', feature, limit? }`.
+  - `evaluateLimitGate(entitlement, resource, currentCount): GateResult` for
+    count-aware gates (custom collections, shareables).
+  - No React/RN dependency. Pure + fully unit-tested.
+- `apps/web/lib/gating/` — web glue:
+  - `useGate(feature)` + `useLimitGate(resource, currentCount)` hooks
+    (TanStack Query reads `getMyEntitlements()`, fail-closed on loading/error).
+  - `<Gate feature={...}>` + `<UpgradePrompt>` (consistent CTA → `/billing`).
+- `apps/mobile/src/lib/gating/` — mobile glue:
+  - Equivalent `useGate` / `useLimitGate` + native `<Gate>` / `<UpgradePrompt>`
+    (Tamagui), routing the upgrade CTA to the mobile billing/paywall surface.
+  - Migrate `apps/mobile/src/billing/`'s 8-entry `PaidFeature` union to
+    re-export from `@binderly/entitlements` (9-entry canonical); fix renamed
+    call sites.
+- Gate wiring at the enumerated web + mobile pro-feature sites NOT owned by
+  siblings.
 
-Free vs paid feature gating across web and mobile.
+## Acceptance criteria
 
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
+- [ ] `@binderly/feature-flags` pure gating core; tests cover every feature ×
+      tier + every limit boundary (2/3, 3/3, pro-unbounded; 0/1, 1/1). 35+ tests.
+- [ ] Web glue hooks + `<Gate>` / `<UpgradePrompt>`, fail-closed; 25+ tests.
+- [ ] Mobile glue hooks + components, fail-closed; 25+ tests.
+- [ ] Gates wired at the enumerated pro-feature sites (those not owned by
+      siblings). Gate-presence regression tests where practical.
+- [ ] Mobile billing union migrated to the canonical 9-entry
+      `@binderly/entitlements` union; broken call sites fixed.
+- [ ] All suites + lint + typecheck + build green locally.
+- [ ] No changes outside `owns_paths` except gate-check wiring at the existing
+      feature screens (documented in the PR).
 
-## Provisional reading list
+## Out of scope
 
-- PROJECT.md § 16 (Freemium plan)
-- rules/10-paywall-billing.md
-- (context files added at elaboration time based on the stage rules)
+- Server-side enforcement (already shipped in T-PB-ENTITLEMENTS + edge fns).
+- The shareable-themes gate wiring (T-SH-THEMES self-wires with the exported hook).
+- The grading-community flywheel gate wiring (T-GR-COMMUNITY-FLYWHEEL self-wires).
+- Cloud-AI scan fallback feature itself (not built; just reserve the gate).
+- Building a net-new mobile paywall screen (route the CTA to the existing surface).
 
 ## Branch & PR
 
 - Branch: `agent/T-PB-GATING`
-- PR title: `T-PB-GATING: Free vs paid feature gating across web and mobile`
+- PR title: `feat(billing): T-PB-GATING — free/pro feature gating across web + mobile`
+- Commit format: Conventional Commits
+
+## Escalation triggers
+
+Stop and surface to orchestrator if:
+- Gate-site wiring requires editing screens owned by a live sibling.
+- A gating decision is genuinely a product call (e.g. retroactive downgrade of
+  over-limit resources on cancellation).
 
 ## Notes from execution
 _(empty until the sub-agent runs)_
