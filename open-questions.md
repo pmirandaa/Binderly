@@ -1074,7 +1074,7 @@ The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`)
 
 ## Q-024 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
 
-**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-61)
+**Status:** ✅ RESOLVED via Option 1 (#FU-61, `43664d5`, #113). `publicShareableDto.owner.tier` now carries the owner's subscription tier (resolved fail-closed in the anonymous `publicShareable` edge handler via the mirrored `resolveEntitlements`), and `ShareableView` calls `resolvePublicTheme(theme, owner.tier === 'pro')` — a free owner's stored Pro theme is no longer honored on the public page (their stored choice is preserved server-side, just not rendered). Original status below.
 
 **Context.** T-SH-THEMES must force-render the `default` theme on the
 public page `/c/{handle}/{slug}` when the shareable's owner is NOT pro
