@@ -28,6 +28,8 @@
 // Optional env:
 //   BINDERLY_PTCGIO_API_KEY       PTCGIO API key (validation tier).
 
+import '../src/load-env.js';
+
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';

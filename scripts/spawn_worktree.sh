@@ -5,7 +5,7 @@
 #   scripts/spawn_worktree.sh <task-id>
 #
 # Behaviour:
-#   - Validates <task-id> against the canonical regex ^T-[A-Z]{2}-[A-Z0-9-]+$.
+#   - Validates <task-id> against the canonical regex ^T-[A-Z]+-[A-Z0-9-]+$.
 #   - Confirms the task id appears in dependencies.yaml as a list item
 #     ("  - id: <task-id>") so we never spawn a worktree for a typo.
 #   - Reads scripts/orchestrator.config.json for branch_prefix,
@@ -51,9 +51,10 @@ EOF
 TASK_ID="$1"
 
 # --- validate task id format ----------------------------------------------
-# Pattern matches T-<2 uppercase letters>-<one-or-more uppercase letters,
-# digits, or dashes>. Same regex documented in the task spec.
-TASK_ID_REGEX='^T-[A-Z]{2}-[A-Z0-9-]+$'
+# Pattern matches T-<one-or-more uppercase letters>-<one-or-more uppercase
+# letters, digits, or dashes>. The scope segment allows single-letter
+# scopes like `T-M-SHELL` / `T-W-SHELL` (see #FU-10).
+TASK_ID_REGEX='^T-[A-Z]+-[A-Z0-9-]+$'
 if [[ ! "${TASK_ID}" =~ ${TASK_ID_REGEX} ]]; then
   echo "ERROR: task id '${TASK_ID}' does not match ${TASK_ID_REGEX}" >&2
   exit 65

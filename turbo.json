@@ -30,6 +30,10 @@
     },
     "format": {
       "cache": false
+    },
+    "seed": {
+      "dependsOn": ["^build"],
+      "cache": false
     }
   }
 }

@@ -59,7 +59,7 @@ LOG_DEPTH="${BINDERLY_MERGE_LOG_DEPTH:-200}"
 # "<task-id>: <message>". Stored newline-separated for cheap grep lookup.
 MERGED_IDS="$(
   git -C "${REPO_ROOT}" log --format=%s "${MAIN_BRANCH}" -n "${LOG_DEPTH}" \
-    | grep -oE '^T-[A-Z]{2}-[A-Z0-9-]+:' \
+    | grep -oE '^T-[A-Z]+-[A-Z0-9-]+:' \
     | sed 's/:$//' \
     | sort -u || true
 )"

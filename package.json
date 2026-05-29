@@ -5,7 +5,7 @@
   "description": "Binderly — Pokémon TCG collection tracker. Monorepo root.",
   "license": "UNLICENSED",
   "engines": {
-    "node": "22.22.2",
+    "node": "22.13.0",
     "pnpm": "9.15.9"
   },
   "packageManager": "pnpm@9.15.9",
@@ -16,6 +16,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "format": "turbo run format",
+    "seed": "turbo run seed --",
     "db:start": "supabase start --workdir infra",
     "db:stop": "supabase stop --workdir infra",
     "db:reset": "supabase db reset --workdir infra",

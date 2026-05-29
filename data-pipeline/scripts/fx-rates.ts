@@ -24,6 +24,8 @@
 // All error paths set `process.exitCode = 1` and let the event loop
 // drain naturally.
 
+import '../src/load-env.js';
+
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';

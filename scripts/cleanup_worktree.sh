@@ -64,7 +64,9 @@ done
 [[ -n "${TASK_ID}" ]] || usage
 
 # --- validate task id format ----------------------------------------------
-TASK_ID_REGEX='^T-[A-Z]{2}-[A-Z0-9-]+$'
+# Scope segment is one-or-more uppercase letters (`T-M-SHELL`, `T-W-SHELL`
+# and the usual two-letter `T-DL-…` all match) — see #FU-10.
+TASK_ID_REGEX='^T-[A-Z]+-[A-Z0-9-]+$'
 if [[ ! "${TASK_ID}" =~ ${TASK_ID_REGEX} ]]; then
   echo "ERROR: task id '${TASK_ID}' does not match ${TASK_ID_REGEX}" >&2
   exit 65

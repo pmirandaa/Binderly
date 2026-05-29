@@ -20,9 +20,10 @@
     "lint": "eslint --max-warnings=0 .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "echo \"@binderly/db: no tests yet\" && exit 0",
-    "db:generate": "tsx scripts/generate.ts",
-    "db:migrate": "tsx scripts/migrate.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "node scripts/generate.mjs",
+    "db:migrate": "node scripts/migrate.mjs",
     "verify-rls": "tsx scripts/verify-rls.ts"
   },
   "dependencies": {
@@ -39,6 +40,7 @@
     "eslint": "9.39.4",
     "prettier": "3.8.3",
     "tsx": "4.21.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
   }
 }

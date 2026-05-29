@@ -23,6 +23,8 @@
 // matching the posture of `scripts/fx-rates.ts` /
 // `scripts/pricing-rollup.ts`).
 
+import '../src/load-env.js';
+
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
