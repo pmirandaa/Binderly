@@ -122,13 +122,64 @@ export type PriceAggregateDto = z.infer<typeof priceAggregateDto>;
 // ============================================================
 
 /**
+ * Trend direction for the headline price, bucketed server-side
+ * by `mv_current_price` from the 30-day trend percentage with a
+ * ±1% dead-band:
+ *
+ * - `'up'`      — 30-day trend ≥ +1%.
+ * - `'down'`    — 30-day trend ≤ −1%.
+ * - `'flat'`    — within ±1% (effectively unchanged).
+ * - `'unknown'` — no 30-day reference price (too new / no history).
+ *
+ * Pre-bucketed in SQL so the headline arrow renders identically
+ * SSR-side, client-side, and in the OG image without the consumer
+ * re-implementing the threshold.
+ */
+export const PRICE_TREND_DIRECTIONS = ['up', 'down', 'flat', 'unknown'] as const;
+export const priceTrendDirectionSchema = z.enum(PRICE_TREND_DIRECTIONS);
+export type PriceTrendDirection = z.infer<typeof priceTrendDirectionSchema>;
+
+/**
+ * The v2 trend + freshness enrichment columns added to
+ * `mv_current_price` by migration `0028_pricing_current_view_v2.sql`
+ * (#FU-5; `context/data-model.md` § `mv_current_price`). Every field
+ * is **optional** so the shape stays backward-compatible: a payload
+ * produced before the enrichment landed (or a row whose history is
+ * too thin to compute a trend) still validates.
+ *
+ * - `currentPrice` — the median of the last 30 days of daily medians
+ *   (the data-model's `current_price`), in `currency`. Null when no
+ *   aggregate fell inside the 30-day window.
+ * - `trend30dPct` / `trend90dPct` / `trendAllTimePct` — percent change
+ *   of the latest median vs the most recent median at / before the
+ *   30- / 90- / all-time look-back, as a signed 2dp decimal string
+ *   (`"-12.50"`). Null when the look-back reference is absent.
+ * - `trendDirection` — `up` / `down` / `flat` / `unknown` bucketing of
+ *   `trend30dPct`.
+ * - `sampleCount30d` — total observations rolled into the trailing
+ *   30-day window.
+ * - `lastObservationAt` — `MAX(observed_at)` from the raw observation
+ *   log for this slice; the truest "last seen in the wild" timestamp.
+ *   Null when no surviving observation rows back the aggregate.
+ */
+const currentPriceTrendFields = {
+  currentPrice: numericString2dpSchema.nullable().optional(),
+  trend30dPct: numericString2dpSchema.nullable().optional(),
+  trend90dPct: numericString2dpSchema.nullable().optional(),
+  trendAllTimePct: numericString2dpSchema.nullable().optional(),
+  trendDirection: priceTrendDirectionSchema.optional(),
+  sampleCount30d: z.number().int().nonnegative().optional(),
+  lastObservationAt: isoDateTimeSchema.nullable().optional(),
+} as const;
+
+/**
  * Read-side wire shape for an `mv_current_price` row, the
  * pre-computed headline price per (printing, grade_tier,
- * market, currency). v1 column set per
- * T-DL-PRICING-CURRENT-VIEW (Q-006 in `open-questions.md`):
- * the latest aggregate stats; the richer trends + freshness
- * columns from `context/data-model.md` § mv_current_price are
- * deferred to a follow-up task.
+ * market, currency). The v1 column set per
+ * T-DL-PRICING-CURRENT-VIEW (Q-006 in `open-questions.md`) — the
+ * latest aggregate stats — plus the additive v2 trend + freshness
+ * columns (`currentPriceTrendFields`, all optional) shipped by
+ * `0028_pricing_current_view_v2.sql` (#FU-5).
  *
  * The card-detail UI's headline price reads directly from
  * this DTO; the "all grade tiers" expanded view reads from
@@ -148,6 +199,7 @@ export const currentPriceDto = z
     highPrice: numericString2dpSchema.nullable(),
     sampleCount: z.number().int().nonnegative(),
     computedAt: isoDateTimeSchema,
+    ...currentPriceTrendFields,
   })
   .strict();
 export type CurrentPriceDto = z.infer<typeof currentPriceDto>;
@@ -174,11 +226,17 @@ export type PrintingCurrentPriceFreshness = z.infer<typeof printingCurrentPriceF
  * all-markets DTO) plus a derived `freshness` band — pre-bucketed
  * by the server so the card-detail page renders the same
  * "fresh / stale" badge SSR-side, client-side, and in the OG
- * image without rounding drift. Carries only the columns
- * `mv_current_price` actually has today; the richer trend
- * columns from `context/data-model.md` § `mv_current_price`
- * (`trend_7d`, `trend_30d`, `sample_count_30d`, …) are deferred
- * — see Q-013 in `open-questions.md`.
+ * image without rounding drift.
+ *
+ * As of `0028_pricing_current_view_v2.sql` (#FU-5) the endpoint also
+ * surfaces the additive v2 trend + freshness columns
+ * (`currentPriceTrendFields`, all optional) read straight from
+ * `mv_current_price`: `currentPrice` (30-day median),
+ * `trend30dPct` / `trend90dPct` / `trendAllTimePct`, `trendDirection`,
+ * `sampleCount30d`, and `lastObservationAt`. The existing `freshness`
+ * band is still derived from `computedAt` (rollup recency); the new
+ * `lastObservationAt` exposes the raw last-seen timestamp alongside it
+ * without changing the established `freshness` semantics.
  */
 export const printingCurrentPriceDto = z
   .object({
@@ -194,6 +252,7 @@ export const printingCurrentPriceDto = z
     sampleCount: z.number().int().nonnegative(),
     computedAt: isoDateTimeSchema,
     freshness: printingCurrentPriceFreshnessSchema,
+    ...currentPriceTrendFields,
   })
   .strict();
 export type PrintingCurrentPriceDto = z.infer<typeof printingCurrentPriceDto>;

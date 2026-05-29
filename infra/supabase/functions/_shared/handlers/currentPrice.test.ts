@@ -43,6 +43,14 @@ interface CurrentPriceResponse {
   sampleCount: number;
   computedAt: string;
   freshness: 'fresh' | 'stale' | 'stale_old';
+  // v2 trend + freshness enrichment (migration 0028, #FU-5).
+  currentPrice: string | null;
+  trend30dPct: string | null;
+  trend90dPct: string | null;
+  trendAllTimePct: string | null;
+  trendDirection: 'up' | 'down' | 'flat' | 'unknown';
+  sampleCount30d: number;
+  lastObservationAt: string | null;
 }
 
 function fakeMvRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -58,6 +66,14 @@ function fakeMvRow(overrides: Record<string, unknown> = {}): Record<string, unkn
     high_price: '18.00',
     sample_count: 22,
     computed_at: '2026-05-19T08:00:00.000Z',
+    // v2 enrichment columns (migration 0028, #FU-5).
+    current_price: '12.40',
+    trend_30d_pct: '4.20',
+    trend_90d_pct: '-3.10',
+    trend_all_time_pct: '25.00',
+    trend_direction: 'up',
+    sample_count_30d: 40,
+    last_observation_at: '2026-05-18T22:00:00.000Z',
     ...overrides,
   };
 }
@@ -92,6 +108,14 @@ describe('GET /v1/printings/:id/current-price', () => {
     expect(body.medianPrice).toBe('12.50');
     expect(body.sampleCount).toBe(22);
     expect(body.freshness).toBeDefined();
+    // v2 enrichment surfaced straight from the materialized view.
+    expect(body.currentPrice).toBe('12.40');
+    expect(body.trend30dPct).toBe('4.20');
+    expect(body.trend90dPct).toBe('-3.10');
+    expect(body.trendAllTimePct).toBe('25.00');
+    expect(body.trendDirection).toBe('up');
+    expect(body.sampleCount30d).toBe(40);
+    expect(body.lastObservationAt).toBe('2026-05-18T22:00:00.000Z');
   });
 
   it('honors gradeTier and market query params', async () => {
