@@ -27,6 +27,8 @@
 // `process.exit()` — it sets `process.exitCode` and lets the event
 // loop drain.
 
+import '../src/load-env.js';
+
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -69,7 +71,7 @@ import type {
   ParserCatalogPrinting,
   ParserCatalogReader,
 } from '../src/parsers/ebay-listing/index.js';
-import type { RawEbayBrowsePriceObservation } from '../src/types.js';
+import type { RawPriceObservation } from '../src/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const SCRIPT_NAME = path.basename(__filename);
@@ -315,7 +317,7 @@ function makeSetReader(db: DrizzleDb): PricingSetReader {
 
 function makeRepo(db: DrizzleDb): EbayBrowsePriceObservationRepo {
   return {
-    async upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number> {
+    async upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number> {
       if (rows.length === 0) return 0;
       const values = rows.map((r) => ({
         printingId: r.printingId,
@@ -327,7 +329,9 @@ function makeRepo(db: DrizzleDb): EbayBrowsePriceObservationRepo {
         observedPrice: r.observedPrice,
         observedCurrency: r.observedCurrency,
         shipping: r.shipping,
-        parseConfidence: r.parseConfidence == null ? null : r.parseConfidence.toFixed(2),
+        // `parseConfidence` is already a `numeric(3,2)`-formatted string on
+        // the shared RawPriceObservation type (#FU-2); pass it straight through.
+        parseConfidence: r.parseConfidence,
         observedAt: r.observedAt,
         observedDate: r.observedDate,
         rawMetadata: r.rawMetadata,
@@ -431,8 +435,8 @@ function makeMockSetReader(): PricingSetReader {
 }
 
 class InMemoryPriceObservationCliRepo implements EbayBrowsePriceObservationRepo {
-  private readonly rows = new Map<string, RawEbayBrowsePriceObservation>();
-  async upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number> {
+  private readonly rows = new Map<string, RawPriceObservation>();
+  async upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number> {
     for (const r of rows) {
       const k = `${r.source}|${r.sourceListingId ?? ''}`;
       this.rows.set(k, { ...r });

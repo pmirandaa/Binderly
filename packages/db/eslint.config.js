@@ -14,8 +14,10 @@ export default [
   {
     // CLI scripts intentionally signal failure via `process.exit(<code>)`
     // so the parent shell sees a meaningful exit code; the n-plugin's
-    // suggestion to throw doesn't apply to top-level entry points.
-    files: ['scripts/**/*.ts'],
+    // suggestion to throw doesn't apply to top-level entry points. Covers
+    // both the tsx-run `.ts` scripts and the plain-ESM `.mjs` wrappers
+    // (`db:generate` / `db:migrate` — see #FU-1).
+    files: ['scripts/**/*.{ts,mjs}'],
     rules: {
       'n/no-process-exit': 'off',
     },

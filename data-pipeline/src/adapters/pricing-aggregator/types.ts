@@ -190,39 +190,14 @@ export type AggregatorQuote = z.infer<typeof aggregatorQuoteSchema>;
 // RawPriceObservation — runner output, pre-write
 // ============================================================
 
-/**
- * The runner's per-quote output, post-resolution and pre-write.
- * Maps 1:1 to `NewPriceObservation` from `@binderly/db`. The
- * production `DrizzlePriceObservationRepo` `satisfies`-asserts
- * the alignment so column drift surfaces at compile time.
- */
-export const rawPriceObservationSchema = z
-  .object({
-    /** `aggregator_<vendor>` (e.g. `aggregator_mock`). */
-    source: z.string().min(1),
-    /**
-     * Synthesised idempotency id. Always non-null at this layer
-     * (the runner never lets a NULL through). The `(source,
-     * source_listing_id)` UNIQUE constraint upserts on this pair.
-     */
-    sourceListingId: z.string().min(1),
-    observationKind: observationKindSchema,
-    /** Catalog `printing.id` UUID. */
-    printingId: z.string().min(1),
-    gradeTier: gradeTierSchema,
-    market: marketCodeSchema,
-    /** Numeric(12,2)-formatted source price. */
-    observedPrice: numericString,
-    observedCurrency: z.string().regex(/^[A-Z]{3}$/u),
-    shipping: numericString.nullable(),
-    /** Numeric(3,2)-formatted parser confidence ('0.86') or null. */
-    parseConfidence: numericString.nullable(),
-    observedAt: z.date(),
-    observedDate: isoDate,
-    rawMetadata: z.record(z.unknown()),
-  })
-  .strict();
-export type RawPriceObservation = z.infer<typeof rawPriceObservationSchema>;
+// The runner's per-quote output (post-resolution, pre-write) is the
+// shared `RawPriceObservation` from `data-pipeline/src/types.ts` — the
+// single source of truth for BOTH pricing adapters (#FU-2). It maps 1:1
+// to `NewPriceObservation` from `@binderly/db`; the production
+// `DrizzlePriceObservationRepo` asserts that alignment. Re-exported here
+// so existing `./types.js` imports keep resolving.
+export { rawPriceObservationSchema } from '../../types.js';
+export type { RawPriceObservation } from '../../types.js';
 
 // ============================================================
 // Re-exports for the package barrel

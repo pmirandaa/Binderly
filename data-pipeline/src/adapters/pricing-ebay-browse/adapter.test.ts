@@ -138,7 +138,7 @@ describe('EbayBrowseAdapter — streamObservationsForQuery', () => {
     });
   }
 
-  it('emits a RawEbayBrowsePriceObservation for a high-confidence PSA 10 listing', async () => {
+  it('emits a RawPriceObservation for a high-confidence PSA 10 listing', async () => {
     const client = new MockEbayBrowseClient();
     client.enqueue(
       { marketplace: 'EBAY_US', query: 'Charizard VMAX 020/172' },
@@ -162,7 +162,10 @@ describe('EbayBrowseAdapter — streamObservationsForQuery', () => {
     expect(o.observedPrice).toBe('99.99');
     expect(o.observedCurrency).toBe('USD');
     expect(o.shipping).toBe('4.99');
-    expect(o.parseConfidence).toBeGreaterThanOrEqual(PRICING_EBAY_BROWSE_MIN_CONFIDENCE);
+    // parseConfidence is now a numeric(3,2)-formatted string on the shared
+    // RawPriceObservation type (#FU-2).
+    expect(typeof o.parseConfidence).toBe('string');
+    expect(Number(o.parseConfidence)).toBeGreaterThanOrEqual(PRICING_EBAY_BROWSE_MIN_CONFIDENCE);
     expect(o.observedAt).toEqual(fixedNow);
     expect(o.observedDate).toBe('2026-05-01');
     expect(o.rawMetadata).toMatchObject({

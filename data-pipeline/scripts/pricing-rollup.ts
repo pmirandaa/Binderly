@@ -25,6 +25,8 @@
 // `scripts/fx-rates.ts` and `scripts/pricing-ebay-browse.ts` — sets
 // `process.exitCode` instead of calling `process.exit()`.
 
+import '../src/load-env.js';
+
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';

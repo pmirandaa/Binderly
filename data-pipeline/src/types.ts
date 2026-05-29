@@ -376,7 +376,7 @@ export interface ResolveListResult<T> {
  *   - `'aggregator_quote'`  — Layer 1 (aggregator's normalized quote).
  *
  * Mirrored here as a const tuple so adapters that emit
- * `RawEbayBrowsePriceObservation` records validate against the schema without
+ * `RawPriceObservation` records validate against the schema without
  * dragging `@binderly/db` into the type graph.
  */
 export const PRICE_OBSERVATION_KINDS = ['sold', 'active_listing', 'aggregator_quote'] as const;
@@ -421,8 +421,12 @@ export const priceObservationGradeTierSchema = z.enum(PRICE_OBSERVATION_GRADE_TI
 export type PriceObservationGradeTier = z.infer<typeof priceObservationGradeTierSchema>;
 
 /**
- * `RawEbayBrowsePriceObservation` — the shape every pricing adapter EMITS,
- * one row per upstream listing / quote / sale.
+ * `RawPriceObservation` — the shape every pricing adapter EMITS, one
+ * row per upstream listing / quote / sale. This is the single shared
+ * type for BOTH pricing adapters (#FU-2): the eBay Browse adapter
+ * (Layer 2, `active_listing`) and the pricing aggregator (Layer 1,
+ * `aggregator_quote` / `sold`) both import it from here — neither keeps
+ * its own differentiated copy.
  *
  * Field-for-field mirror of `NewPriceObservation` from `@binderly/db`
  * (insert type for `price_observation`) so the runner's repo
@@ -430,15 +434,15 @@ export type PriceObservationGradeTier = z.infer<typeof priceObservationGradeTier
  * second translation pass — same posture as `FxRateRow` ↔ `NewFxRate`
  * from `T-DL-FX-RATES`.
  *
- * `observedPrice` and `shipping` are strings (rather than `number`)
- * because Drizzle's `numeric` columns round-trip cleanly as strings
- * (`'12.34'`) but suffer the usual floating-point quirks when fed
- * raw `number` (`0.1 + 0.2 → 0.30000000000000004`).
+ * `observedPrice`, `shipping`, and `parseConfidence` are strings
+ * (rather than `number`) because Drizzle's `numeric` columns round-trip
+ * cleanly as strings (`'12.34'`) but suffer the usual floating-point
+ * quirks when fed a raw `number` (`0.1 + 0.2 → 0.30000000000000004`).
  *
  * Shared by `T-DL-PRICING-EBAY-BROWSE` (Layer 2) and
  * `T-DL-PRICING-AGGREGATOR` (Layer 1).
  */
-export const rawEbayBrowsePriceObservationSchema = z
+export const rawPriceObservationSchema = z
   .object({
     /** `'ebay_browse'`, `'aggregator_<name>'`, etc. */
     source: z.string().min(1),
@@ -465,8 +469,18 @@ export const rawEbayBrowsePriceObservationSchema = z
       .string()
       .regex(/^-?\d+(\.\d{1,2})?$/)
       .nullable(),
-    /** 0..1. Aggregates exclude < 0.7 per the rollup spec. */
-    parseConfidence: z.number().min(0).max(1).nullable(),
+    /**
+     * Parser confidence as a `numeric(3,2)`-formatted string in `[0, 1]`
+     * (e.g. `'0.86'`), or null when the source is confidence-free.
+     * String (not number) so it round-trips into the `parse_confidence`
+     * numeric column without float drift — same posture as
+     * `observedPrice` / `shipping`. Aggregates exclude < 0.70 per the
+     * rollup spec.
+     */
+    parseConfidence: z
+      .string()
+      .regex(/^-?\d+(\.\d{1,2})?$/)
+      .nullable(),
     /** When the upstream quote / sale was real. */
     observedAt: z.date(),
     /** ISO `YYYY-MM-DD`; date-only of `observedAt` (UTC) for FX joins. */
@@ -479,4 +493,4 @@ export const rawEbayBrowsePriceObservationSchema = z
     rawMetadata: z.record(z.unknown()).nullable(),
   })
   .strict();
-export type RawEbayBrowsePriceObservation = z.infer<typeof rawEbayBrowsePriceObservationSchema>;
+export type RawPriceObservation = z.infer<typeof rawPriceObservationSchema>;

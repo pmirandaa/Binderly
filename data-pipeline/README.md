@@ -119,8 +119,12 @@ master-set membership, upserts to the catalog tables, and pipes
 each printing's image through the image pipeline.
 
 ```sh
-# Required env (defaults work against infra/docker-compose.yml):
-export DATABASE_URL='postgres://postgres:postgres@localhost:54322/postgres'
+# Required env. NOTE: data-pipeline jobs write to the catalog/pricing
+# tables created by the migrations, which live on the **Supabase**
+# Postgres at :54322 — NOT the Compose stub on :5433. Point DATABASE_URL
+# there. (These can also live in `.env`; the scripts auto-load it — see
+# "Environment & database target" below.)
+export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
 export BINDERLY_DATA_PIPELINE_UA='Binderly/0.1 (contact: legal@binderly.app)'
 export S3_ENDPOINT_URL='http://localhost:9000'
 export MINIO_ROOT_USER='minio'
@@ -168,6 +172,32 @@ The `src/jobs/` folder holds the cron-runnable runners that consume the
 adapters and write to `@binderly/db`. Each ships a CLI under `scripts/`
 for ad-hoc / local invocation.
 
+### Environment & database target
+
+Every CLI under `scripts/` auto-loads a `.env` file at startup
+(package-local `data-pipeline/.env` first, then the monorepo-root
+`.env`). Real, already-exported environment variables always win, so
+`.env` is just a convenience that makes the smoke tests below true
+one-liners — no `export DATABASE_URL=…` preamble required.
+
+**Database target — read this before running a smoke.** The
+data-pipeline writes to the catalog (`set` / `card` / `printing`) and
+pricing (`price_observation`, `price_aggregate`, `fx_rate`, …) tables,
+which are created by the migrations. **Migrations live on the Supabase
+CLI Postgres at `:54322`** (`pnpm db:start` / `supabase start`), **not**
+the Compose Postgres on `:5433`. Point `DATABASE_URL` (or
+`SUPABASE_DB_URL`) at the Supabase URL for any smoke that runs
+`db:migrate` and then reads the migrated tables:
+
+```sh
+export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
+```
+
+Pointing it at the Compose stub on `:5433` (the `.env.example` default,
+which exists for unrelated ETL staging) makes the jobs fail with
+`relation "…" does not exist` because that database never receives
+schema migrations.
+
 ### `fx-rates` — daily FX-rate ingest (T-DL-FX-RATES)
 
 Pulls from the [Frankfurter](https://frankfurter.dev) FX API and upserts
@@ -203,7 +233,7 @@ Hits eBay's [Browse API](https://developer.ebay.com/api-docs/buy/browse/overview
 (`api.ebay.com/buy/browse/v1/item_summary/search`), parses each
 listing title via `parseEbayListing()`, joins to a printing via
 `resolveListingToPrinting()`, and upserts the resolved
-`RawEbayBrowsePriceObservation` rows into `price_observation` keyed on
+`RawPriceObservation` rows into `price_observation` keyed on
 `(source = 'ebay_browse', source_listing_id = itemId)`. Per
 `PROJECT.md` § 13, this is the _independent_ (Layer 2) data trail —
 free, no approval required, growing in coverage and history every
@@ -363,8 +393,10 @@ git checkout main && git pull --ff-only
 export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
 pnpm install --prefer-offline
 
-# 1. Bring up Postgres + run migrations.
-docker compose -f infra/docker-compose.yml up -d postgres
+# 1. Bring up the Supabase Postgres (:54322, where migrations live) + run
+#    migrations. DATABASE_URL is auto-loaded from .env, or export it:
+export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
+pnpm exec supabase start --workdir infra
 pnpm --filter @binderly/db db:migrate
 
 # 2. Seed a tiny pricing fixture (the eBay-browse mock writes
@@ -463,8 +495,11 @@ git checkout main && git pull --ff-only
 export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
 pnpm install --prefer-offline
 
-# 1. Bring up Postgres + apply migrations (creates mv_current_price WITH NO DATA).
-docker compose -f infra/docker-compose.yml up -d postgres
+# 1. Bring up the Supabase Postgres (:54322, where migrations live) + apply
+#    migrations (creates mv_current_price WITH NO DATA). DATABASE_URL is
+#    auto-loaded from .env, or export it:
+export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
+pnpm exec supabase start --workdir infra
 pnpm --filter @binderly/db db:migrate
 
 # 2. Confirm the view exists (empty for now).
@@ -549,8 +584,11 @@ git checkout main && git pull --ff-only
 export PATH="/Users/pmiranda/.nvm/versions/node/v22.13.0/bin:$PATH"
 pnpm install --prefer-offline
 
-# 1. Apply migrations (creates `data_conflict` + RLS posture).
-docker compose -f infra/docker-compose.yml up -d postgres
+# 1. Bring up the Supabase Postgres (:54322, where migrations live) + apply
+#    migrations (creates `data_conflict` + RLS posture). DATABASE_URL is
+#    auto-loaded from .env, or export it:
+export DATABASE_URL='postgresql://postgres:postgres@localhost:54322/postgres'
+pnpm exec supabase start --workdir infra
 pnpm --filter @binderly/db db:migrate
 
 # 2. Run a seed against any set; the resolver's conflicts now persist:

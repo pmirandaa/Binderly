@@ -256,7 +256,10 @@ export class InMemoryPriceObservationRepo implements PriceObservationRepo {
   list(): RawPriceObservation[] {
     return [...this.rows.values()].sort((a, b) => {
       if (a.source !== b.source) return a.source.localeCompare(b.source);
-      return a.sourceListingId.localeCompare(b.sourceListingId);
+      // `sourceListingId` is nullable on the shared RawPriceObservation
+      // type (#FU-2); the aggregator always synthesises one, but guard
+      // for the type anyway.
+      return (a.sourceListingId ?? '').localeCompare(b.sourceListingId ?? '');
     });
   }
 }

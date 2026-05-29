@@ -13,7 +13,7 @@
 //      whose cards are enumerated into one query each.
 //   3. The job iterates the query plan, calls
 //      `adapter.streamObservationsForQuery`, batches the resulting
-//      `RawEbayBrowsePriceObservation` rows into `repo.upsertMany`, and
+//      `RawPriceObservation` rows into `repo.upsertMany`, and
 //      tallies per-query stats into the report.
 //
 // Idempotency: relies on `price_observation`'s
@@ -34,7 +34,7 @@ import {
 import { NotFoundError, type AdapterLogger } from '../interfaces/adapter.js';
 
 import type { EbayMarketplace } from '../adapters/pricing-ebay-browse/index.js';
-import type { RawEbayBrowsePriceObservation } from '../types.js';
+import type { RawPriceObservation } from '../types.js';
 
 // ============================================================
 // Repo boundary
@@ -53,7 +53,7 @@ export interface EbayBrowsePriceObservationRepo {
    * `rows.length`). Implementations MUST use the canonical UNIQUE
    * `(source, source_listing_id)` for ON CONFLICT.
    */
-  upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number>;
+  upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number>;
 }
 
 // ============================================================
@@ -199,7 +199,7 @@ export async function runPricingEbayBrowseIngest(
   const cappedQueries = queries.slice(0, cap);
 
   const errors: PricingEbayBrowseError[] = [];
-  const buffered: RawEbayBrowsePriceObservation[] = [];
+  const buffered: RawPriceObservation[] = [];
   let listingsFetched = 0;
   let listingsParsed = 0;
   let droppedLot = 0;
@@ -345,9 +345,9 @@ function errToObj(err: unknown): Record<string, unknown> {
  */
 export class InMemoryEbayBrowsePriceObservationRepo implements EbayBrowsePriceObservationRepo {
   /** `(source, source_listing_id)` → row. */
-  readonly rows = new Map<string, RawEbayBrowsePriceObservation>();
+  readonly rows = new Map<string, RawPriceObservation>();
 
-  async upsertMany(rows: ReadonlyArray<RawEbayBrowsePriceObservation>): Promise<number> {
+  async upsertMany(rows: ReadonlyArray<RawPriceObservation>): Promise<number> {
     for (const row of rows) {
       const key = `${row.source}|${row.sourceListingId ?? '\u0000'}`;
       this.rows.set(key, { ...row });
@@ -359,7 +359,7 @@ export class InMemoryEbayBrowsePriceObservationRepo implements EbayBrowsePriceOb
     return this.rows.size;
   }
 
-  list(): RawEbayBrowsePriceObservation[] {
+  list(): RawPriceObservation[] {
     return [...this.rows.values()].sort((a, b) => {
       if (a.printingId !== b.printingId) return a.printingId.localeCompare(b.printingId);
       return (a.sourceListingId ?? '').localeCompare(b.sourceListingId ?? '');

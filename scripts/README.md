@@ -103,7 +103,7 @@ recipe and this README must be revisited.
 | Situation | Behaviour |
 | --------- | --------- |
 | `spawn_worktree.sh` called with no arg / extra args | exits 64 with usage banner |
-| Task id doesn't match `^T-[A-Z]{2}-[A-Z0-9-]+$` | exits 65 |
+| Task id doesn't match `^T-[A-Z]+-[A-Z0-9-]+$` | exits 65 |
 | Task id not in `dependencies.yaml` | exits 65 |
 | `orchestrator.config.json` or `dependencies.yaml` missing | exits 66 |
 | Worktree path already exists on disk | exits 73, hint to run cleanup |
