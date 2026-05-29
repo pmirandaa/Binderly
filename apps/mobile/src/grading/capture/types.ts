@@ -1,34 +1,47 @@
 // Public types for the grading capture flow.
 //
-// The session shape mirrors a **subset** of the
-// `grading_submission` row from `context/data-model.md`:
-// `front_url + back_url + corner_urls[0..1]`. The remaining two
-// corner crops + surface raking-light shot are out of scope this
-// iteration (follow-up FU-T-GR-CAPTURE-FULL-SCHEMA), so the
-// emitted session intentionally only carries the four shots this
-// task captures.
+// The session shape carries the **full PROJECT.md § 12 shot set**:
+// `front_url + back_url + corner_urls[0..3] + surface_url`. It maps
+// to the `grading_submission` row from `context/data-model.md` and
+// to the `gradingCaptureShotSetSchema` / `cornerUrls` contract in
+// `@binderly/api-contracts` (the four corner kinds map to
+// `cornerUrls` in canonical `[TL, TR, BL, BR]` order). The shot
+// taxonomy here is the on-device capture model; the upload step
+// converts the local URIs into the URL-bearing submission DTO.
 
 /**
- * The four shots in the v1 capture flow, in user-visible order.
+ * The seven shots in the full capture flow, in user-visible order.
  *
  * - `frontFull` — full portrait of the front, used for centering +
- *   surface (when surface ships).
+ *   surface.
  * - `backFull` — full portrait of the back, used for centering +
  *   the back-side corners model.
- * - `frontCorner` — close-up of the front top-left corner.
- * - `backCorner` — close-up of the back top-right corner.
+ * - `frontCorner` — close-up of the top-left corner (`cornerUrls[0]`).
+ * - `backCorner` — close-up of the top-right corner (`cornerUrls[1]`).
+ * - `bottomLeftCorner` — close-up of the bottom-left corner
+ *   (`cornerUrls[2]`).
+ * - `bottomRightCorner` — close-up of the bottom-right corner
+ *   (`cornerUrls[3]`).
+ * - `surface` — raking-light angled shot of the front; reveals
+ *   whitening / scratches for the surface sub-grade.
  */
 export type GradingShotKind =
   | 'frontFull'
   | 'backFull'
   | 'frontCorner'
-  | 'backCorner';
+  | 'backCorner'
+  | 'bottomLeftCorner'
+  | 'bottomRightCorner'
+  | 'surface';
 
 /** Overlay shape rendered on top of the camera surface. */
 export type CaptureOverlayKind =
   | 'full-portrait'
   | 'corner-top-left'
-  | 'corner-top-right';
+  | 'corner-top-right'
+  | 'corner-bottom-left'
+  | 'corner-bottom-right'
+  | 'surface-raking';
 
 /** Per-step constants — declared in `constants.ts`, consumed everywhere. */
 export interface CaptureStepDefinition {
@@ -43,6 +56,17 @@ export interface CaptureStepDefinition {
   readonly overlay: CaptureOverlayKind;
   /** Minimum frame-fraction the detected card region must cover. */
   readonly coverageMin: number;
+  /**
+   * Per-step lower brightness bound override. The raking-light
+   * surface shot is intentionally captured under angled light and
+   * runs darker than a flat full-card shot, so it relaxes the
+   * default floor. Omitted ⇒ the global `CAPTURE_BRIGHTNESS_MIN`.
+   */
+  readonly brightnessMin?: number;
+  /** Per-step upper brightness bound override. Omitted ⇒ global max. */
+  readonly brightnessMax?: number;
+  /** Per-step sharpness floor override. Omitted ⇒ global min. */
+  readonly sharpnessMin?: number;
 }
 
 /** Quality metrics for a single capture attempt. All values are real. */
@@ -112,15 +136,20 @@ export interface GradingShot {
 }
 
 /**
- * The session emitted to the next screen when all four shots are
- * accepted. Keys match the step kinds 1-to-1 so the centering
- * task can destructure deterministically.
+ * The session emitted to the next screen when every shot is
+ * accepted. Keys match the step kinds 1-to-1 so downstream grading
+ * tasks can destructure deterministically. The four corner shots
+ * map to the `cornerUrls` contract in canonical `[TL, TR, BL, BR]`
+ * order; `surface` maps to the raking-light `surfaceUrl`.
  */
 export interface GradingCaptureSession {
   readonly frontFull: GradingShot;
   readonly backFull: GradingShot;
   readonly frontCorner: GradingShot;
   readonly backCorner: GradingShot;
+  readonly bottomLeftCorner: GradingShot;
+  readonly bottomRightCorner: GradingShot;
+  readonly surface: GradingShot;
   /** Session id (uuid-ish). Used by the review screen for testIDs. */
   readonly id: string;
   /** Session start timestamp (ms since epoch). */
@@ -133,7 +162,10 @@ export interface GradingCaptureSession {
 export interface CaptureSessionState {
   readonly id: string;
   readonly startedAt: number;
-  /** Index of the **current** step (0..3 when in progress, 4 when complete). */
+  /**
+   * Index of the **current** step (0-based; equals the total step
+   * count when the session is complete).
+   */
   readonly stepIndex: number;
   /** Accepted shots so far, keyed by kind. */
   readonly shots: Partial<Record<GradingShotKind, GradingShot>>;
@@ -143,6 +175,6 @@ export interface CaptureSessionState {
    * new attempt yet).
    */
   readonly lastReason: CaptureFeedbackReason | null;
-  /** True iff all four shots have been accepted. */
+  /** True iff every shot has been accepted. */
   readonly isComplete: boolean;
 }

@@ -36,7 +36,7 @@ describe('<CaptureStepIndicator>', () => {
     expect(view.getByTestId('capture-step-dot-backCorner').getAttribute('data-state')).toBe(
       'pending',
     );
-    expect(view.container.textContent).toContain('Step 3 of 4');
+    expect(view.container.textContent).toContain('Step 3 of 7');
   });
 
   it('caps the step text at the total when complete', () => {
@@ -53,7 +53,7 @@ describe('<CaptureStepIndicator>', () => {
         acceptedKinds={accepted}
       />,
     );
-    expect(view.container.textContent).toContain('Step 4 of 4');
+    expect(view.container.textContent).toContain('Step 7 of 7');
   });
 });
 
@@ -104,6 +104,32 @@ describe('<CaptureFramingOverlay>', () => {
     );
     expect(view.queryByTestId('capture-framing-overlay-corner-top-right')).not.toBeNull();
     expect(view.queryByTestId('capture-framing-corner-top-right')).not.toBeNull();
+  });
+
+  it('renders the corner-bottom-left variant', () => {
+    const view = renderWithProvider(
+      <CaptureFramingOverlay kind="corner-bottom-left" hint="Bottom-left" />,
+    );
+    expect(view.queryByTestId('capture-framing-overlay-corner-bottom-left')).not.toBeNull();
+    expect(view.queryByTestId('capture-framing-corner-bottom-left')).not.toBeNull();
+  });
+
+  it('renders the corner-bottom-right variant', () => {
+    const view = renderWithProvider(
+      <CaptureFramingOverlay kind="corner-bottom-right" hint="Bottom-right" />,
+    );
+    expect(view.queryByTestId('capture-framing-overlay-corner-bottom-right')).not.toBeNull();
+    expect(view.queryByTestId('capture-framing-corner-bottom-right')).not.toBeNull();
+  });
+
+  it('renders the surface-raking variant with a tilt indicator', () => {
+    const view = renderWithProvider(
+      <CaptureFramingOverlay kind="surface-raking" hint="Surface" />,
+    );
+    expect(view.queryByTestId('capture-framing-overlay-surface-raking')).not.toBeNull();
+    expect(view.queryByTestId('capture-framing-surface')).not.toBeNull();
+    expect(view.queryByTestId('capture-framing-surface-tilt')).not.toBeNull();
+    expect(view.container.textContent).toContain('Tilt the phone');
   });
 });
 

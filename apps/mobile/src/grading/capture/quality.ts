@@ -39,6 +39,7 @@ import type {
   CaptureFeedbackReason,
   CaptureQualityMetrics,
   CaptureQualityResult,
+  CaptureStepDefinition,
   GradingShotKind,
 } from './types.js';
 
@@ -147,6 +148,41 @@ export function evaluateCaptureQualityForKind(
   return evaluateCaptureQuality(pixels, width, height, {
     coverageMin: coverageMinByKind[kind],
   });
+}
+
+/**
+ * Resolve the full {@link QualityEvaluationOptions} for a capture
+ * step, folding in any per-step gate overrides (the raking-light
+ * surface step relaxes the brightness floor; corner steps lower
+ * the coverage floor). The live frame-processor + the
+ * {@link evaluateCaptureQualityForStep} wrapper both go through
+ * here so every surface uses one gate per step.
+ */
+export function gateOptionsForStep(step: CaptureStepDefinition): QualityEvaluationOptions {
+  const options: {
+    coverageMin: number;
+    sharpnessMin?: number;
+    brightnessMin?: number;
+    brightnessMax?: number;
+  } = { coverageMin: step.coverageMin };
+  if (step.sharpnessMin !== undefined) options.sharpnessMin = step.sharpnessMin;
+  if (step.brightnessMin !== undefined) options.brightnessMin = step.brightnessMin;
+  if (step.brightnessMax !== undefined) options.brightnessMax = step.brightnessMax;
+  return options;
+}
+
+/**
+ * Evaluate a capture against a specific step's resolved gate. The
+ * screen + the live frame-processor use this so the per-step
+ * brightness / coverage overrides are always honoured.
+ */
+export function evaluateCaptureQualityForStep(
+  pixels: Uint8Array,
+  width: number,
+  height: number,
+  step: CaptureStepDefinition,
+): CaptureQualityResult {
+  return evaluateCaptureQuality(pixels, width, height, gateOptionsForStep(step));
 }
 
 // --- internals -------------------------------------------------------

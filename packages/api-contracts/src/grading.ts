@@ -200,3 +200,89 @@ export const updateGradingSubmissionStatusRequest = z
 export type UpdateGradingSubmissionStatusRequest = z.infer<
   typeof updateGradingSubmissionStatusRequest
 >;
+
+// ============================================================
+// Capture shot-set — client-side (pre-upload) capture model
+// ============================================================
+//
+// The mobile guided-capture flow (`apps/mobile/src/grading/capture/`)
+// produces a set of **local file URIs** — one per shot — before any
+// upload happens. The submission DTOs above (`frontUrl` / `backUrl` /
+// `cornerUrls[4]` / `surfaceUrl`) are the *post-upload* wire shape.
+//
+// This block pins the shared **shot taxonomy + ordering** so the
+// capture client, the upload mapper, and any future consumer agree on
+// (a) which shots the full PROJECT.md § 12 capture set contains and
+// (b) the canonical order the four corner crops map into the
+// `cornerUrls` array. It is append-only and introduces no DB column —
+// the capture model is a TS/contract concern, not a new table.
+
+/**
+ * The complete PROJECT.md § 12 capture shot set, in user-facing
+ * capture order: full front, full back, the four corner close-ups
+ * (top-left, top-right, bottom-left, bottom-right), then the
+ * raking-light surface shot.
+ */
+export const GRADING_CAPTURE_SHOT_KINDS = [
+  'frontFull',
+  'backFull',
+  'frontCorner',
+  'backCorner',
+  'bottomLeftCorner',
+  'bottomRightCorner',
+  'surface',
+] as const;
+export const gradingCaptureShotKindSchema = z.enum(GRADING_CAPTURE_SHOT_KINDS);
+export type GradingCaptureShotKind = z.infer<typeof gradingCaptureShotKindSchema>;
+
+/**
+ * The four corner shot kinds in the canonical `cornerUrls` order —
+ * `[top_left, top_right, bottom_left, bottom_right]`, matching the
+ * grading worker's `CornerLabel` ordering and the
+ * `grading_submission.corner_urls` array. The upload mapper reads
+ * the per-kind URI in exactly this order.
+ */
+export const GRADING_CAPTURE_CORNER_SHOT_ORDER = [
+  'frontCorner',
+  'backCorner',
+  'bottomLeftCorner',
+  'bottomRightCorner',
+] as const satisfies ReadonlyArray<GradingCaptureShotKind>;
+
+/**
+ * The local (pre-upload) capture shot-set: one non-empty local file
+ * URI per shot kind. This is the contract shape the mobile capture
+ * session emits once every shot is accepted. `string().min(1)` (not
+ * `.url()`) because these are on-device `file://` / `ph://` URIs, not
+ * R2 URLs — the upload step converts them into the URL-bearing
+ * {@link submitGradingPredictionRequest} shape.
+ */
+export const gradingCaptureShotSetSchema = z
+  .object({
+    frontFull: z.string().min(1),
+    backFull: z.string().min(1),
+    frontCorner: z.string().min(1),
+    backCorner: z.string().min(1),
+    bottomLeftCorner: z.string().min(1),
+    bottomRightCorner: z.string().min(1),
+    surface: z.string().min(1),
+  })
+  .strict();
+export type GradingCaptureShotSet = z.infer<typeof gradingCaptureShotSetSchema>;
+
+/**
+ * Map a captured shot-set's corner URIs into the canonical
+ * `cornerUrls` tuple `[top_left, top_right, bottom_left, bottom_right]`.
+ * The single source of truth for "which corner goes where" so the
+ * capture client and the upload mapper never drift.
+ */
+export function gradingCaptureCornerUris(
+  shotSet: GradingCaptureShotSet,
+): readonly [string, string, string, string] {
+  return [
+    shotSet.frontCorner,
+    shotSet.backCorner,
+    shotSet.bottomLeftCorner,
+    shotSet.bottomRightCorner,
+  ];
+}

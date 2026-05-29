@@ -11,6 +11,7 @@ export {
   CAPTURE_BRIGHTNESS_MIN,
   CAPTURE_CORNER_COVERAGE_MIN,
   CAPTURE_COVERAGE_ACTIVITY_RATIO,
+  CAPTURE_COVERAGE_MIN_BY_KIND,
   CAPTURE_FULL_COVERAGE_MIN,
   CAPTURE_GRID_HEIGHT,
   CAPTURE_GRID_WIDTH,
@@ -19,6 +20,7 @@ export {
   CAPTURE_SHARPNESS_MIN,
   CAPTURE_STEP_COUNT,
   CAPTURE_STEPS,
+  CAPTURE_SURFACE_BRIGHTNESS_MIN,
 } from './constants.js';
 
 export type {
@@ -37,6 +39,8 @@ export {
   CAPTURE_FEEDBACK_COPY,
   evaluateCaptureQuality,
   evaluateCaptureQualityForKind,
+  evaluateCaptureQualityForStep,
+  gateOptionsForStep,
 } from './quality.js';
 export type { QualityEvaluationOptions } from './quality.js';
 
@@ -48,6 +52,29 @@ export {
   reduceCaptureSession,
 } from './session.js';
 export type { CaptureSessionAction } from './session.js';
+
+export {
+  buildCaptureQualityEvent,
+  CAPTURE_FRAME_MIN_INTERVAL_MS,
+  createCaptureQualitySink,
+  createCaptureThrottleState,
+  shouldEmitCaptureFrame,
+  useCaptureFrameProcessor,
+} from './frame-processor.js';
+export type {
+  CaptureFrameLike,
+  CaptureQualityEvent,
+  CaptureQualityListener,
+  CaptureQualitySink,
+  CaptureThrottleState,
+  UseCaptureFrameProcessorOptions,
+} from './frame-processor.js';
+
+export { deriveCaptureButtonState } from './capture-button.js';
+export type {
+  CaptureButtonState,
+  DeriveCaptureButtonStateInput,
+} from './capture-button.js';
 
 export {
   evaluateAttemptFromPixels,

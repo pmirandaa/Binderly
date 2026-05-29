@@ -185,7 +185,7 @@ describe('buildEmittedSession', () => {
     expect(buildEmittedSession(s, 100)).toBeNull();
   });
 
-  it('emits the full session shape when all four shots are accepted', () => {
+  it('emits the full session shape when every shot is accepted', () => {
     let s = createInitialSessionState({ id: 'i', startedAt: 0 });
     for (const kind of CAPTURE_KINDS) {
       s = reduceCaptureSession(s, { type: 'accept', shot: makeShot(kind) });
@@ -200,5 +200,19 @@ describe('buildEmittedSession', () => {
     expect(emitted.backFull.kind).toBe('backFull');
     expect(emitted.frontCorner.kind).toBe('frontCorner');
     expect(emitted.backCorner.kind).toBe('backCorner');
+    expect(emitted.bottomLeftCorner.kind).toBe('bottomLeftCorner');
+    expect(emitted.bottomRightCorner.kind).toBe('bottomRightCorner');
+    expect(emitted.surface.kind).toBe('surface');
+  });
+
+  it('returns null when the surface shot is missing despite isComplete', () => {
+    // Defensive guard: a hand-built complete-looking state missing a
+    // required shot must not emit a malformed session.
+    let s = createInitialSessionState({ id: 'i', startedAt: 0 });
+    for (const kind of CAPTURE_KINDS) {
+      s = reduceCaptureSession(s, { type: 'accept', shot: makeShot(kind) });
+    }
+    const broken = { ...s, shots: { ...s.shots, surface: undefined } };
+    expect(buildEmittedSession(broken, 100)).toBeNull();
   });
 });

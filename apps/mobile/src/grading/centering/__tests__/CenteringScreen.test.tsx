@@ -38,6 +38,9 @@ function makeSession(id = 'gcs-screen-1'): GradingCaptureSession {
     backFull: makeShot('backFull'),
     frontCorner: makeShot('frontCorner'),
     backCorner: makeShot('backCorner'),
+    bottomLeftCorner: makeShot('bottomLeftCorner'),
+    bottomRightCorner: makeShot('bottomRightCorner'),
+    surface: makeShot('surface'),
   };
 }
 
