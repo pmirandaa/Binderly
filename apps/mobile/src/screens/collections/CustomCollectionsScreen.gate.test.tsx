@@ -12,12 +12,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BinderlyClient } from '@binderly/api-client';
 import type { CustomCollectionDto } from '@binderly/api-contracts';
 
-import type { GateState } from '../../lib/gating/index.js';
-
+import { CustomCollectionsScreen } from './CustomCollectionsScreen';
 import { AuthProvider } from '../../components/providers/AuthProvider';
 import { ApiClientProvider } from '../../lib/api-client';
 import { renderWithProvider } from '../../test-utils/render';
 
+import type { GateState } from '../../lib/gating/index.js';
 import type { ReactNode } from 'react';
 
 const { routerMocks } = vi.hoisted(() => ({
@@ -54,7 +54,6 @@ vi.mock('../../lib/gating/index.js', () => ({
   useLimitGate: () => hoisted.gateState,
 }));
 
-import { CustomCollectionsScreen } from './CustomCollectionsScreen';
 
 function makeCollection(
   partial: Partial<CustomCollectionDto> & { id: string },
