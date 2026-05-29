@@ -59,6 +59,46 @@ export type RevenueCatFetch = (
   init: { method: string; headers: Record<string, string> },
 ) => Promise<RevenueCatFetchResponse>;
 
+/**
+ * Structured signal emitted whenever an entitlement read falls back to
+ * the free tier — RC unreachable / non-200 / malformed body / unset key
+ * (#FU-54, entitlement-fallback observability).
+ *
+ * The fallback path is invisible by design (it returns a normal
+ * free-tier result so the app keeps working during an RC blip), which
+ * means a chronic RC outage — or a never-provisioned secret key —
+ * silently locks every paying user out of pro features with no signal.
+ * This hook gives operators a fail-closed fallback *rate*: wire it to a
+ * counter / log pipeline and alert when it spikes. The default sink is
+ * a dependency-light structured `console.warn` (one JSON line, keyed on
+ * a stable `event` so a log scraper can count it without a telemetry
+ * lib).
+ */
+export interface EntitlementFallbackSignal {
+  /** Stable discriminator — the metric/log name a pipeline keys on. */
+  readonly event: 'entitlements.fallback';
+  /** Why the read fell back (mirrors `EntitlementReadResult.error`). */
+  readonly reason: string;
+  /** The RC `app_user_id` the read targeted (empty string if unset). */
+  readonly appUserId: string;
+  /** ISO-8601 timestamp the read resolved. */
+  readonly checkedAt: string;
+}
+
+/** Sink for {@link EntitlementFallbackSignal}s. Must not throw (guarded). */
+export type EntitlementFallbackHook = (signal: EntitlementFallbackSignal) => void;
+
+/**
+ * Default fallback sink — a single structured `console.warn` line.
+ * Dependency-light on purpose (no telemetry lib in this package): a log
+ * scraper computes the fallback rate by counting the stable `event`
+ * key. Exported so consumers can compose it (e.g. tee to a counter
+ * *and* the console).
+ */
+export function defaultFallbackSink(signal: EntitlementFallbackSignal): void {
+  console.warn(JSON.stringify(signal));
+}
+
 /** Options for {@link readEntitlement}. */
 export interface ReadEntitlementOptions {
   /** RevenueCat **secret** API key. Empty/missing → fail-closed to free. */
@@ -74,6 +114,13 @@ export interface ReadEntitlementOptions {
   readonly fetch?: RevenueCatFetch;
   /** Test seam for "now" — defaults to `Date.now`. */
   readonly now?: () => number;
+  /**
+   * Observability hook fired on every fail-closed fallback (#FU-54).
+   * Defaults to {@link defaultFallbackSink} (a structured
+   * `console.warn`). A throwing hook is swallowed so observability can
+   * never break the fail-closed read.
+   */
+  readonly onFallback?: EntitlementFallbackHook;
 }
 
 /**
@@ -100,17 +147,35 @@ export async function readEntitlement(
 ): Promise<EntitlementReadResult> {
   const now = options.now ?? Date.now;
   const checkedAt = new Date(now()).toISOString();
+  // Emit the observability signal (#FU-54) then return the fail-closed
+  // free-tier result. Centralising it here means every `return` below
+  // that degrades to free is counted exactly once.
+  const emitFallback = (reason: string): EntitlementReadResult => {
+    const signal: EntitlementFallbackSignal = {
+      event: 'entitlements.fallback',
+      reason,
+      appUserId: typeof options.appUserId === 'string' ? options.appUserId : '',
+      checkedAt,
+    };
+    const sink = options.onFallback ?? defaultFallbackSink;
+    try {
+      sink(signal);
+    } catch {
+      // Observability must never break the fail-closed read.
+    }
+    return fallback(checkedAt, reason);
+  };
 
   if (typeof options.apiKey !== 'string' || options.apiKey.length === 0) {
-    return fallback(checkedAt, 'RevenueCat secret API key is not configured.');
+    return emitFallback('RevenueCat secret API key is not configured.');
   }
   if (typeof options.appUserId !== 'string' || options.appUserId.length === 0) {
-    return fallback(checkedAt, 'app_user_id is required to read entitlements.');
+    return emitFallback('app_user_id is required to read entitlements.');
   }
 
   const fetchImpl = options.fetch ?? (globalThis.fetch as RevenueCatFetch | undefined);
   if (typeof fetchImpl !== 'function') {
-    return fallback(checkedAt, 'fetch is not available in this runtime.');
+    return emitFallback('fetch is not available in this runtime.');
   }
 
   const baseUrl = options.baseUrl ?? REVENUECAT_API_BASE_URL;
@@ -127,22 +192,19 @@ export async function readEntitlement(
       },
     });
   } catch (cause) {
-    return fallback(checkedAt, `RevenueCat request failed: ${messageOf(cause)}`);
+    return emitFallback(`RevenueCat request failed: ${messageOf(cause)}`);
   }
 
   if (!response.ok) {
     const body = await safeText(response);
-    return fallback(
-      checkedAt,
-      `RevenueCat returned ${response.status}: ${truncate(body, 200)}`,
-    );
+    return emitFallback(`RevenueCat returned ${response.status}: ${truncate(body, 200)}`);
   }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(await response.text());
   } catch (cause) {
-    return fallback(checkedAt, `RevenueCat response was not valid JSON: ${messageOf(cause)}`);
+    return emitFallback(`RevenueCat response was not valid JSON: ${messageOf(cause)}`);
   }
 
   const proActive = isProEntitlementActive(parsed, now());
