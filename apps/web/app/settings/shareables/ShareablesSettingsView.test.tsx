@@ -1,9 +1,37 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const hoisted = vi.hoisted(() => ({
+  gate: {
+    result: { allowed: false, reason: 'requires_pro', feature: 'shareable_themes' },
+    isLoading: false,
+  } as GateState,
+}));
+
+vi.mock('../../../lib/gating/useGate', () => ({
+  useGate: () => hoisted.gate,
+  useLimitGate: () => hoisted.gate,
+}));
 
 import { createFakeSettingsApi, FAKE_SHAREABLE } from './fixtures';
 import { ShareablesSettingsView } from './ShareablesSettingsView';
 import { renderWithProviders } from '../../../test-utils/render';
+
+import type { GateState } from '../../../lib/gating/useGate';
+
+function setThemesPro(): void {
+  hoisted.gate = { result: { allowed: true }, isLoading: false };
+}
+function setThemesFree(): void {
+  hoisted.gate = {
+    result: { allowed: false, reason: 'requires_pro', feature: 'shareable_themes' },
+    isLoading: false,
+  };
+}
+
+beforeEach(() => {
+  setThemesFree();
+});
 
 describe('ShareablesSettingsView', () => {
   it('renders the page shell after loading the profile + shareables', async () => {
@@ -243,17 +271,50 @@ describe('ShareablesSettingsView', () => {
     expect(api.state.shareables[0]?.showPhotos).toBe(false);
   });
 
-  it('disables non-default theme options for free users', async () => {
+  it('locks non-default themes in the picker for free users', async () => {
     const api = createFakeSettingsApi();
     renderWithProviders(<ShareablesSettingsView api={api} />);
     await waitFor(() => {
-      expect(screen.getByTestId('shareable-row-theme-select')).toBeInTheDocument();
+      expect(screen.getByTestId('shareable-row-theme-picker')).toBeInTheDocument();
     });
-    const goldOpt = screen.getByTestId('shareable-row-theme-option-gold') as HTMLOptionElement;
-    expect(goldOpt.disabled).toBe(true);
-    expect(goldOpt.textContent).toContain('Pro');
-    const defaultOpt = screen.getByTestId('shareable-row-theme-option-default') as HTMLOptionElement;
-    expect(defaultOpt.disabled).toBe(false);
+    expect(
+      screen.getByTestId('shareable-row-theme-picker-option-gold').getAttribute('data-locked'),
+    ).toBe('true');
+    expect(
+      screen.getByTestId('shareable-row-theme-picker-option-default').getAttribute('data-locked'),
+    ).toBe('false');
+  });
+
+  it('shows the upgrade prompt and does not persist a Pro theme for free users', async () => {
+    const api = createFakeSettingsApi();
+    renderWithProviders(<ShareablesSettingsView api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('shareable-row-theme-picker-option-gold')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('shareable-row-theme-picker-option-gold'));
+    });
+    expect(screen.getByTestId('shareable-row-theme-picker-upgrade')).toBeInTheDocument();
+    expect(api.state.shareables[0]?.theme).toBe('default');
+  });
+
+  it('lets a pro user select and persist a Pro theme', async () => {
+    setThemesPro();
+    const api = createFakeSettingsApi();
+    renderWithProviders(<ShareablesSettingsView api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('shareable-row-theme-picker-option-gold')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('shareable-row-theme-picker-option-gold'));
+    });
+    const save = screen.getByTestId('shareable-row-save');
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    await waitFor(() => {
+      expect(api.state.shareables[0]?.theme).toBe('gold');
+    });
   });
 
   it('disables the "show collection value" toggle for free users', async () => {

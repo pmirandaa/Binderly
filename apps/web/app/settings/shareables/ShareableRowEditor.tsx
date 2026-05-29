@@ -3,18 +3,17 @@
 // Per-shareable row editor. Owns the local "draft" state for one
 // shareable: slug, theme, show toggles. Save dispatches the
 // optimistic update via the parent-supplied `onSave` callback;
-// delete dispatches through `onDelete`. All copy is intentionally
-// plain — themes are paid-only, so the dropdown lists the other
-// theme entries as disabled options with a "Pro" label rather than
-// hiding them (the visible-but-disabled treatment doubles as the
-// upsell surface T-SH-THEMES will replace).
+// delete dispatches through `onDelete`. The theme selector is the
+// pro-gated `<ThemePicker>` (T-SH-THEMES): free users can preview the
+// full gallery, but only Pro can apply a non-default theme.
 
 import { useMemo, useState } from 'react';
 
-import { SHAREABLE_THEMES, type ShareableDto, type ShareableTheme, type UpdateShareableRequest } from '@binderly/api-contracts';
+import { type ShareableDto, type ShareableTheme, type UpdateShareableRequest } from '@binderly/api-contracts';
 import { Button, Card, Input, Text, XStack, YStack } from '@binderly/ui';
 
 import { validateSlug } from './validation';
+import { ThemePicker } from '../../c/themes/ThemePicker';
 
 export interface ShareableRowEditorProps {
   shareable: ShareableDto;
@@ -23,7 +22,7 @@ export interface ShareableRowEditorProps {
   onSave: (id: string, patch: UpdateShareableRequest) => Promise<void>;
   /** Delete the shareable. Resolves after the row is removed. */
   onDelete: (id: string) => Promise<void>;
-  /** Initial "pro tier" gate for the theme dropdown. */
+  /** Initial "pro tier" gate for the per-shareable "show value" toggle. */
   isPro?: boolean;
   /** Test seam — pre-set the confirmation state to skip the first click. */
   defaultConfirmingDelete?: boolean;
@@ -130,30 +129,11 @@ export function ShareableRowEditor({
       />
 
       <YStack gap="$2" data-testid="shareable-row-theme-block">
-        <Text variant="caption">Theme</Text>
-        <select
+        <ThemePicker
           value={draft.theme}
-          onChange={(e) =>
-            setDraft((cur) => ({ ...cur, theme: e.target.value as ShareableTheme }))
-          }
-          data-testid="shareable-row-theme-select"
-          aria-label="Theme"
-        >
-          {SHAREABLE_THEMES.map((theme) => {
-            const isLocked = theme !== 'default' && !isPro;
-            return (
-              <option
-                key={theme}
-                value={theme}
-                disabled={isLocked}
-                data-testid={`shareable-row-theme-option-${theme}`}
-              >
-                {theme}
-                {isLocked ? ' (Pro)' : ''}
-              </option>
-            );
-          })}
-        </select>
+          onSelect={(next) => setDraft((cur) => ({ ...cur, theme: next }))}
+          testId="shareable-row-theme-picker"
+        />
       </YStack>
 
       <YStack gap="$2" data-testid="shareable-row-toggles">

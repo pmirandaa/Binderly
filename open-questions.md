@@ -1069,3 +1069,48 @@ The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`)
 **Proposed resolution → #FU-60 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-60 in `status.md`'s Known Follow-ups.
 
 **Status: open** (non-blocking; placeholder scaffold is sufficient until labelled cross-company data exists).
+
+---
+
+## Q-024 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
+
+**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-61)
+
+**Context.** T-SH-THEMES must force-render the `default` theme on the
+public page `/c/{handle}/{slug}` when the shareable's owner is NOT pro
+(so a downgraded owner's themed page reverts cleanly, server-side). The
+resolver is already written for this: `resolvePublicTheme(themeId,
+ownerIsPro)` returns `default` when `ownerIsPro === false`.
+
+**Problem.** The merged read path does not surface the owner's tier on
+the public payload. `PublicSharePayload` (`apps/web/lib/share/api.ts`)
+and `publicShareableDto` (`@binderly/api-contracts`) expose only
+`{ handle, displayName, avatarUrl, bio }` for the owner — no tier. The
+anonymous edge handler (`infra/supabase/functions/.../publicShareable`)
+resolves `(handle, slug) → (profile, shareable)` but never reads the
+owner's entitlement. Adding the tier requires a backend edge-function +
+contract change, which is outside T-SH-THEMES' `owns_paths`.
+
+**Options.**
+1. Add `owner.tier` (or `ownerIsPro: boolean`) to `publicShareableDto`
+   + the edge handler (entitlements read for the resolved owner).
+   `ShareableView` then passes it to `resolvePublicTheme`. (Recommended.)
+2. A dedicated `GET /v1/c/{handle}/{slug}/owner-tier` lookup. (Extra
+   round-trip; rejected.)
+
+**Interim shipped.** `ShareableView` calls
+`resolvePublicTheme(theme, null)` — renders the stored theme for
+everyone. The `ownerIsPro === false` downgrade branch is already wired,
+so once the payload carries the tier, flipping `null → ownerIsPro`
+enforces the downgrade with no further change to the theme system.
+
+**Recommendation.** Option 1, tracked by **T-BE-SHAREABLE-OWNER-TIER**
+(#FU-61). Settings-side gating (persisting a non-default theme) is
+already enforced via the `shareable_themes` gate, so the only gap is the
+public-render downgrade for an already-persisted theme after a
+downgrade. (Numbering: authored as Q-022, renumbered to **Q-024** at
+merge — Q-022 + #FU-58 were claimed by T-DP-EAS, #FU-59 by
+T-BE-READS-WRITES, Q-023 + #FU-60 by T-GR-DATA-HYGIENE at iter 34/35; the
+OG-theming wire-up is **#FU-62**, T-SH-OG-THEME-WIRE.)
+
+**Pablo's answer:** _(empty until answered)_

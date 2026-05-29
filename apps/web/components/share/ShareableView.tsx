@@ -12,6 +12,13 @@
 // `apiToShareApi(getApiClient())` lazily in
 // `<ShareableRoute>`.
 //
+// Theming (T-SH-THEMES): the stored `theme_id` is resolved through
+// `resolvePublicTheme` and the whole surface is wrapped in a
+// `<ShareableThemeProvider>` so the palette/font/header treatment
+// apply SSR-side. Header + empty-state colours read straight from the
+// resolved palette so they track the theme rather than the base UI
+// tokens.
+//
 // Why a `'use client'` component and not a true server
 // component: T-W-BROWSE / T-W-COLLECTION established that the
 // page entry-points stay `force-dynamic` server components that
@@ -27,6 +34,8 @@ import { useEffect, useState } from 'react';
 import { Button, Card, Text, XStack, YStack } from '@binderly/ui';
 
 import { MemberTile } from './MemberTile';
+import { resolvePublicTheme, type Theme } from '../../app/c/themes/registry';
+import { ShareableThemeProvider } from '../../app/c/themes/ShareableThemeProvider';
 import {
   formatCardTally,
   formatLastUpdated,
@@ -178,128 +187,153 @@ export function ShareableView({
   const { owner, counts, members, collectionTitle, description, lastUpdatedAt } = payload;
   const ownerLabel = owner.displayName ?? `@${owner.handle}`;
   const hasCounts = counts.catalogTotal > 0;
+  // Free-tier enforcement lives in `resolvePublicTheme`. INTERIM
+  // (Q-022 / FU T-BE-SHAREABLE-OWNER-TIER): the public payload does
+  // not yet carry the owner's tier, so we pass `ownerIsPro = null`
+  // and render the stored theme for everyone. The downgrade branch
+  // already fires for `ownerIsPro === false`, so the day the backend
+  // surfaces that field this enforces itself with no change here.
+  const theme: Theme = resolvePublicTheme(payload.shareable.theme, null);
 
   return (
-    <YStack
-      padding="$6"
-      gap="$5"
-      maxWidth={1100}
-      marginHorizontal="auto"
-      data-testid="share-page"
-    >
-      <YStack gap="$2" data-testid="share-header">
-        <Text variant="caption" tone="muted" data-testid="share-header-owner">
-          {ownerLabel} · @{owner.handle}
-        </Text>
-        <Text variant="title" data-testid="share-header-title">
-          {collectionTitle}
-        </Text>
-        {description !== null ? (
-          <Text variant="body" tone="muted" data-testid="share-header-description">
-            {description}
-          </Text>
-        ) : null}
-        <Text variant="caption" tone="muted" data-testid="share-header-updated">
-          Last updated {formatLastUpdated(lastUpdatedAt, now)}
-        </Text>
-      </YStack>
-
-      <Card
-        variant="outlined"
-        padding="$5"
-        gap="$3"
-        data-testid="share-summary"
+    <ShareableThemeProvider theme={theme}>
+      <YStack
+        padding="$6"
+        gap="$5"
+        maxWidth={1100}
+        marginHorizontal="auto"
+        data-testid="share-page"
       >
-        <Text variant="subtitle">Collection snapshot</Text>
-        {hasCounts ? (
-          <XStack gap="$5" flexWrap="wrap">
-            <SummaryStat
-              label="Cards owned"
-              value={formatCardTally(counts.ownedUnique, counts.catalogTotal)}
-              testId="share-summary-tally"
-            />
-            <SummaryStat
-              label="Completion"
-              value={formatPercent(counts.completionPct)}
-              testId="share-summary-completion"
-            />
-            {counts.ownedTotalQuantity !== counts.ownedUnique ? (
-              <SummaryStat
-                label="Total copies"
-                value={String(counts.ownedTotalQuantity)}
-                testId="share-summary-quantity"
-              />
-            ) : null}
-          </XStack>
-        ) : (
-          <Text variant="body" tone="muted" data-testid="share-summary-empty">
-            {formatOwnedShort(counts.ownedUnique)}
-          </Text>
-        )}
-      </Card>
-
-      <YStack gap="$4" data-testid="share-member-grid">
-        <Text variant="subtitle">
-          Cards in this shareable ({members.length})
-        </Text>
-        {members.length === 0 ? (
-          <YStack
-            padding="$5"
-            gap="$2"
-            backgroundColor="$surfaceMuted"
-            borderRadius={12}
-            data-testid="share-member-empty"
+        <YStack gap="$2" data-testid="share-header">
+          <Text
+            variant="caption"
+            style={{ color: theme.palette.textMuted }}
+            data-testid="share-header-owner"
           >
-            <Text variant="body" tone="muted">
-              The owner hasn&apos;t added any cards to this shareable yet.
+            {ownerLabel} · @{owner.handle}
+          </Text>
+          <Text
+            variant="title"
+            style={{ color: theme.palette.text }}
+            data-testid="share-header-title"
+          >
+            {collectionTitle}
+          </Text>
+          {description !== null ? (
+            <Text
+              variant="body"
+              style={{ color: theme.palette.textMuted }}
+              data-testid="share-header-description"
+            >
+              {description}
             </Text>
-          </YStack>
-        ) : (
-          <XStack
-            gap="$3"
-            flexWrap="wrap"
-            data-testid="share-member-list"
+          ) : null}
+          <Text
+            variant="caption"
+            style={{ color: theme.palette.textMuted }}
+            data-testid="share-header-updated"
           >
-            {members.map((member) => (
-              <YStack
-                key={member.printingId}
-                width={180}
-                data-testid="share-member-cell"
-              >
-                <MemberTile member={member} />
-              </YStack>
-            ))}
-          </XStack>
-        )}
-      </YStack>
-
-      <Card
-        variant="outlined"
-        padding="$4"
-        gap="$2"
-        data-testid="share-footer"
-      >
-        <Text variant="bodySmall" tone="muted" data-testid="share-footer-url">
-          {publicShareUrl(handle, slug)}
-        </Text>
-        <XStack gap="$3" alignItems="center" flexWrap="wrap">
-          <Text variant="body" tone="muted">
-            Powered by Binderly — your collection, your way.
+            Last updated {formatLastUpdated(lastUpdatedAt, now)}
           </Text>
-          <Link
-            href="/auth/sign-in?signup=1"
-            style={{ textDecoration: 'none' }}
-            data-testid="share-signup-link"
-          >
-            <Button
-              label="Sign up free →"
-              aria-label="Sign up free to build your own shareable"
-              data-testid="share-signup-button"
-            />
-          </Link>
-        </XStack>
-      </Card>
-    </YStack>
+        </YStack>
+
+        <Card
+          variant="outlined"
+          padding="$5"
+          gap="$3"
+          data-testid="share-summary"
+        >
+          <Text variant="subtitle">Collection snapshot</Text>
+          {hasCounts ? (
+            <XStack gap="$5" flexWrap="wrap">
+              <SummaryStat
+                label="Cards owned"
+                value={formatCardTally(counts.ownedUnique, counts.catalogTotal)}
+                testId="share-summary-tally"
+              />
+              <SummaryStat
+                label="Completion"
+                value={formatPercent(counts.completionPct)}
+                testId="share-summary-completion"
+              />
+              {counts.ownedTotalQuantity !== counts.ownedUnique ? (
+                <SummaryStat
+                  label="Total copies"
+                  value={String(counts.ownedTotalQuantity)}
+                  testId="share-summary-quantity"
+                />
+              ) : null}
+            </XStack>
+          ) : (
+            <Text variant="body" tone="muted" data-testid="share-summary-empty">
+              {formatOwnedShort(counts.ownedUnique)}
+            </Text>
+          )}
+        </Card>
+
+        <YStack gap="$4" data-testid="share-member-grid">
+          <Text variant="subtitle" style={{ color: theme.palette.text }}>
+            Cards in this shareable ({members.length})
+          </Text>
+          {members.length === 0 ? (
+            <YStack
+              padding="$5"
+              gap="$2"
+              borderRadius={12}
+              style={{ backgroundColor: theme.palette.surfaceMuted }}
+              data-testid="share-member-empty"
+            >
+              <Text variant="body" style={{ color: theme.palette.textMuted }}>
+                The owner hasn&apos;t added any cards to this shareable yet.
+              </Text>
+            </YStack>
+          ) : (
+            <XStack
+              gap="$3"
+              flexWrap="wrap"
+              data-testid="share-member-list"
+            >
+              {members.map((member) => (
+                <YStack
+                  key={member.printingId}
+                  width={180}
+                  data-testid="share-member-cell"
+                >
+                  <MemberTile member={member} />
+                </YStack>
+              ))}
+            </XStack>
+          )}
+        </YStack>
+
+        <Card
+          variant="outlined"
+          padding="$4"
+          gap="$2"
+          data-testid="share-footer"
+        >
+          <Text variant="bodySmall" tone="muted" data-testid="share-footer-url">
+            {publicShareUrl(handle, slug)}
+          </Text>
+          <XStack gap="$3" alignItems="center" flexWrap="wrap">
+            <Text variant="body" tone="muted">
+              Powered by Binderly — your collection, your way.
+            </Text>
+            <Link
+              href="/auth/sign-in?signup=1"
+              style={{ textDecoration: 'none' }}
+              data-testid="share-signup-link"
+            >
+              <Button
+                label="Sign up free →"
+                aria-label="Sign up free to build your own shareable"
+                data-testid="share-signup-button"
+              />
+            </Link>
+          </XStack>
+        </Card>
+      </YStack>
+    </ShareableThemeProvider>
   );
 }
 
