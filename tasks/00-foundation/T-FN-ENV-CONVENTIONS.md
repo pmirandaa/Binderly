@@ -3,7 +3,7 @@
 **Stage:** 00-foundation
 **Agent role:** devops
 **Effort:** S
-**Status:** pending
+**Status:** merged
 
 ## Hard dependencies
 - T-FN-DOCKER
