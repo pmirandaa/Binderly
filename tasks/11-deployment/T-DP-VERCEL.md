@@ -3,83 +3,67 @@
 **Stage:** 11-deployment
 **Agent role:** devops
 **Effort:** S
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
+**Status:** merged
 
----
+## Hard dependencies
+- T-W-SHELL (merged — the Next.js app shell being deployed)
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 4 (Infra & Deployment), § 17 (Build Phases)) and any
->    referenced sections.
-> 2. Read `rules/11-deployment.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-DP-VERCEL`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+## Soft dependencies
+- T-DP-SUPABASE-PROD (the prod Supabase URL/anon key the web build reads)
+- T-DP-R2-PROD (the prod R2 public base URL the web reads for catalog images)
 
----
-
-## Provisional metadata (from `dependencies.yaml`)
-
-**Hard dependencies:**
-
-- T-W-SHELL
-
-**Parallel-safe with:** T-DP-FLY, T-DP-SUPABASE-PROD, T-DP-R2-PROD
-
-**Owns paths:**
-
-- `apps/web/vercel.json`
-- `.github/workflows/deploy-web.yml`
-
-## Provisional goal
-
-Vercel deployment for web.
-
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
-
-## Provisional reading list
-
-- PROJECT.md § 4 (Infra & Deployment), § 17 (Build Phases)
+## Required reading
+- PROJECT.md § 3 (Tech Stack — "Deploys (web) | Vercel"), § 4 (Infra & Deployment)
 - rules/11-deployment.md
-- (context files added at elaboration time based on the stage rules)
+- apps/web/package.json, apps/web/next.config.mjs, apps/web/lib/env.ts (env contract)
+- .github/workflows/ci.yml (the pnpm/corepack setup block this workflow reuses)
+
+## Goal
+Stand up the production Vercel deployment for `@binderly/web` (Next.js 15
+App Router inside the pnpm + turbo monorepo). Ship the Vercel project
+config and a `deploy-web` GitHub Actions workflow that deploys on merge to
+`main` (web-path-filtered) and on manual dispatch. Because Pablo has not yet
+provisioned the Vercel account/token, the live deploy step is **guarded on
+`secrets.VERCEL_TOKEN`** and no-ops cleanly until provisioned — everything
+else (config, workflow YAML, env documentation) ships now.
+
+## Deliverables
+- `apps/web/vercel.json` — framework `nextjs`, monorepo-aware install/build
+  commands (`pnpm install` / `turbo run build --filter=@binderly/web...`),
+  `outputDirectory` `.next`, region, and a documented env-var contract.
+- `.github/workflows/deploy-web.yml` — push-to-`main` (web paths) +
+  `workflow_dispatch`; Vercel CLI deploy guarded on `VERCEL_TOKEN` presence.
+- Env-var contract documented in the consolidated `infra/DEPLOYMENT_SECRETS.md`.
+
+## Acceptance criteria
+- [ ] `apps/web/vercel.json` is valid JSON and sets framework, build/install
+      commands targeting `@binderly/web` and its workspace deps, and output dir.
+- [ ] `deploy-web.yml` is valid YAML, triggers on `push` to `main` filtered to
+      web-relevant paths plus `workflow_dispatch`.
+- [ ] The live deploy job is gated so it is skipped (not failed) when
+      `VERCEL_TOKEN` is absent — CI never goes red for a missing secret.
+- [ ] Every env var the web app reads (`NEXT_PUBLIC_*` + server Paddle/Supabase
+      vars) is enumerated in `infra/DEPLOYMENT_SECRETS.md`.
+- [ ] No changes outside `owns_paths` (+ shared `infra/DEPLOYMENT_SECRETS.md`).
+
+## Out of scope
+- Provisioning the real Vercel project / token (Pablo, at go-live).
+- Sentry source-map upload wiring (T-DP-MONITORING).
+- Preview/staging environment tuning beyond documenting it exists.
 
 ## Branch & PR
-
-- Branch: `agent/T-DP-VERCEL`
-- PR title: `T-DP-VERCEL: Vercel deployment for web`
+- Branch: `agent/T-DP-INFRA` (shipped as part of the Stage 11 cluster)
+- PR title: `feat(deploy): T-DP-VERCEL/FLY/SUPABASE-PROD/R2-PROD — Stage 11 deployment scaffolding (secrets pending)`
+- Commit format: Conventional Commits
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+Shipped via the cluster PR. The web app reads `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` (required), `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`,
+`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_TCGPLAYER_AFFILIATE_ID`, the
+`NEXT_PUBLIC_PADDLE_*` client vars, and the server-only `PADDLE_API_KEY` /
+`PADDLE_WEBHOOK_SECRET` / `SUPABASE_SERVICE_ROLE_KEY` / `SUPABASE_URL`. The
+deploy uses the **Vercel CLI** (`vercel deploy --prod`) driven from CI rather
+than Vercel's native Git integration so the monorepo build command and turbo
+filter stay in version control and the deploy stays gated on a CI-managed
+token. Inert until `VERCEL_TOKEN` + `VERCEL_ORG_ID` + `VERCEL_PROJECT_ID` are
+added to GitHub secrets — see `infra/DEPLOYMENT_SECRETS.md`.

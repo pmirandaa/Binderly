@@ -1,0 +1,12 @@
+[
+  {
+    "AllowedOrigins": [
+      "https://binderly.app",
+      "https://www.binderly.app"
+    ],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["Range", "If-Match", "If-None-Match", "If-Modified-Since"],
+    "ExposeHeaders": ["Content-Length", "Content-Type", "ETag", "Cache-Control", "Content-Range", "Accept-Ranges"],
+    "MaxAgeSeconds": 86400
+  }
+]

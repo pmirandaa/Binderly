@@ -1,0 +1,16 @@
+{
+  "Rules": [
+    {
+      "ID": "abort-incomplete-multipart-uploads",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "" },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 7 }
+    },
+    {
+      "ID": "retain-catalog-images-indefinitely",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "printings/" },
+      "Comment": "Catalog images are content, not transient data — no expiration. The pipeline overwrites the same deterministic keys on re-run, so storage is bounded by catalog size, not run count."
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+# Production database migrations → Supabase Postgres.
+#
+# Applies pending Drizzle SQL migrations to the production database on merge
+# to `main` (when migration sources change) and on manual dispatch. Uses the
+# repo's `pnpm db:migrate` (drizzle-orm postgres-js migrator via
+# packages/db/scripts/migrate.ts) — the SAME additive, journal-tracked path
+# used locally. NEVER `db reset` / `drizzle-kit push`:
+#   - idempotent: the drizzle journal table skips already-applied migrations.
+#   - non-destructive: forward-only; no auto-reset, no drop.
+#
+# Per rules/11-deployment.md: "Migrations run before app deploy." This
+# workflow is the migrate step; the web/Fly deploys are separate workflows.
+# At go-live, sequence merges (or use workflow_dispatch) so this lands first.
+#
+# SCAFFOLDING MODE (Stage 11): the migrate job is GUARDED on the presence of
+# `secrets.PROD_DATABASE_URL`. Until Pablo provisions the prod Supabase
+# project + DB connection string (see infra/DEPLOYMENT_SECRETS.md), the
+# `migrate` job is SKIPPED — never failed.
+
+name: Deploy / DB migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "packages/db/src/migrations/**"
+      - "packages/db/scripts/migrate.ts"
+      - ".github/workflows/deploy-db.yml"
+  workflow_dispatch:
+
+concurrency:
+  # Never cancel an in-flight migration — let it finish to keep the journal
+  # consistent.
+  group: deploy-db
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: guard (secret presence)
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          PROD_DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          if [ -n "$PROD_DATABASE_URL" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "PROD_DATABASE_URL present — migrations will be applied."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::PROD_DATABASE_URL not set — skipping prod migrations (Stage 11 scaffolding mode). See infra/DEPLOYMENT_SECRETS.md."
+          fi
+
+  migrate:
+    name: migrate (pnpm db:migrate)
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      # packages/db/scripts/migrate.ts resolves the target from
+      # --url > DATABASE_URL > SUPABASE_DB_URL. We feed the prod connection
+      # string via DATABASE_URL. Use the SESSION (port 5432) or the pooler
+      # connection string per infra/supabase/production/migration-runbook.md.
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      TURBO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable Corepack and activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          pnpm --version
+      - name: Resolve pnpm store path
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Apply pending migrations to production
+        run: pnpm db:migrate

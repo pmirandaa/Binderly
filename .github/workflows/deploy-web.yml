@@ -1,0 +1,105 @@
+# Production deploy for the Next.js web app (@binderly/web) → Vercel.
+#
+# Deploy strategy: we drive Vercel via its CLI from CI (NOT Vercel's native
+# Git integration). Why CLI:
+#   - The monorepo build command + turbo filter (`--filter=@binderly/web...`)
+#     live in version control (apps/web/vercel.json) instead of the Vercel
+#     dashboard, so the deploy is reproducible and reviewable.
+#   - The deploy gate (CI green on main) is enforced here, in one place, the
+#     same way the other Stage 11 deploy workflows are.
+#   - `apps/web/vercel.json` sets `github.enabled: false` so the two
+#     mechanisms can't race.
+#
+# SCAFFOLDING MODE (Stage 11): the live deploy is GUARDED on the presence of
+# `secrets.VERCEL_TOKEN`. Until Pablo provisions the Vercel project + token
+# (see infra/DEPLOYMENT_SECRETS.md), the `deploy` job is SKIPPED — never
+# failed — so this workflow is inert and green. The moment the three Vercel
+# secrets are added, deploys go live with no YAML change.
+
+name: Deploy / Web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-web.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate: emit `enabled=true` only when the Vercel token secret is present.
+  # Secrets can't be referenced in job-level `if:` directly, so we read the
+  # secret into a step env var and surface a boolean output the deploy job
+  # depends on. Absent secret → enabled=false → deploy job is skipped.
+  guard:
+    name: guard (secret presence)
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -n "$VERCEL_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "VERCEL_TOKEN present — live deploy will run."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN not set — skipping live web deploy (Stage 11 scaffolding mode). See infra/DEPLOYMENT_SECRETS.md."
+          fi
+
+  deploy:
+    name: deploy (vercel --prod)
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      TURBO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable Corepack and activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          pnpm --version
+      - name: Resolve pnpm store path
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Vercel CLI
+        run: npm install --global vercel@39
+      - name: Pull Vercel project settings (production)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        working-directory: apps/web
+      - name: Build (Vercel)
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+        working-directory: apps/web
+      - name: Deploy prebuilt output to production
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
+        working-directory: apps/web
