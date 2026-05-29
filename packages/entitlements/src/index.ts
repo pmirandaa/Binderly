@@ -26,10 +26,13 @@ export {
 export { canUseFeature, withinFreeLimit } from './can.js';
 
 export {
+  defaultFallbackSink,
   featuresForTier,
   isProEntitlementActive,
   readEntitlement,
   REVENUECAT_API_BASE_URL,
+  type EntitlementFallbackHook,
+  type EntitlementFallbackSignal,
   type EntitlementReadResult,
   type ReadEntitlementOptions,
   type RevenueCatFetch,

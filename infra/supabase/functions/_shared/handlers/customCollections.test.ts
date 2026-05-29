@@ -399,6 +399,86 @@ describe('GET /v1/me/custom-collections/:id/items', () => {
   });
 });
 
+describe('GET /v1/me/custom-collections/:id/items/:printingId — single-GET (#FU-49)', () => {
+  it('returns the single membership row', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        custom_collection: [
+          { data: { id: FIXTURE_CUSTOM_COLLECTION_ID, user_id: FIXTURE_USER_ID }, error: null },
+        ],
+        custom_collection_item: [
+          {
+            data: {
+              custom_collection_id: FIXTURE_CUSTOM_COLLECTION_ID,
+              printing_id: FIXTURE_PRINTING_ID,
+              added_at: '2024-06-02T12:00:00.000Z',
+            },
+            error: null,
+          },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/custom-collections/${FIXTURE_CUSTOM_COLLECTION_ID}/items/${FIXTURE_PRINTING_ID}`,
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const data = await readSuccessBody<{ customCollectionId: string; printingId: string }>(
+      response,
+    );
+    expect(data.customCollectionId).toBe(FIXTURE_CUSTOM_COLLECTION_ID);
+    expect(data.printingId).toBe(FIXTURE_PRINTING_ID);
+  });
+
+  it('returns 404 when the membership row is absent', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        custom_collection: [
+          { data: { id: FIXTURE_CUSTOM_COLLECTION_ID, user_id: FIXTURE_USER_ID }, error: null },
+        ],
+        custom_collection_item: [{ data: null, error: null }],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/custom-collections/${FIXTURE_CUSTOM_COLLECTION_ID}/items/${FIXTURE_PRINTING_ID}`,
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(response.status).toBe(404);
+    const body = await readErrorBody(response);
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('returns 403 when the caller does not own the parent collection', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        custom_collection: [
+          {
+            data: { id: FIXTURE_CUSTOM_COLLECTION_ID, user_id: FIXTURE_OTHER_USER_ID },
+            error: null,
+          },
+        ],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/custom-collections/${FIXTURE_CUSTOM_COLLECTION_ID}/items/${FIXTURE_PRINTING_ID}`,
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(response.status).toBe(403);
+  });
+});
+
 describe('POST /v1/me/custom-collections/:id/items', () => {
   it('adds a printing and returns 201', async () => {
     const fake = createFakeSupabase({

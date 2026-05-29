@@ -292,6 +292,44 @@ export async function handleListCustomCollectionItems(
   return apiOk(request, ctx.cors, ctx.requestId, rows.map(customCollectionItemToWire));
 }
 
+/**
+ * Single-item read for a manual-collection membership row (single-GET,
+ * #FU-49). Closes the second half of the Q-019 gap (the
+ * `getCustomCollectionItem({ customCollectionId, printingId })` the
+ * api-client lacked). Ownership is gated on the parent collection; the
+ * membership row itself is keyed `(custom_collection_id, printing_id)`.
+ * An absent membership yields `NOT_FOUND`.
+ */
+export async function handleGetCustomCollectionItem(
+  request: Request,
+  match: RouteMatch,
+  ctx: HandlerContext,
+): Promise<Response> {
+  const session = await requireUser(request, ctx.env, ctx.deps);
+  const customCollectionId = requireParam(match, 'id');
+  const printingId = requireParam(match, 'printingId');
+  await assertOwnership(session, CUSTOM_COLLECTION_TABLE, customCollectionId, 'custom_collection');
+  const { data, error } = await session.supabase
+    .from(CUSTOM_COLLECTION_ITEM_TABLE)
+    .select('*')
+    .eq('custom_collection_id', customCollectionId)
+    .eq('printing_id', printingId)
+    .maybeSingle();
+  if (error !== null) throw translatePostgrestError(error);
+  if (data === null) {
+    throw new ApiError(
+      'NOT_FOUND',
+      `Printing ${printingId} not in collection ${customCollectionId}.`,
+    );
+  }
+  return apiOk(
+    request,
+    ctx.cors,
+    ctx.requestId,
+    customCollectionItemToWire(data as CustomCollectionItemRow),
+  );
+}
+
 export async function handleAddPrintingToCustomCollection(
   request: Request,
   match: RouteMatch,

@@ -52,6 +52,17 @@ export interface CollectionResource {
     options?: ListCollectionItemsOptions,
   ) => Promise<PaginatedResponse<CollectionItemDto>>;
   /**
+   * Fetch a single `collection_item` by id (single-GET, #FU-49).
+   * Closes the Q-019 gap where consumers had to re-page the list or
+   * reach around the API to hydrate one row. A row that doesn't exist
+   * — or isn't owned by the caller (RLS) — yields an
+   * {@link ApiNotFoundError} (HTTP 404).
+   */
+  readonly getCollectionItem: (input: {
+    readonly id: string;
+    readonly signal?: AbortSignal;
+  }) => Promise<CollectionItemDto>;
+  /**
    * Authoritative server-side completion math — Set %, Master %,
    * All Pokémon %. Replaces the iter-17/18 client-side fanout
    * stop-gap (`apps/mobile/src/lib/collection/completion.ts` +
@@ -99,6 +110,18 @@ export interface CollectionResource {
     readonly customCollectionId: string;
     readonly signal?: AbortSignal;
   }) => Promise<CustomCollectionItemDto[]>;
+  /**
+   * Fetch a single manual-collection membership row by
+   * `(customCollectionId, printingId)` (single-GET, #FU-49). The second
+   * half of the Q-019 single-GET gap. A row that doesn't exist — or a
+   * collection not owned by the caller — yields an
+   * {@link ApiNotFoundError} (HTTP 404).
+   */
+  readonly getCustomCollectionItem: (input: {
+    readonly customCollectionId: string;
+    readonly printingId: string;
+    readonly signal?: AbortSignal;
+  }) => Promise<CustomCollectionItemDto>;
   readonly addPrintingToCustomCollection: (input: {
     readonly customCollectionId: string;
     readonly body: AddPrintingToCustomCollectionRequest;
@@ -137,6 +160,17 @@ export function makeCollectionResource(http: HttpClient): CollectionResource {
           ...(options.signal !== undefined ? { signal: options.signal } : {}),
         },
         collectionItemListSchema,
+      );
+    },
+
+    async getCollectionItem({ id, signal }): Promise<CollectionItemDto> {
+      return http.request(
+        {
+          path: `/v1/me/collection/${encodeURIComponent(id)}`,
+          method: 'GET',
+          ...(signal !== undefined ? { signal } : {}),
+        },
+        collectionItemDto,
       );
     },
 
@@ -264,6 +298,21 @@ export function makeCollectionResource(http: HttpClient): CollectionResource {
           ...(signal !== undefined ? { signal } : {}),
         },
         customCollectionItemArraySchema,
+      );
+    },
+
+    async getCustomCollectionItem({
+      customCollectionId,
+      printingId,
+      signal,
+    }): Promise<CustomCollectionItemDto> {
+      return http.request(
+        {
+          path: `/v1/me/custom-collections/${encodeURIComponent(customCollectionId)}/items/${encodeURIComponent(printingId)}`,
+          method: 'GET',
+          ...(signal !== undefined ? { signal } : {}),
+        },
+        customCollectionItemDto,
       );
     },
 
