@@ -235,6 +235,24 @@ export function ShareableView({
           >
             Last updated {formatLastUpdated(lastUpdatedAt, now)}
           </Text>
+          {owner.socialLinks.length > 0 ? (
+            <XStack gap="$3" flexWrap="wrap" data-testid="share-header-social-links">
+              {owner.socialLinks.map((link, index) => (
+                <Link
+                  key={`${link.url}-${index}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  style={{ textDecoration: 'none' }}
+                  data-testid={`share-social-link-${index}`}
+                >
+                  <Text variant="bodySmall" style={{ color: theme.palette.text }}>
+                    {link.label}
+                  </Text>
+                </Link>
+              ))}
+            </XStack>
+          ) : null}
         </YStack>
 
         <Card

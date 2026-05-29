@@ -164,6 +164,41 @@ export const profilePreferencesSchema = z
 export type ProfilePreferences = z.infer<typeof profilePreferencesSchema>;
 
 // ============================================================
+// Social links — owner-level "link in bio" list (#FU-51)
+// ============================================================
+
+/**
+ * Cap on the number of social links an owner can attach to their
+ * profile. Links are owner-level (stored on `profile`, not on an
+ * individual `shareable`) so they render in the header of every
+ * public shareable the owner publishes — the conventional
+ * "link in bio" model.
+ */
+export const SOCIAL_LINKS_MAX = 8;
+
+/**
+ * A single owner social link. `label` is the human-facing caption
+ * (e.g. "Twitter", "My shop"); `url` must be an absolute http(s)
+ * URL — validated here so a bad link can never be persisted.
+ */
+export const socialLinkSchema = z
+  .object({
+    label: z.string().trim().min(1).max(30),
+    url: z.string().url().max(2048),
+  })
+  .strict();
+export type SocialLink = z.infer<typeof socialLinkSchema>;
+
+/**
+ * The owner's ordered list of social links. Bounded by
+ * {@link SOCIAL_LINKS_MAX}; an empty array is the "no links"
+ * sentinel (the DB column is nullable jsonb — readers coerce
+ * `null` to `[]`).
+ */
+export const socialLinksSchema = z.array(socialLinkSchema).max(SOCIAL_LINKS_MAX);
+export type SocialLinks = z.infer<typeof socialLinksSchema>;
+
+// ============================================================
 // Profile — read DTO
 // ============================================================
 
@@ -186,6 +221,12 @@ export const profileDto = z
     displayName: z.string().nullable(),
     avatarUrl: z.string().url().nullable(),
     bio: z.string().nullable(),
+    /**
+     * Owner social links (#FU-51). Defaults to `[]` so a profile
+     * read from a row whose nullable `social_links_json` column is
+     * NULL parses cleanly.
+     */
+    socialLinks: socialLinksSchema.default([]),
     preferences: profilePreferencesSchema,
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
@@ -212,6 +253,8 @@ export const updateProfileRequest = z
     displayName: z.string().max(80).nullish(),
     avatarUrl: z.string().url().nullish(),
     bio: z.string().max(280).nullish(),
+    /** Replace the owner's social-link list wholesale (#FU-51). */
+    socialLinks: socialLinksSchema.optional(),
     preferences: profilePreferencesSchema.optional(),
   })
   .strict()

@@ -53,6 +53,12 @@ export const shareable = pgTable(
     slug: text('slug').notNull(),
     target: jsonb('target').notNull(),
     theme: text('theme').notNull().default('default'),
+    // Kill switch (#FU-50). When false the public render endpoint
+    // 404s and the slug-gated anon read policy hides the row; the
+    // owner still sees it in their settings list. The hand-authored
+    // companion migration `0027_shareable_owner_config.sql` adds the
+    // column + folds `is_active = true` into the public-read policy.
+    isActive: boolean('is_active').notNull().default(true),
     showValues: boolean('show_values').notNull().default(false),
     showMissing: boolean('show_missing').notNull().default(true),
     showPhotos: boolean('show_photos').notNull().default(false),

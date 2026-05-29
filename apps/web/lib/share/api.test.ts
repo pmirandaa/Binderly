@@ -37,6 +37,7 @@ function makeRichPayload(
       displayName: 'Pablo Miranda',
       avatarUrl: 'https://images.binderly.app/avatars/pablo.webp',
       bio: 'Collecting since Base Set.',
+      socialLinks: [],
     },
     collectionTitle: "Pablo's collection",
     description: 'My all-time favourites.',

@@ -34,6 +34,19 @@ describe('profile.getMyProfile', () => {
     expect(p.handle).toBe('pablo');
   });
 
+  it('surfaces owner social links (#FU-51)', async () => {
+    const { profile } = makeResource(mockFetch({ status: 200, body: okEnvelope(VALID_PROFILE) }));
+    const p = await profile.getMyProfile();
+    expect(p.socialLinks).toEqual([{ label: 'Twitter', url: 'https://twitter.com/pablo' }]);
+  });
+
+  it('defaults socialLinks to [] when the wire omits the key', async () => {
+    const { socialLinks: _drop, ...withoutLinks } = VALID_PROFILE;
+    const { profile } = makeResource(mockFetch({ status: 200, body: okEnvelope(withoutLinks) }));
+    const p = await profile.getMyProfile();
+    expect(p.socialLinks).toEqual([]);
+  });
+
   it('hits GET /v1/me/profile', async () => {
     const { fetch, profile } = makeResource(
       mockFetch({ status: 200, body: okEnvelope(VALID_PROFILE) }),

@@ -94,6 +94,7 @@ export function ShareablesSettingsScreen({ api }: ShareablesSettingsScreenProps)
         ...(patch.handle !== undefined ? { handle: patch.handle } : {}),
         ...(patch.displayName !== undefined ? { displayName: patch.displayName ?? null } : {}),
         ...(patch.bio !== undefined ? { bio: patch.bio ?? null } : {}),
+        ...(patch.socialLinks !== undefined ? { socialLinks: patch.socialLinks } : {}),
       };
       setState((s) => (s.kind === 'ready' ? { ...s, profile: optimistic } : s));
       try {
@@ -118,6 +119,7 @@ export function ShareablesSettingsScreen({ api }: ShareablesSettingsScreenProps)
               ...(patch.slug !== undefined ? { slug: patch.slug } : {}),
               ...(patch.target !== undefined ? { target: patch.target } : {}),
               ...(patch.theme !== undefined ? { theme: patch.theme } : {}),
+              ...(patch.isActive !== undefined ? { isActive: patch.isActive } : {}),
               ...(patch.showValues !== undefined ? { showValues: patch.showValues } : {}),
               ...(patch.showMissing !== undefined ? { showMissing: patch.showMissing } : {}),
               ...(patch.showPhotos !== undefined ? { showPhotos: patch.showPhotos } : {}),

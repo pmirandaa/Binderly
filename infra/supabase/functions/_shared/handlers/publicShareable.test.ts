@@ -168,6 +168,7 @@ interface PublicShareableWire {
     displayName: string | null;
     avatarUrl: string | null;
     bio: string | null;
+    socialLinks: ReadonlyArray<{ label: string; url: string }>;
   };
   collectionTitle: string;
   description: string | null;
@@ -244,6 +245,36 @@ describe('GET /v1/c/:handle/:slug (default Accept)', () => {
     expect(response.status).toBe(404);
   });
 
+  it('returns 404 when the shareable is unpublished (is_active = false) (#FU-50)', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        profile: [{ data: profileRow(), error: null }],
+        shareable: [{ data: shareableRow({ is_active: false }), error: null }],
+      },
+    });
+    const response = await makeHandlerWithFake(fake)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, { method: 'GET' }),
+    );
+    expect(response.status).toBe(404);
+    const body = await readErrorBody(response);
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('serves an active shareable and surfaces isActive on the wire', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        profile: [{ data: profileRow(), error: null }],
+        shareable: [{ data: shareableRow({ is_active: true }), error: null }],
+      },
+    });
+    const response = await makeHandlerWithFake(fake)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, { method: 'GET' }),
+    );
+    expect(response.status).toBe(200);
+    const body = await readSuccessBody<ShareableWire & { isActive: boolean }>(response);
+    expect(body.isActive).toBe(true);
+  });
+
   it('honors x-request-id propagation', async () => {
     const fake = createFakeSupabase({
       tableResponses: {
@@ -293,6 +324,44 @@ describe('GET /v1/c/:handle/:slug (rich Accept header)', () => {
     expect(body.collectionTitle).toBe("Pablo's collection");
     expect(body.counts.ownedUnique).toBe(2);
     expect(body.counts.ownedTotalQuantity).toBe(3);
+  });
+
+  it('surfaces the owner social links in the rich payload (#FU-51)', async () => {
+    const fake = makeFullShareFake({
+      profile: {
+        ...profileRow(),
+        social_links_json: [
+          { label: 'Twitter', url: 'https://twitter.com/pablo' },
+          { label: 'Shop', url: 'https://shop.example.com' },
+          // Defensive: malformed entries are dropped, not surfaced.
+          { label: '', url: 'https://bad.example.com' },
+          { nope: true },
+        ],
+      },
+    });
+    const response = await makeHandlerWithFake(fake)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, {
+        method: 'GET',
+        headers: { accept: RICH_ACCEPT },
+      }),
+    );
+    const body = await readSuccessBody<PublicShareableWire>(response);
+    expect(body.owner.socialLinks).toEqual([
+      { label: 'Twitter', url: 'https://twitter.com/pablo' },
+      { label: 'Shop', url: 'https://shop.example.com' },
+    ]);
+  });
+
+  it('defaults owner social links to [] when the column is null', async () => {
+    const fake = makeFullShareFake({ profile: { ...profileRow(), social_links_json: null } });
+    const response = await makeHandlerWithFake(fake)(
+      new Request(`http://localhost/v1/c/${HANDLE}/${SLUG}`, {
+        method: 'GET',
+        headers: { accept: RICH_ACCEPT },
+      }),
+    );
+    const body = await readSuccessBody<PublicShareableWire>(response);
+    expect(body.owner.socialLinks).toEqual([]);
   });
 
   it('computes completionPct = ownedUnique / catalogTotal * 100', async () => {

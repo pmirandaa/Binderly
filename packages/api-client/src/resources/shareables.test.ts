@@ -58,6 +58,24 @@ describe('shareables.listShareables', () => {
     const { shareables } = makeResource(mockFetch({ status: 401 }));
     await expect(shareables.listShareables()).rejects.toBeInstanceOf(ApiUnauthorizedError);
   });
+
+  it('surfaces isActive and defaults it to true when omitted (#FU-50)', async () => {
+    const { shareables } = makeResource(
+      mockFetch({
+        status: 200,
+        body: okEnvelope([{ ...VALID_SHAREABLE, isActive: false }]),
+      }),
+    );
+    const list = await shareables.listShareables();
+    expect(list[0]?.isActive).toBe(false);
+
+    const { isActive: _drop, ...withoutFlag } = VALID_SHAREABLE;
+    const { shareables: s2 } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope([withoutFlag]) }),
+    );
+    const list2 = await s2.listShareables();
+    expect(list2[0]?.isActive).toBe(true);
+  });
 });
 
 describe('shareables.getShareable', () => {

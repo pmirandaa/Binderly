@@ -337,6 +337,7 @@ describe('v1 mux — does not autoboot Deno.serve in node', () => {
       ['GET', '/c/:handle/:slug'],
       ['POST', '/smart-collections/preview'],
       ['GET', '/me/entitlements'],
+      ['GET', '/me/handle-available'],
       ['POST', '/me/community-submissions'],
     ];
     for (const [method, pattern] of expectedPatterns) {

@@ -1223,3 +1223,44 @@ endpoints — a backend task, no migration needed since `canonical_key`
 columns already exist + are unique).
 
 **Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-027 — Social links scoped to the profile (owner-level "link in bio"), not per-shareable (T-SH-OWNER-CONFIG / #FU-51)
+
+**Status:** decided — shipped per-profile; flag for product review (non-blocking).
+(Numbering: authored as Q-025, renumbered to **Q-027** at merge — siblings
+T-DP-MONITORING claimed Q-025 + #FU-63 and T-POLISH-SWEEP claimed Q-026 +
+#FU-64; this follow-up is **#FU-65**.)
+
+**Context.** #FU-51 asked for a "social links" add/remove editor in owner
+settings, rendered on the public shareable page. The scope line read
+"add `social_links_json jsonb` to the shareable/profile table" — leaving
+the grain (per-shareable vs per-owner) to the implementer.
+
+**Decision.** Stored on `profile.social_links_json` (owner-level), not on
+`shareable`. Rationale: social links are an identity/"link in bio"
+concept that belongs to the person, not to an individual binder. A single
+list edited once shows in the header of every shareable the owner
+publishes, which matches the existing owner-identity fields (handle,
+display name, bio) that already live on `profile` and render in the same
+public header. Per-shareable links would multiply the editing surface and
+duplicate data with little user benefit.
+
+**Shipped.**
+- Contract: `socialLinks` (array of `{ label, url }`, max 8) on
+  `profileDto` + `updateProfileRequest`, surfaced on
+  `publicShareOwnerDto.socialLinks` (defaults to `[]`).
+- DB: nullable `profile.social_links_json` (migration 0027). Defensive
+  parse in the public edge handler (null/malformed → `[]`).
+- UI: add/remove editor with http(s) URL validation in web + mobile owner
+  settings; rendered in the public page header.
+
+**Open question for product.** If we later want per-binder link sets
+(e.g. a "buy/trade" binder linking to a marketplace vs a showcase binder
+linking to socials), we would add an optional per-shareable override that
+falls back to the profile list. Tracked as **#FU-65
+(T-SH-PER-SHAREABLE-LINKS)** — not built; raise priority only if product
+wants per-binder overrides.
+
+**Pablo's answer:** _(empty until answered)_

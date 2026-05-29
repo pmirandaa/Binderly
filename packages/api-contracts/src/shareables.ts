@@ -15,6 +15,7 @@
 
 import { z } from 'zod';
 
+import { socialLinksSchema } from './auth.js';
 import { slugSchema } from './collection.js';
 import { isoDateTimeSchema, uuidSchema } from './common.js';
 
@@ -81,6 +82,14 @@ export const shareableDto = z
     slug: slugSchema,
     target: shareableTarget,
     theme: shareableThemeSchema,
+    /**
+     * Kill switch (#FU-50). When `false` the shareable is hidden
+     * from public reads (the public render endpoint 404s) but the
+     * owner still sees it in their settings list. Defaults to
+     * `true` so rows read before the `is_active` column shipped
+     * parse as active.
+     */
+    isActive: z.boolean().default(true),
     showValues: z.boolean(),
     showMissing: z.boolean(),
     showPhotos: z.boolean(),
@@ -108,6 +117,7 @@ export const createShareableRequest = z
     slug: slugSchema,
     target: shareableTarget,
     theme: shareableThemeSchema.optional(),
+    isActive: z.boolean().optional(),
     showValues: z.boolean().optional(),
     showMissing: z.boolean().optional(),
     showPhotos: z.boolean().optional(),
@@ -126,6 +136,7 @@ export const updateShareableRequest = z
     slug: slugSchema.optional(),
     target: shareableTarget.optional(),
     theme: shareableThemeSchema.optional(),
+    isActive: z.boolean().optional(),
     showValues: z.boolean().optional(),
     showMissing: z.boolean().optional(),
     showPhotos: z.boolean().optional(),
@@ -154,6 +165,12 @@ export const publicShareOwnerDto = z
     displayName: z.string().nullable(),
     avatarUrl: z.string().url().nullable(),
     bio: z.string().nullable(),
+    /**
+     * Owner social links rendered in the public page header
+     * (#FU-51). Defaults to `[]` so older payloads (and the bare
+     * `getPublicShareable` path) parse without the key.
+     */
+    socialLinks: socialLinksSchema.default([]),
   })
   .strict();
 export type PublicShareOwnerDto = z.infer<typeof publicShareOwnerDto>;

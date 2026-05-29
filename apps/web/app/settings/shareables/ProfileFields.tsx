@@ -11,12 +11,38 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { HandleAvailabilityResponse, ProfileDto, UpdateProfileRequest } from '@binderly/api-contracts';
-import { Button, Card, Input, Text, YStack } from '@binderly/ui';
+import type {
+  HandleAvailabilityResponse,
+  ProfileDto,
+  SocialLink,
+  UpdateProfileRequest,
+} from '@binderly/api-contracts';
+import { SOCIAL_LINKS_MAX } from '@binderly/api-contracts';
+import { Button, Card, Input, Text, XStack, YStack } from '@binderly/ui';
 
-import { MAX_BIO_LENGTH, validateBio, validateDisplayName, validateHandle } from './validation';
+import {
+  MAX_BIO_LENGTH,
+  validateBio,
+  validateDisplayName,
+  validateHandle,
+  validateSocialLinkLabel,
+  validateSocialLinkUrl,
+} from './validation';
 
 const HANDLE_DEBOUNCE_MS = 400;
+
+/**
+ * Order-sensitive structural equality for two social-link lists.
+ * Used to decide whether the social-links section is "dirty" relative
+ * to the persisted profile.
+ */
+function socialLinksEqual(
+  a: readonly SocialLink[],
+  b: readonly SocialLink[],
+): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((link, i) => link.label === b[i]?.label && link.url === b[i]?.url);
+}
 
 export interface ProfileFieldsProps {
   profile: ProfileDto;
@@ -42,6 +68,7 @@ export function ProfileFields({
   const [handle, setHandle] = useState<string>(profile.handle);
   const [displayName, setDisplayName] = useState<string>(profile.displayName ?? '');
   const [bio, setBio] = useState<string>(profile.bio ?? '');
+  const [socialLinks, setSocialLinks] = useState<SocialLink[]>(() => [...profile.socialLinks]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<AvailabilityStatus>({ kind: 'idle' });
@@ -49,6 +76,23 @@ export function ProfileFields({
   const handleValidation = useMemo(() => validateHandle(handle), [handle]);
   const displayNameValidation = useMemo(() => validateDisplayName(displayName), [displayName]);
   const bioValidation = useMemo(() => validateBio(bio), [bio]);
+
+  // Every link row must have a non-empty, in-range label + a valid
+  // http(s) URL before the profile can save (#FU-51).
+  const socialLinksValid = useMemo(
+    () =>
+      socialLinks.every(
+        (link) =>
+          validateSocialLinkLabel(link.label).kind === 'ok' &&
+          validateSocialLinkUrl(link.url).kind === 'ok',
+      ),
+    [socialLinks],
+  );
+  const socialLinksChanged = useMemo(
+    () => !socialLinksEqual(socialLinks, profile.socialLinks),
+    [socialLinks, profile.socialLinks],
+  );
+  const atLinkCap = socialLinks.length >= SOCIAL_LINKS_MAX;
 
   const trimmedHandle = handle.trim();
   const handleChangedFromCurrent = trimmedHandle.toLowerCase() !== profile.handle.toLowerCase();
@@ -99,6 +143,7 @@ export function ProfileFields({
     if (handleValidation.kind !== 'ok') return false;
     if (displayNameValidation.kind !== 'ok') return false;
     if (bioValidation.kind !== 'ok') return false;
+    if (!socialLinksValid) return false;
     if (handleChangedFromCurrent && availability.kind === 'unavailable') return false;
     if (handleChangedFromCurrent && availability.kind === 'checking') return false;
     return true;
@@ -107,6 +152,7 @@ export function ProfileFields({
     handleValidation.kind,
     displayNameValidation.kind,
     bioValidation.kind,
+    socialLinksValid,
     handleChangedFromCurrent,
     availability.kind,
   ]);
@@ -114,7 +160,8 @@ export function ProfileFields({
   const hasChanges =
     handleChangedFromCurrent ||
     displayName !== (profile.displayName ?? '') ||
-    bio !== (profile.bio ?? '');
+    bio !== (profile.bio ?? '') ||
+    socialLinksChanged;
 
   async function handleSave(): Promise<void> {
     setSaving(true);
@@ -129,6 +176,12 @@ export function ProfileFields({
     if (bio !== (profile.bio ?? '')) {
       patch.bio = bio.trim().length === 0 ? null : bio.trim();
     }
+    if (socialLinksChanged) {
+      patch.socialLinks = socialLinks.map((link) => ({
+        label: link.label.trim(),
+        url: link.url.trim(),
+      }));
+    }
     try {
       await onSave(patch);
     } catch (err) {
@@ -136,9 +189,25 @@ export function ProfileFields({
       setHandle(profile.handle);
       setDisplayName(profile.displayName ?? '');
       setBio(profile.bio ?? '');
+      setSocialLinks([...profile.socialLinks]);
     } finally {
       setSaving(false);
     }
+  }
+
+  function updateLink(index: number, patch: Partial<SocialLink>): void {
+    setSocialLinks((cur) =>
+      cur.map((link, i) => (i === index ? { ...link, ...patch } : link)),
+    );
+  }
+
+  function addLink(): void {
+    if (atLinkCap) return;
+    setSocialLinks((cur) => [...cur, { label: '', url: '' }]);
+  }
+
+  function removeLink(index: number): void {
+    setSocialLinks((cur) => cur.filter((_link, i) => i !== index));
   }
 
   const availabilityCopy = useMemo(() => {
@@ -236,6 +305,81 @@ export function ProfileFields({
         >
           {bioValidation.message ?? `${bio.length}/${MAX_BIO_LENGTH} characters.`}
         </Text>
+      </YStack>
+
+      <YStack gap="$2" data-testid="profile-social-links-block">
+        <Text variant="subtitle">Social links</Text>
+        <Text variant="bodySmall" tone="muted">
+          Shown in the header of every public shareable. Up to {SOCIAL_LINKS_MAX} links.
+        </Text>
+        {socialLinks.length === 0 ? (
+          <Text variant="bodySmall" tone="muted" data-testid="profile-social-links-empty">
+            No links yet.
+          </Text>
+        ) : (
+          <YStack gap="$3" data-testid="profile-social-links-list">
+            {socialLinks.map((link, index) => {
+              const urlValidation = validateSocialLinkUrl(link.url);
+              const labelValidation = validateSocialLinkLabel(link.label);
+              return (
+                <YStack
+                  key={`social-link-${index}`}
+                  gap="$2"
+                  data-testid={`profile-social-link-row-${index}`}
+                >
+                  <Input
+                    label="Label"
+                    value={link.label}
+                    onChangeText={(next) => updateLink(index, { label: next })}
+                    size="md"
+                    error={labelValidation.kind === 'too-long'}
+                    {...(labelValidation.message !== null
+                      ? { errorText: labelValidation.message }
+                      : {})}
+                    testID={`profile-social-link-label-${index}`}
+                  />
+                  <Input
+                    label="URL"
+                    value={link.url}
+                    onChangeText={(next) => updateLink(index, { url: next })}
+                    size="md"
+                    error={urlValidation.kind === 'invalid' || urlValidation.kind === 'too-long'}
+                    {...(urlValidation.message !== null
+                      ? { errorText: urlValidation.message }
+                      : {})}
+                    testID={`profile-social-link-url-${index}`}
+                  />
+                  <XStack>
+                    <Button
+                      label="Remove"
+                      variant="secondary"
+                      size="sm"
+                      onPress={() => removeLink(index)}
+                      aria-label={`Remove link ${index + 1}`}
+                      data-testid={`profile-social-link-remove-${index}`}
+                    />
+                  </XStack>
+                </YStack>
+              );
+            })}
+          </YStack>
+        )}
+        <XStack>
+          <Button
+            label="Add link"
+            variant="secondary"
+            size="sm"
+            disabled={atLinkCap}
+            onPress={addLink}
+            aria-label="Add social link"
+            data-testid="profile-social-link-add"
+          />
+        </XStack>
+        {atLinkCap ? (
+          <Text variant="caption" tone="muted" data-testid="profile-social-links-cap">
+            Reached the {SOCIAL_LINKS_MAX}-link limit.
+          </Text>
+        ) : null}
       </YStack>
 
       {error !== null ? (

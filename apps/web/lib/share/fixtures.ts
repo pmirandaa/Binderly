@@ -30,6 +30,7 @@ export function makeShareableDto(overrides: Partial<ShareableDto> = {}): Shareab
     slug: 'my-binder',
     target: { kind: 'full' },
     theme: 'default',
+    isActive: true,
     showValues: false,
     showMissing: true,
     showPhotos: false,
@@ -47,6 +48,7 @@ export function makePublicShareOwner(
     displayName: 'Pablo Miranda',
     avatarUrl: null,
     bio: 'Collecting since Base Set.',
+    socialLinks: [],
     ...overrides,
   };
 }

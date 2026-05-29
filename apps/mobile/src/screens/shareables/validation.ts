@@ -96,6 +96,64 @@ export function validateBio(input: string): BioValidation {
   return { kind: 'ok', message: null };
 }
 
+/** Max length of a social-link caption (matches `socialLinkSchema.label`). */
+export const SOCIAL_LINK_LABEL_MAX = 30;
+/** Max length of a social-link URL (matches `socialLinkSchema.url`). */
+export const SOCIAL_LINK_URL_MAX = 2048;
+
+export type SocialLinkUrlValidationKind = 'ok' | 'empty' | 'invalid' | 'too-long';
+
+export interface SocialLinkUrlValidation {
+  readonly kind: SocialLinkUrlValidationKind;
+  readonly message: string | null;
+}
+
+/**
+ * Validate a single social-link URL (#FU-51). Accepts only absolute
+ * `http`/`https` URLs — the same shape `socialLinkSchema.url` enforces
+ * server-side. Empty is `'empty'` (incomplete row, not an error).
+ */
+export function validateSocialLinkUrl(input: string): SocialLinkUrlValidation {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    return { kind: 'empty', message: null };
+  }
+  if (trimmed.length > SOCIAL_LINK_URL_MAX) {
+    return { kind: 'too-long', message: `URL is limited to ${SOCIAL_LINK_URL_MAX} characters.` };
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { kind: 'invalid', message: 'Enter a full URL, e.g. https://example.com.' };
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return { kind: 'invalid', message: 'Links must start with http:// or https://.' };
+  }
+  return { kind: 'ok', message: null };
+}
+
+export type SocialLinkLabelValidationKind = 'ok' | 'empty' | 'too-long';
+
+export interface SocialLinkLabelValidation {
+  readonly kind: SocialLinkLabelValidationKind;
+  readonly message: string | null;
+}
+
+export function validateSocialLinkLabel(input: string): SocialLinkLabelValidation {
+  const trimmed = input.trim();
+  if (trimmed.length === 0) {
+    return { kind: 'empty', message: null };
+  }
+  if (trimmed.length > SOCIAL_LINK_LABEL_MAX) {
+    return {
+      kind: 'too-long',
+      message: `Label is limited to ${SOCIAL_LINK_LABEL_MAX} characters.`,
+    };
+  }
+  return { kind: 'ok', message: null };
+}
+
 export interface DisplayNameValidation {
   readonly kind: 'ok' | 'too-long';
   readonly message: string | null;

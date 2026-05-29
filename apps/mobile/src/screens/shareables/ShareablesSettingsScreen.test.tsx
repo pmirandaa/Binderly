@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { createFakeSettingsApi, FAKE_SHAREABLE } from './fixtures';
+import { createFakeSettingsApi, FAKE_PROFILE, FAKE_SHAREABLE } from './fixtures';
 import { ShareablesSettingsScreen } from './ShareablesSettingsScreen';
 import { renderWithProvider } from '../../test-utils/render';
 
@@ -171,6 +171,78 @@ describe('<ShareablesSettingsScreen> (mobile)', () => {
     });
     await waitFor(() => {
       expect(api.state.shareables[0]?.showMissing).toBe(false);
+    });
+  });
+
+  it('toggles the kill switch off and persists isActive=false (#FU-50)', async () => {
+    const api = createFakeSettingsApi();
+    renderWithProvider(<ShareablesSettingsScreen api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('m-shareable-row-is-active')).toBeInTheDocument();
+    });
+    const toggle = screen.getByTestId('m-shareable-row-is-active') as HTMLInputElement;
+    expect(toggle.checked).toBe(true);
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
+    expect(screen.getByTestId('m-shareable-row-unpublished-hint')).toBeInTheDocument();
+    const save = screen.getByTestId('m-shareable-row-save');
+    await act(async () => {
+      fireEvent.click(save);
+    });
+    await waitFor(() => {
+      expect(api.state.shareables[0]?.isActive).toBe(false);
+    });
+  });
+
+  it('adds a social link and persists it on the profile (#FU-51)', async () => {
+    const api = createFakeSettingsApi();
+    renderWithProvider(<ShareablesSettingsScreen api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('m-profile-social-link-add')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('m-profile-social-link-add'));
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByTestId('m-profile-social-link-label-0'), {
+        target: { value: 'Twitter' },
+      });
+      fireEvent.change(screen.getByTestId('m-profile-social-link-url-0'), {
+        target: { value: 'https://twitter.com/pablo' },
+      });
+    });
+    const saveBtn = screen.getByTestId('m-profile-fields-save');
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
+    await waitFor(() => {
+      expect(api.state.profile.socialLinks).toEqual([
+        { label: 'Twitter', url: 'https://twitter.com/pablo' },
+      ]);
+    });
+  });
+
+  it('removes a social link from an owner who already has one (#FU-51)', async () => {
+    const api = createFakeSettingsApi({
+      profile: {
+        ...FAKE_PROFILE,
+        socialLinks: [{ label: 'Twitter', url: 'https://twitter.com/pablo' }],
+      },
+    });
+    renderWithProvider(<ShareablesSettingsScreen api={api} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('m-profile-social-link-remove-0')).toBeInTheDocument();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('m-profile-social-link-remove-0'));
+    });
+    const saveBtn = screen.getByTestId('m-profile-fields-save');
+    await act(async () => {
+      fireEvent.click(saveBtn);
+    });
+    await waitFor(() => {
+      expect(api.state.profile.socialLinks).toEqual([]);
     });
   });
 

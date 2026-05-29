@@ -72,6 +72,14 @@ describe('shareableDto', () => {
     expect(shareableDto.parse(VALID).target.kind).toBe('full');
   });
 
+  it('defaults isActive to true when the key is absent (#FU-50)', () => {
+    expect(shareableDto.parse(VALID).isActive).toBe(true);
+  });
+
+  it('parses an explicitly-disabled shareable', () => {
+    expect(shareableDto.parse({ ...VALID, isActive: false }).isActive).toBe(false);
+  });
+
   it('parses a themed custom-collection shareable', () => {
     expect(
       shareableDto.parse({
@@ -124,6 +132,10 @@ describe('updateShareableRequest', () => {
     expect(updateShareableRequest.parse({ showValues: true }).showValues).toBe(true);
   });
 
+  it('parses an isActive kill-switch PATCH (#FU-50)', () => {
+    expect(updateShareableRequest.parse({ isActive: false }).isActive).toBe(false);
+  });
+
   it('rejects an empty body', () => {
     expect(updateShareableRequest.safeParse({}).success).toBe(false);
   });
@@ -162,6 +174,26 @@ describe('publicShareOwnerDto', () => {
         bio: null,
       }).displayName,
     ).toBeNull();
+  });
+
+  it('defaults socialLinks to [] and parses a populated list (#FU-51)', () => {
+    expect(
+      publicShareOwnerDto.parse({
+        handle: 'pablo',
+        displayName: null,
+        avatarUrl: null,
+        bio: null,
+      }).socialLinks,
+    ).toEqual([]);
+    expect(
+      publicShareOwnerDto.parse({
+        handle: 'pablo',
+        displayName: null,
+        avatarUrl: null,
+        bio: null,
+        socialLinks: [{ label: 'Twitter', url: 'https://twitter.com/pablo' }],
+      }).socialLinks,
+    ).toHaveLength(1);
   });
 
   it('rejects an avatar URL that is not a URL', () => {

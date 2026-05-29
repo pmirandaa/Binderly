@@ -67,6 +67,7 @@ interface ProfileRow {
   readonly display_name: string | null;
   readonly avatar_url: string | null;
   readonly bio: string | null;
+  readonly social_links_json: unknown;
 }
 
 interface ShareableRow {
@@ -75,11 +76,17 @@ interface ShareableRow {
   readonly slug: string;
   readonly target: unknown;
   readonly theme: string;
+  readonly is_active: boolean;
   readonly show_values: boolean;
   readonly show_missing: boolean;
   readonly show_photos: boolean;
   readonly created_at: string;
   readonly updated_at: string;
+}
+
+interface SocialLinkWire {
+  label: string;
+  url: string;
 }
 
 interface CollectionItemRow {
@@ -132,6 +139,7 @@ interface ShareableWire {
   slug: string;
   target: unknown;
   theme: string;
+  isActive: boolean;
   showValues: boolean;
   showMissing: boolean;
   showPhotos: boolean;
@@ -158,6 +166,7 @@ interface PublicShareableWire {
     displayName: string | null;
     avatarUrl: string | null;
     bio: string | null;
+    socialLinks: readonly SocialLinkWire[];
   };
   collectionTitle: string;
   description: string | null;
@@ -195,7 +204,7 @@ export async function handleGetPublicShareable(
   //    the comparison is case-insensitive at the DB level.
   const { data: profileData, error: profileError } = await supabase
     .from('profile')
-    .select('user_id, handle, display_name, avatar_url, bio')
+    .select('user_id, handle, display_name, avatar_url, bio, social_links_json')
     .eq('handle', handle)
     .maybeSingle();
   if (profileError !== null) throw translatePostgrestError(profileError);
@@ -216,6 +225,15 @@ export async function handleGetPublicShareable(
     throw new ApiError('NOT_FOUND', `No shareable "${slug}" for handle "${handle}".`);
   }
   const shareable = shareableData as ShareableRow;
+
+  // 2b) Kill switch (#FU-50). An unpublished shareable is a clean 404
+  //     to the public — the service-role client bypasses the slug-gated
+  //     anon read policy, so this explicit check is the real gate for
+  //     the SSR render path. `=== false` so legacy rows (and tests)
+  //     written before the `is_active` column existed read as active.
+  if (shareable.is_active === false) {
+    throw new ApiError('NOT_FOUND', `Shareable "${slug}" is not published.`);
+  }
 
   // 3) Branch on Accept header. The legacy api-client method asks
   //    for `application/json` (or sends no Accept at all) and gets
@@ -243,6 +261,7 @@ function shareableRowToWire(row: ShareableRow): ShareableWire {
     slug: row.slug,
     target: row.target,
     theme: row.theme,
+    isActive: row.is_active !== false,
     showValues: row.show_values,
     showMissing: row.show_missing,
     showPhotos: row.show_photos,
@@ -349,6 +368,7 @@ async function buildPublicSharePayload(
       displayName: profile.display_name,
       avatarUrl: profile.avatar_url,
       bio: profile.bio,
+      socialLinks: parseSocialLinks(profile.social_links_json),
     },
     collectionTitle,
     description,
@@ -361,6 +381,32 @@ async function buildPublicSharePayload(
     members,
     lastUpdatedAt,
   };
+}
+
+/**
+ * Coerce the owner's `profile.social_links_json` jsonb column into a
+ * clean wire array (#FU-51). The column is untyped jsonb (NULL = "no
+ * links"), so we defensively drop anything that isn't a
+ * `{ label: string, url: string }` pair rather than trusting the DB
+ * to enforce the shape — the API contract (`socialLinksSchema`) is the
+ * write-time guard, this is the read-time belt-and-braces. Caps the
+ * output at SOCIAL_LINKS_MAX entries.
+ */
+const SOCIAL_LINKS_MAX = 8;
+
+function parseSocialLinks(raw: unknown): SocialLinkWire[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SocialLinkWire[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const label = (entry as { label?: unknown }).label;
+    const url = (entry as { url?: unknown }).url;
+    if (typeof label !== 'string' || typeof url !== 'string') continue;
+    if (label.length === 0 || url.length === 0) continue;
+    out.push({ label, url });
+    if (out.length >= SOCIAL_LINKS_MAX) break;
+  }
+  return out;
 }
 
 type ParsedTarget = { kind: 'full' } | { kind: 'custom'; customCollectionId: string };

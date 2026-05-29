@@ -18,6 +18,7 @@ import {
 import { handleGetCollectionCompletion } from './handlers/completion.ts';
 import { handleGetPrintingCurrentPrice } from './handlers/currentPrice.ts';
 import { handleGetMyEntitlements } from './handlers/entitlements.ts';
+import { handleCheckHandleAvailability } from './handlers/handleAvailability.ts';
 import { handleGetPublicShareable } from './handlers/publicShareable.ts';
 import { handleSmartCollectionsPreview } from './handlers/smartPreview.ts';
 import {
@@ -140,6 +141,9 @@ export const ROUTES: readonly ContextualRoute[] = [
 
   // ---- entitlements — unified RC read path (T-PB-ENTITLEMENTS) ----
   entry('GET', '/me/entitlements', handleGetMyEntitlements),
+
+  // ---- handle availability — settings handle picker (#FU-52) ----
+  entry('GET', '/me/handle-available', handleCheckHandleAvailability),
 
   // ---- community submissions — pro-gated flywheel write (#FU-55) ----
   entry('POST', '/me/community-submissions', handleSubmitCommunitySubmission),
