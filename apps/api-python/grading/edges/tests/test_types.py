@@ -8,7 +8,6 @@ from grading.edges.types import (
     NUM_STRIPS,
     STRIP_LABELS,
     STRIP_THICKNESS_PX,
-    EdgesLabelledSample,
     EdgesRequest,
     EdgesPrediction,
     EdgesSubgrade,
@@ -35,49 +34,6 @@ class TestConstants:
 
     def test_strip_thickness_value(self):
         assert STRIP_THICKNESS_PX == 32
-
-
-class TestEdgesLabelledSample:
-    def test_is_labelled_for_edges_true(self):
-        sample = EdgesLabelledSample(
-            source="psa_cert",
-            source_id="1",
-            grade_company="PSA",
-            overall_grade=9.0,
-            edges_score=8.5,
-        )
-        assert sample.is_labelled_for_edges() is True
-
-    def test_is_labelled_for_edges_false_when_none(self):
-        sample = EdgesLabelledSample(
-            source="psa_cert",
-            source_id="2",
-            grade_company="PSA",
-            overall_grade=9.0,
-            edges_score=None,
-        )
-        assert sample.is_labelled_for_edges() is False
-
-    def test_default_image_urls_empty(self):
-        sample = EdgesLabelledSample(
-            source="psa_cert",
-            source_id="3",
-            grade_company="PSA",
-            overall_grade=9.0,
-            edges_score=8.0,
-        )
-        assert sample.image_urls == []
-
-    def test_frozen_immutable(self):
-        sample = EdgesLabelledSample(
-            source="psa_cert",
-            source_id="4",
-            grade_company="PSA",
-            overall_grade=9.0,
-            edges_score=8.0,
-        )
-        with pytest.raises((AttributeError, TypeError)):
-            sample.edges_score = 7.0  # type: ignore[misc]
 
 
 class TestEdgesRequest:

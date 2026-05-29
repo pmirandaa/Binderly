@@ -9,7 +9,7 @@ Or via Make::
     make train  # in apps/api-python/grading/surface/
 
 The training pipeline:
-1. Load labelled samples via ``SurfaceMergedDataLoader``.
+1. Load labelled samples via ``MergedDataLoader(subgrade_key='surface')``.
 2. Build feature arrays via ``SurfaceDataset``.
 3. Split 80/20 train/val.
 4. Run ``TrainingLoop`` for ``num_epochs``.
@@ -27,10 +27,11 @@ from typing import Any, Optional
 
 import numpy as np
 
+from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.eval_metrics import summarise_metrics
 from grading.ml_common.training_loop import TrainingLoop, mse_loss
 from grading.ml_common.types import TrainingConfig, TrainingResult
-from grading.surface.dataset import SurfaceDataset, SurfaceMergedDataLoader
+from grading.surface.dataset import SurfaceDataset
 from grading.surface.export import export_surface_model
 from grading.surface.model import SurfaceModel
 from grading.surface.types import NUM_SURFACE_SHOTS_V1
@@ -64,7 +65,7 @@ def train_surface_model(
     if config is None:
         config = TrainingConfig(subgrade_column="surface", patch_size=patch_size)
 
-    loader = SurfaceMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="surface")
     labelled = loader.load_labelled()
 
     if not labelled:

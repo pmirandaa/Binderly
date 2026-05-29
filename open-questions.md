@@ -1049,7 +1049,30 @@ account/token, with the OTA wiring tracked separately as #FU-58.
 
 ---
 
-## Q-023 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
+## Q-023 — Cross-company grade calibration constants are unvalidated placeholders (T-GR-GRADE-CALIBRATION / #FU-56)
+
+**Raised:** 2026-05-29 (iter 34, by the grading-data-hygiene worker; renumbered from Q-022 → Q-023 at merge — the parallel T-DP-EAS worker claimed Q-022)
+**Blocking:** No — `grading/calibration/` ships as a scaffold with a documented placeholder affine map (PSA-anchored, per-company `slope`/`intercept`), so downstream flywheel/pricing code has a single normalised scale to consume today. Nothing depends on the constants being *correct* yet.
+
+**Context:**
+
+#FU-56 asked for a cross-company calibration module mapping `company + grade → normalised internal scale` (PSA-equivalent `[1.0, 10.0]`). PSA/BGS/CGC/SGC grade on different, differently-strict scales, so a mixed corpus (community flywheel, cross-company pricing) needs one scale before grades can be compared/aggregated.
+
+The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`) is a per-company affine transform with **heuristic constants** drawn from rough market cross-grade lore (e.g. BGS 9.5 ≈ PSA 10 → BGS gets a small positive intercept). These are explicitly NOT a data fit, carry low `confidence`, and are clamped to `[1, 10]`. The affine map is expressed as a numpy dot product so a learned weight vector can drop in without changing call sites.
+
+**Open question:**
+
+1. Where does the labelled cross-company training signal come from? Options: (a) the same physical card graded by ≥2 companies (rare but cleanest), (b) card-identity matches across companies via #FU-40's printing match + realised market value as the regression target, (c) curated expert equivalence tables. Each has different bias/coverage.
+2. Granularity: is a single per-company affine enough, or do we need per-company-**per-grade-tier** constants (cross-grade equivalence is non-linear at the very top — the 9.5↔10 band behaves differently from the mid-scale)?
+3. Should the normalised scale stay PSA-anchored, or move to a company-neutral latent scale once learned?
+
+**Proposed resolution → #FU-59 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-59 in `status.md`'s Known Follow-ups.
+
+**Status: open** (non-blocking; placeholder scaffold is sufficient until labelled cross-company data exists).
+
+---
+
+## Q-024 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
 
 **Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-60)
 
@@ -1085,9 +1108,9 @@ enforces the downgrade with no further change to the theme system.
 (#FU-60). Settings-side gating (persisting a non-default theme) is
 already enforced via the `shareable_themes` gate, so the only gap is the
 public-render downgrade for an already-persisted theme after a
-downgrade. (Numbering: this question was authored as Q-022 but renumbered
-to **Q-023** at merge — Q-022 + #FU-58 were claimed by T-DP-EAS and
-#FU-59 by T-BE-READS-WRITES at iter 35; the OG-theming wire-up is
-**#FU-61**, T-SH-OG-THEME-WIRE.)
+downgrade. (Numbering: authored as Q-022, renumbered to **Q-024** at
+merge — Q-022 + #FU-58 were claimed by T-DP-EAS, #FU-59 by
+T-BE-READS-WRITES, and Q-023 by T-GR-GRADE-CALIBRATION at iter 34/35; the
+OG-theming wire-up is **#FU-61**, T-SH-OG-THEME-WIRE.)
 
 **Pablo's answer:** _(empty until answered)_

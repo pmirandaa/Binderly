@@ -22,22 +22,22 @@ class TestLabelledGradingSample:
             source_id="12345",
             grade_company="PSA",
             overall_grade=9.0,
-            corners_score=8.5,
+            subgrade_score=8.5,
             image_urls=["https://example.com/img.jpg"],
         )
         assert s.source == "psa_cert"
-        assert s.corners_score == 8.5
-        assert s.is_labelled_for_corners()
+        assert s.subgrade_score == 8.5
+        assert s.is_labelled()
 
-    def test_null_corners_not_labelled(self):
+    def test_null_subgrade_not_labelled(self):
         s = LabelledGradingSample(
             source="ebay_sold",
             source_id="abc",
             grade_company="PSA",
             overall_grade=9.0,
-            corners_score=None,
+            subgrade_score=None,
         )
-        assert not s.is_labelled_for_corners()
+        assert not s.is_labelled()
 
     def test_frozen_immutable(self):
         s = LabelledGradingSample(
@@ -45,7 +45,7 @@ class TestLabelledGradingSample:
             source_id="x",
             grade_company="PSA",
             overall_grade=None,
-            corners_score=7.0,
+            subgrade_score=7.0,
         )
         with pytest.raises(Exception):
             s.source = "other"  # type: ignore[misc]
@@ -56,7 +56,7 @@ class TestLabelledGradingSample:
             source_id="1",
             grade_company="PSA",
             overall_grade=None,
-            corners_score=None,
+            subgrade_score=None,
         )
         assert s.image_urls == []
 
@@ -66,7 +66,7 @@ class TestLabelledGradingSample:
             source_id="1",
             grade_company="PSA",
             overall_grade=None,
-            corners_score=None,
+            subgrade_score=None,
         )
         assert s.printing_id is None
 

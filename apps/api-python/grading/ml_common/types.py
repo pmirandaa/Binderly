@@ -21,7 +21,7 @@ from typing import Optional, Protocol, runtime_checkable
 
 @dataclass(frozen=True)
 class LabelledGradingSample:
-    """Normalised training/eval row.
+    """Normalised training/eval row, shared by all three sub-grade models.
 
     Sources:
     - PSA cert lookup  → ``source = 'psa_cert'``
@@ -29,11 +29,14 @@ class LabelledGradingSample:
     - Auction PWCC      → ``source = 'auction_pwcc'``
     - Auction Goldin    → ``source = 'auction_goldin'``
 
-    ``corners_score`` is the PSA sub-grade label this row contributes.
-    Rows where ``corners_score is None`` are filtered out before training
-    (they may still be useful for other sub-grades).
+    ``subgrade_score`` is the numeric sub-grade label this row contributes for
+    whichever sub-grade the producing ``MergedDataLoader`` was keyed to
+    (``'corners'`` / ``'edges'`` / ``'surface'`` — see ``MergedDataLoader``'s
+    ``subgrade_key``).  Rows where ``subgrade_score is None`` lack a label for
+    that sub-grade and are filtered out before training (they may still be
+    usable for a different sub-grade keyed loader).
 
-    ``printing_id`` is NULL for all v1 rows (pending #FU-40 image ingest).
+    ``printing_id`` is NULL for all v1 rows (pending #FU-40 printing match).
     ``image_urls`` are the raw URLs; ``ImageLoader`` handles fetching / mocking.
     """
 
@@ -41,14 +44,14 @@ class LabelledGradingSample:
     source_id: str
     grade_company: str
     overall_grade: Optional[float]
-    corners_score: Optional[float]
+    subgrade_score: Optional[float]
     image_urls: list[str] = field(default_factory=list)
     printing_id: Optional[str] = None
     raw_metadata: dict = field(default_factory=dict)
 
-    def is_labelled_for_corners(self) -> bool:
-        """True when this row can be used as a corners training example."""
-        return self.corners_score is not None
+    def is_labelled(self) -> bool:
+        """True when this row carries a usable sub-grade label."""
+        return self.subgrade_score is not None
 
 
 # ---------------------------------------------------------------------------

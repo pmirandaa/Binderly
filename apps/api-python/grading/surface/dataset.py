@@ -2,14 +2,15 @@
 
 Data loading
 ------------
-``SurfaceMergedDataLoader`` reads raw DB row dicts from all three scraper
-tables and normalises them into ``LabelledGradingSample`` objects with the
-surface score stored in ``corners_score``.  (The field is named
-``corners_score`` because that is the only numeric label slot in the shared
-``LabelledGradingSample`` type in ml_common.  This naming mismatch is tracked
-as #FU-44 and will be fixed with a rename once all sub-grade tasks merge.)
+Surface training data is loaded through the shared
+``grading.ml_common.MergedDataLoader`` keyed to the ``'surface'`` sub-grade
+(``MergedDataLoader(..., subgrade_key='surface')``).  The surface label lands
+in ``LabelledGradingSample.subgrade_score`` — the generic label slot shared by
+all three sub-grade modules.  The parallel ``SurfaceMergedDataLoader`` that
+originally lived here was folded into that single shared code path by #FU-44
+(see Q-017 in open-questions.md).
 
-The SQL equivalents for the filter applied here are:
+The SQL equivalents for the filter the shared loader applies are:
 - PSA: ``subgrades->>'surface' IS NOT NULL``
 - eBay / auctions: ``parsed_sub_grades->>'surface' IS NOT NULL``
 
@@ -31,158 +32,13 @@ data includes a third shot, ``SurfaceDataset`` can be instantiated with
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 import numpy as np
 
 from grading.ml_common.image_loader import ImageLoader
 from grading.ml_common.types import LabelledGradingSample
 from grading.surface.types import NUM_SURFACE_SHOTS_V1, NUM_SURFACE_SHOTS_WITH_RAKING
-
-
-# ---------------------------------------------------------------------------
-# Surface-specific data loaders
-# ---------------------------------------------------------------------------
-
-
-def _to_float(value: Any) -> float | None:
-    if value is None:
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-class _SurfacePSALoader:
-    """Normalise ``grading_training_sample`` rows for surface training.
-
-    Reads ``subgrades->>'surface'`` and stores it in ``corners_score``
-    (the generic label slot in ``LabelledGradingSample``).
-    """
-
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
-        self._rows = rows
-
-    def load(self) -> list[LabelledGradingSample]:
-        samples: list[LabelledGradingSample] = []
-        for row in self._rows:
-            if row.get("grade_company") != "PSA":
-                continue
-            subgrades: dict = row.get("subgrades") or {}
-            surface_score = _to_float(subgrades.get("surface"))
-            images: dict = row.get("images") or {}
-            urls: list[str] = [v for v in images.values() if isinstance(v, str)]
-            samples.append(
-                LabelledGradingSample(
-                    source="psa_cert",
-                    source_id=str(row.get("source_id", "")),
-                    grade_company="PSA",
-                    overall_grade=_to_float(row.get("grade")),
-                    corners_score=surface_score,
-                    image_urls=urls,
-                    printing_id=row.get("printing_id"),
-                    raw_metadata=row.get("raw_metadata") or {},
-                )
-            )
-        return samples
-
-
-class _SurfaceEbayLoader:
-    """Normalise ``ebay_graded_listing_observation`` rows for surface training."""
-
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
-        self._rows = rows
-
-    def load(self) -> list[LabelledGradingSample]:
-        samples: list[LabelledGradingSample] = []
-        for row in self._rows:
-            sub: dict = row.get("parsed_sub_grades") or {}
-            surface_score = _to_float(sub.get("surface"))
-            thumbnail = row.get("thumbnail_url")
-            urls: list[str] = [thumbnail] if thumbnail else []
-            company = row.get("parsed_grading_company") or "OTHER"
-            samples.append(
-                LabelledGradingSample(
-                    source="ebay_sold",
-                    source_id=str(row.get("listing_id", "")),
-                    grade_company=company,
-                    overall_grade=_to_float(row.get("parsed_overall_grade")),
-                    corners_score=surface_score,
-                    image_urls=urls,
-                    printing_id=row.get("printing_id"),
-                    raw_metadata={"title": row.get("title", "")},
-                )
-            )
-        return samples
-
-
-class _SurfaceAuctionLoader:
-    """Normalise ``auction_lot_observation`` rows for surface training."""
-
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
-        self._rows = rows
-
-    def load(self) -> list[LabelledGradingSample]:
-        samples: list[LabelledGradingSample] = []
-        for row in self._rows:
-            sub: dict = row.get("parsed_sub_grades") or {}
-            surface_score = _to_float(sub.get("surface"))
-            image_urls: list[str] = list(row.get("lot_image_urls") or [])
-            house = row.get("auction_house") or "unknown"
-            company = row.get("parsed_grading_company") or "OTHER"
-            samples.append(
-                LabelledGradingSample(
-                    source=f"auction_{house}",
-                    source_id=str(row.get("lot_id", "")),
-                    grade_company=company,
-                    overall_grade=_to_float(row.get("parsed_overall_grade")),
-                    corners_score=surface_score,
-                    image_urls=image_urls,
-                    printing_id=row.get("printing_id"),
-                    raw_metadata={"lot_title": row.get("lot_title", "")},
-                )
-            )
-        return samples
-
-
-class SurfaceMergedDataLoader:
-    """Union of PSA + eBay + Auction loaders, filtered to surface-labelled rows.
-
-    Reads ``subgrades->>'surface'`` (PSA) and ``parsed_sub_grades->>'surface'``
-    (eBay + auctions) from raw rows.  The surface score is stored in
-    ``LabelledGradingSample.corners_score`` — the generic label slot shared by
-    all sub-grade modules (naming tracked as #FU-44).
-
-    Args:
-        psa_rows: ``grading_training_sample`` rows (source='psa_cert').
-        ebay_rows: ``ebay_graded_listing_observation`` rows.
-        auction_rows: ``auction_lot_observation`` rows.
-    """
-
-    def __init__(
-        self,
-        psa_rows: list[dict[str, Any]],
-        ebay_rows: list[dict[str, Any]],
-        auction_rows: list[dict[str, Any]],
-    ) -> None:
-        self._psa = _SurfacePSALoader(psa_rows)
-        self._ebay = _SurfaceEbayLoader(ebay_rows)
-        self._auction = _SurfaceAuctionLoader(auction_rows)
-
-    def load_all(self) -> list[LabelledGradingSample]:
-        """Return all samples regardless of surface label availability."""
-        return self._psa.load() + self._ebay.load() + self._auction.load()
-
-    def load_labelled(self) -> list[LabelledGradingSample]:
-        """Return only samples with a non-null surface score."""
-        return [s for s in self.load_all() if s.corners_score is not None]
-
-    def load(self) -> list[LabelledGradingSample]:
-        return self.load_labelled()
-
-    def __len__(self) -> int:
-        return len(self.load_labelled())
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +59,7 @@ class SurfaceDataset:
     are available, the last URL is repeated to pad (same strategy as CornersDataset).
 
     Args:
-        samples: Filtered list (all with ``corners_score`` non-null = surface-labelled).
+        samples: Filtered list (all with ``subgrade_score`` non-null = surface-labelled).
         image_loader: ``ImageLoader`` instance. Defaults to mock mode.
         patch_size: Side length (pixels) for each image patch.
         num_shots: Number of shots to include in the feature vector (2 or 3).
@@ -221,7 +77,7 @@ class SurfaceDataset:
                 f"num_shots must be {NUM_SURFACE_SHOTS_V1} (v1) or "
                 f"{NUM_SURFACE_SHOTS_WITH_RAKING} (with raking light), got {num_shots}"
             )
-        self._samples = [s for s in samples if s.corners_score is not None]
+        self._samples = [s for s in samples if s.is_labelled()]
         self._loader = image_loader or ImageLoader(live=False, size=patch_size)
         self._patch_size = patch_size
         self._num_shots = num_shots
@@ -239,7 +95,7 @@ class SurfaceDataset:
         return len(self._samples)
 
     def __getitem__(self, idx: int) -> tuple[np.ndarray, float]:
-        """Return ``(feature_vector, surface_score)`` for one sample.
+        """Return ``(feature_vector, subgrade_score)`` for one sample.
 
         The feature vector has shape ``(input_dim,)``; it is the concatenation
         of ``num_shots`` flattened image-patch arrays.
@@ -247,7 +103,7 @@ class SurfaceDataset:
         sample = self._samples[idx]
         patches = self._load_patches(sample.image_urls)
         feature = patches.flatten().astype(np.float32)
-        label = float(sample.corners_score)  # type: ignore[arg-type]
+        label = float(sample.subgrade_score)  # type: ignore[arg-type]
         return feature, label
 
     def build_arrays(self) -> tuple[np.ndarray, np.ndarray]:

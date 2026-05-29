@@ -23,7 +23,7 @@ class CornersDataset:
     """Build (X, y) arrays from a list of labelled grading samples.
 
     Args:
-        samples: Filtered list (all with ``corners_score`` non-null).
+        samples: Filtered list (all with ``subgrade_score`` non-null).
         image_loader: ``ImageLoader`` instance.  Defaults to mock mode.
         patch_size: Side length (pixels) for each corner crop.
     """
@@ -34,7 +34,7 @@ class CornersDataset:
         image_loader: Optional[ImageLoader] = None,
         patch_size: int = 8,
     ) -> None:
-        self._samples = [s for s in samples if s.is_labelled_for_corners()]
+        self._samples = [s for s in samples if s.is_labelled()]
         self._loader = image_loader or ImageLoader(live=False, size=patch_size)
         self._patch_size = patch_size
         self._input_dim = NUM_CORNERS * patch_size * patch_size * 3
@@ -47,7 +47,7 @@ class CornersDataset:
         return len(self._samples)
 
     def __getitem__(self, idx: int) -> tuple[np.ndarray, float]:
-        """Return ``(feature_vector, corners_score)`` for one sample.
+        """Return ``(feature_vector, subgrade_score)`` for one sample.
 
         The feature vector has shape ``(input_dim,)``; it is the concatenation
         of 4 flattened corner-patch arrays.
@@ -55,7 +55,7 @@ class CornersDataset:
         sample = self._samples[idx]
         patches = self._load_patches(sample.image_urls)
         feature = patches.flatten().astype(np.float32)
-        label = float(sample.corners_score)  # type: ignore[arg-type]
+        label = float(sample.subgrade_score)  # type: ignore[arg-type]
         return feature, label
 
     def build_arrays(self) -> tuple[np.ndarray, np.ndarray]:

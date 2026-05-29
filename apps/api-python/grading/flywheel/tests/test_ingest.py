@@ -104,9 +104,9 @@ class TestBuildTrainingSampleRow:
         assert isinstance(sample, LabelledGradingSample)
         assert sample.source == "psa_cert"  # loader re-tags by table
         assert sample.grade_company == "PSA"
-        assert sample.corners_score == 9.5
+        assert sample.subgrade_score == 9.5
         assert sample.overall_grade == 9.0
-        assert sample.is_labelled_for_corners()
+        assert sample.is_labelled()
 
 
 class TestImageHandler:

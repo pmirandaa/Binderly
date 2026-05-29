@@ -9,7 +9,7 @@ Or via Make::
     make train  # in apps/api-python/grading/edges/
 
 The training pipeline:
-1. Load labelled samples via ``EdgesMergedDataLoader``.
+1. Load labelled samples via ``MergedDataLoader(subgrade_key='edges')``.
 2. Build feature arrays via ``EdgesDataset``.
 3. Split 80/20 train/val.
 4. Run ``TrainingLoop`` for ``num_epochs``.
@@ -26,9 +26,10 @@ from typing import Any, Optional
 
 import numpy as np
 
-from grading.edges.dataset import EdgesDataset, EdgesMergedDataLoader
+from grading.edges.dataset import EdgesDataset
 from grading.edges.export import export_edges_model
 from grading.edges.model import EdgesModel
+from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.training_loop import TrainingLoop, mse_loss
 from grading.ml_common.types import TrainingConfig, TrainingResult
 
@@ -59,7 +60,7 @@ def train_edges_model(
     if config is None:
         config = TrainingConfig(subgrade_column="edges", patch_size=patch_size)
 
-    loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
     labelled = loader.load_labelled()
 
     if not labelled:
