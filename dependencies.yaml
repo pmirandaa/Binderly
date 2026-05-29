@@ -1081,7 +1081,7 @@ tasks:
     stage: 11-deployment
     title: Vercel deployment for web
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-W-SHELL]
     parallel_safe_with: [T-DP-FLY, T-DP-SUPABASE-PROD, T-DP-R2-PROD]
     provides: [deploy:vercel]
@@ -1094,7 +1094,7 @@ tasks:
     stage: 11-deployment
     title: Fly.io deployment for Python services
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-SC-ANN-INDEX, T-GR-AGGREGATE]
     parallel_safe_with: [T-DP-VERCEL, T-DP-SUPABASE-PROD, T-DP-R2-PROD]
     provides: [deploy:fly]
@@ -1107,7 +1107,7 @@ tasks:
     stage: 11-deployment
     title: Supabase production project + migrations CI
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-DL-RLS-POLICIES]
     parallel_safe_with: [T-DP-VERCEL, T-DP-FLY, T-DP-R2-PROD]
     provides: [deploy:supabase]
@@ -1120,7 +1120,7 @@ tasks:
     stage: 11-deployment
     title: R2 production buckets + access keys
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-DL-IMAGE-PIPELINE]
     parallel_safe_with: [T-DP-VERCEL, T-DP-FLY, T-DP-SUPABASE-PROD]
     provides: [deploy:r2]

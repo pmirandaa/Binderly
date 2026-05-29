@@ -934,3 +934,62 @@ escalation required. Backend follow-ups:
 - `T-SH-SOCIAL-LINKS` — add `social_links` jsonb to `profile`, contract,
   client, settings-UI row editor.
 
+
+---
+
+## Q-021 — Fly target has no HTTP entrypoint: api-python ships only batch/CLI jobs
+
+**Raised:** 2026-05-29 (iter 33, by the T-DP-INFRA / Stage 11 deployment cluster worker)
+**Blocking:** A *live* Fly deploy of `apps/api-python` (T-DP-FLY). NOT blocking
+the scaffolding — `infra/fly/` config + Dockerfile + `deploy-fly.yml` shipped
+and are inert until `FLY_API_TOKEN` is provisioned anyway.
+
+**Context:**
+
+`PROJECT.md` § 3 (tech-stack table) and § 4 name "Heavy services | Python
+(FastAPI) on Fly.io". But the actual `apps/api-python/` package currently
+ships **only batch / offline / CLI jobs** — `embeddings/`, `ann/`, `grading/`
+modules plus console scripts in `pyproject.toml` `[project.scripts]`
+(`binderly-build-tflite`, `binderly-build-card-embeddings`,
+`binderly-build-ann-index`, `binderly-embeddings-smoke`). There is **no
+FastAPI / ASGI app, no `uvicorn`/`fastapi` dependency, and no HTTP
+entrypoint** anywhere in the tree (grep for `fastapi|uvicorn|@app` → 0 hits).
+
+A Fly app with an `[http_service]` + `/healthz` check (which `fly.toml`
+declares) needs a long-running server that binds a port. With no entrypoint,
+`flyctl deploy` would build the image fine but the machine would fail its
+healthcheck and never go healthy. Adding the entrypoint (an
+`binderly_api.main:app` ASGI module exposing `/healthz` + the future
+grading/recognition routes referenced by #FU-46 / `T-GR-SERVING`) plus
+`fastapi` + `uvicorn[standard]` deps is **application source owned by the
+Python track**, not deploy config — out of scope for this config-only
+deployment task, and per the dispatch escalation rules it is surfaced here
+rather than guessed/built invasively.
+
+**Options:**
+
+1. **Add a minimal FastAPI serving app to `apps/api-python`** (a
+   `binderly_api/main.py` with `GET /healthz` to start, growing into the
+   grading/recognition endpoints) + add `fastapi`/`uvicorn` to `dependencies`.
+   The shipped `infra/fly/{fly.toml,Dockerfile}` already target
+   `binderly_api.main:app`, so this is the only missing piece for a live
+   long-running service. — Recommended if Fly is meant to *serve traffic*
+   (the PROJECT.md reading). Tracked as the Stage 11 go-live follow-up.
+2. **Repurpose Fly for batch/cron jobs only** (no HTTP server): replace
+   `[http_service]` with a `[processes]` worker or scheduled Fly Machines
+   that run the existing console scripts on a cadence. Changes the topology
+   (no healthcheck-on-port). — Pick this if the Python service is only ever
+   offline pipelines and the "serving" need is satisfied elsewhere.
+3. **Defer Fly entirely** until a Python service genuinely needs to serve
+   traffic (e.g. cloud scan fallback / grading serving), and run the batch
+   jobs from CI / locally in the meantime. — Lowest cost now; revisit at the
+   first real serving requirement.
+
+**Recommendation:** Option 1. PROJECT.md clearly intends a FastAPI service on
+Fly, and the grading-serving follow-ups (#FU-46 / `T-GR-SERVING`) will need
+exactly this. The deploy scaffolding is written so that landing the entrypoint
++ the two deps is the *only* remaining step before a live deploy works. Logged
+as the Stage 11 go-live follow-up; the deploy-fly workflow stays inert until
+both `FLY_API_TOKEN` and the entrypoint exist.
+
+**Pablo's answer:** _(empty until answered)_
