@@ -1,0 +1,50 @@
+# Fly.io app config for the Binderly Python service (apps/api-python).
+#
+# SCAFFOLDING (Stage 11): this declares a small FastAPI-style HTTP service.
+# The api-python package currently ships only batch/CLI jobs and has NO HTTP
+# entrypoint yet (see open-questions.md Q-021 + the Stage 11 go-live
+# follow-up). `infra/fly/Dockerfile`'s CMD targets `binderly_api.main:app`,
+# the ASGI entrypoint the follow-up will add. Until then this config is
+# correct-but-inert: `flyctl deploy` only runs once FLY_API_TOKEN is set
+# (see .github/workflows/deploy-fly.yml + infra/DEPLOYMENT_SECRETS.md), and a
+# live deploy additionally needs the entrypoint to bind :8080 for the
+# healthcheck to pass.
+#
+# `app` is a PLACEHOLDER — Pablo runs `fly apps create binderly-api` (or
+# picks a name) and updates this field (or passes `--app` to flyctl) at
+# go-live.
+
+app = "binderly-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  # Quiet TF/abseil log noise if any module transitively imports it.
+  TF_CPP_MIN_LOG_LEVEL = "3"
+
+# Single HTTP service. Fly terminates TLS at the edge and forwards to the
+# app's internal port. Autostop/autostart keeps the free-tier VM idle when
+# there is no traffic (cost ceiling per PROJECT.md § 4).
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+# Small shared-CPU VM — sane default for a low-traffic FastAPI service.
+# Bump to performance-* or add memory if embedding/grading inference needs it.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpus = 1

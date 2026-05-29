@@ -1,0 +1,35 @@
+# Keep the Fly build context lean. The Dockerfile only needs apps/api-python,
+# but flyctl tars the whole context (repo root) — exclude everything heavy /
+# irrelevant so uploads stay small and builds stay fast.
+
+# JS monorepo — never needed by the Python image.
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+**/dist/
+.turbo/
+**/.turbo/
+apps/web/
+apps/mobile/
+packages/
+data-pipeline/
+
+# Python build/test artefacts.
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.venv/
+**/*.egg-info/
+.mypy_cache/
+
+# VCS + tooling.
+.git/
+.github/
+**/.DS_Store
+
+# Large offline-only model/training assets are fetched from R2 at runtime,
+# never baked into the image.
+**/*.tflite
+**/*.onnx
+**/*.npz
