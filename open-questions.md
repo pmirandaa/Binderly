@@ -1267,9 +1267,7 @@ wants per-binder overrides.
 
 ## Q-028 — `mv_current_price` v2 trend/freshness display semantics + freshness source (T-DL-PRICING-CURRENT-VIEW-V2 / #FU-5; pairs with T-SP-PRICING-DISPLAY)
 
-**Status:** additive defaults shipped (backward-compatible); the display
-semantics + the freshness-source switch are flagged for T-SP-PRICING-DISPLAY
-(non-blocking). (Numbering: authored as **Q-028**.)
+**Status:** ✅ **RESOLVED** (#FU-66 / T-SP-PRICING-DISPLAY-TRENDS; squash `c2ddd33`, #117). The display semantics were decided and wired on web (`CardPriceBlock`) + mobile (`PriceBlock`); see the **Resolution** note at the foot of this entry. (Numbering: authored as **Q-028**.)
 
 **Context.** Migration `0028_pricing_current_view_v2.sql` enriched the
 `mv_current_price` materialized view with the richer shape from
@@ -1314,6 +1312,13 @@ owner) `anon`/`authenticated` ALL grants. Now SELECT-only and matching intent;
 **Consumer-side wiring** (render the trend arrow + % change + "last seen" on
 card detail; decide whether to flip `freshness` to `lastObservationAt`) is
 tracked as **#FU-66 (T-SP-PRICING-DISPLAY-TRENDS)**.
+
+**Resolution (#FU-66, squash `c2ddd33`, #117).**
+1. **Trend base** — kept the migration's server-side definition (latest daily median vs the reference median at/before the look-back, calendar-anchored). The UI renders the pre-computed `trend30dPct` + `trendDirection` **verbatim** — no client recompute. The headline shows the **30-day** trend; 90d/all-time stay on the DTO for a future expanded view.
+2. **±1% dead-band** — kept as shipped, in SQL. Consumers render the server-bucketed `trendDirection` directly (arrow ▲/▼/→ + colour) so SSR, client, and the OG image agree without re-implementing the threshold.
+3. **Freshness source** — `freshness` STAYS anchored on `computedAt` (rollup recency): fully backward-compatible, no bucket re-tuning. Instead `lastObservationAt` is surfaced **additively** as an explicit "Last seen {date}" line (the truer observation recency). Flipping the band itself to `lastObservationAt` — which needs the 7d/30d thresholds re-tuned against the real observation cadence — is deferred to **#FU-68**.
+
+Shared formatting lives in `@binderly/pricing-display` (`formatTrendPercent`, `trendArrow`, `trendDirectionLabel`, `hasRenderableTrend`) so web + mobile render identically. The trend is suppressed when `trendDirection` is `unknown`/absent or the % is unformattable; the "Last seen" line is omitted when `lastObservationAt` is null/absent.
 
 ---
 
