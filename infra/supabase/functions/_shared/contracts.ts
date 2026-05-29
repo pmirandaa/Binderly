@@ -400,3 +400,78 @@ function walkRangeRules(
     }
   }
 }
+
+// ============================================================
+// `community_submission` write schema — mirror of
+// `api-contracts/communitySubmission.ts` (T-GR-COMMUNITY-FLYWHEEL /
+// #FU-55). The Edge Function bundle can't import the workspace
+// package (see this file's header), so the WRITE shape the
+// `POST /me/community-submissions` handler validates is mirrored
+// here. The corresponding parity tests live in `contracts.test.ts`.
+// ============================================================
+
+/**
+ * Grading companies the community flywheel accepts — a superset of
+ * `GRADE_COMPANIES` (which omits SGC). Pinned against the
+ * `community_submission_grade_company_check` DB constraint.
+ */
+export const COMMUNITY_GRADE_COMPANIES = ['PSA', 'BGS', 'CGC', 'SGC'] as const;
+export const communityGradeCompanySchema = z.enum(COMMUNITY_GRADE_COMPANIES);
+
+/** A grade on the canonical 1.0–10.0 0.5-step grid. */
+const communityGradeSchema = z
+  .number()
+  .min(1)
+  .max(10)
+  .refine((v) => Number.isInteger(v * 2), {
+    message: 'grade must be on the 0.5 step grid (e.g. 9 or 9.5)',
+  });
+
+const communitySubgradesSchema = z
+  .object({
+    centering: communityGradeSchema.optional(),
+    corners: communityGradeSchema.optional(),
+    edges: communityGradeSchema.optional(),
+    surface: communityGradeSchema.optional(),
+  })
+  .strict();
+
+const communitySubmissionImagesSchema = z
+  .object({
+    front: z.string().url(),
+    back: z.string().url(),
+    corners: z.array(z.string().url()).optional(),
+    surface: z.string().url().optional(),
+    slab: z.string().url().optional(),
+  })
+  .strict();
+
+/**
+ * Submit a graded outcome to the community flywheel. `consent` MUST be
+ * `true`; at least one grade signal is required (an `overallGrade`, a
+ * non-empty `subgrades`, or `blackLabel: true`).
+ */
+export const submitCommunitySubmissionRequest = z
+  .object({
+    gradeCompany: communityGradeCompanySchema,
+    certNumber: z.string().min(1).max(64),
+    overallGrade: communityGradeSchema.nullish(),
+    subgrades: communitySubgradesSchema.nullish(),
+    blackLabel: z.boolean().optional().default(false),
+    rawGradeLabel: z.string().max(64).nullish(),
+    images: communitySubmissionImagesSchema,
+    gradingSubmissionId: uuidSchema.optional(),
+    consent: z.literal(true),
+  })
+  .strict()
+  .refine(
+    (v) =>
+      v.blackLabel === true ||
+      (v.overallGrade !== null && v.overallGrade !== undefined) ||
+      (v.subgrades !== null && v.subgrades !== undefined && Object.keys(v.subgrades).length > 0),
+    {
+      message: 'a grade is required: provide overallGrade, sub-grades, or blackLabel',
+      path: ['overallGrade'],
+    },
+  );
+export type SubmitCommunitySubmissionRequest = z.infer<typeof submitCommunitySubmissionRequest>;

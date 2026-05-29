@@ -994,11 +994,64 @@ both `FLY_API_TOKEN` and the entrypoint exist.
 
 **Pablo's answer:** _(empty until answered)_
 
+
 ---
 
-## Q-022 — Cross-company grade calibration constants are unvalidated placeholders (T-GR-GRADE-CALIBRATION / #FU-56)
+## Q-022 — Mobile release cadence + OTA (EAS Update) strategy not yet decided
 
-**Raised:** 2026-05-29 (iter 34, by the grading-data-hygiene worker)
+**Raised:** 2026-05-29 (iter 35, by the T-DP-EAS / Stage 11 deployment worker)
+**Blocking:** Nothing. The EAS build/submit scaffolding (`apps/mobile/eas.json`
++ `deploy-mobile.yml`) ships and is inert until `EXPO_TOKEN` is provisioned.
+This is a forward-looking process/topology decision, not a blocker.
+
+**Context:**
+
+The EAS scaffolding deliberately makes two choices that are reversible but
+worth confirming before go-live:
+
+1. **Build cadence = manual dispatch only.** Unlike `deploy-web` /
+   `deploy-fly` / `deploy-db` (which auto-run on push to `main`), the mobile
+   workflow is `workflow_dispatch`-only and store submission is an opt-in
+   input. Native EAS builds consume metered build minutes and store releases
+   have review/cadence implications, so auto-building every `apps/mobile/**`
+   push seemed wrong. The trade-off is there's no automatic
+   build-on-merge signal for mobile.
+2. **No OTA (`expo-updates`) runtime is wired.** `eas.json` declares
+   `development`/`preview`/`production` **channels** so EAS Update can be
+   layered on later, but the app has no `expo-updates` dependency or runtime
+   config today, so JS-only hotfixes still require a full store build. Wiring
+   OTA is an application-code change (adds `expo-updates`, runtime version
+   policy, update-check UX) owned by the mobile track, not deploy config.
+
+Also note `extra.eas.projectId` is intentionally absent from `app.json` — it's
+written by `eas init` against Pablo's real Expo account (first-run setup in
+`infra/eas/README.md`), so it can't be committed by this scaffolding task.
+
+**Options:**
+
+1. **Keep manual-dispatch builds + add OTA later.** Ship as scaffolded; wire
+   `expo-updates` + `eas update` as a follow-up (#FU-58) once an Expo account
+   exists. — Recommended; lowest cost now, matches the "inert until secrets"
+   posture and avoids burning build minutes pre-launch.
+2. **Auto-build a `preview` profile on merge to `main`.** Gives a continuous
+   internal-QA build per merge. — Costs build minutes continuously; revisit
+   post-launch if the team wants nightly internal builds.
+3. **Wire OTA now (mock/dev only).** Add `expo-updates` immediately so the
+   channel wiring is exercised end-to-end. — More invasive app-code change for
+   no pre-account benefit; better as the #FU-58 follow-up.
+
+**Recommendation:** Option 1. The build/submit config is correct and inert; the
+OTA wiring + any auto-build cadence are best decided once Pablo has an Expo
+account and a launch timeline. Logged as Stage 11 go-live (#FU-53) for the
+account/token, with the OTA wiring tracked separately as #FU-58.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-023 — Cross-company grade calibration constants are unvalidated placeholders (T-GR-GRADE-CALIBRATION / #FU-56)
+
+**Raised:** 2026-05-29 (iter 34, by the grading-data-hygiene worker; renumbered from Q-022 → Q-023 at merge — the parallel T-DP-EAS worker claimed Q-022)
 **Blocking:** No — `grading/calibration/` ships as a scaffold with a documented placeholder affine map (PSA-anchored, per-company `slope`/`intercept`), so downstream flywheel/pricing code has a single normalised scale to consume today. Nothing depends on the constants being *correct* yet.
 
 **Context:**
@@ -1013,6 +1066,6 @@ The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`)
 2. Granularity: is a single per-company affine enough, or do we need per-company-**per-grade-tier** constants (cross-grade equivalence is non-linear at the very top — the 9.5↔10 band behaves differently from the mid-scale)?
 3. Should the normalised scale stay PSA-anchored, or move to a company-neutral latent scale once learned?
 
-**Proposed resolution → #FU-58 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-58 in `status.md`'s Known Follow-ups.
+**Proposed resolution → #FU-59 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-59 in `status.md`'s Known Follow-ups.
 
 **Status: open** (non-blocking; placeholder scaffold is sufficient until labelled cross-company data exists).

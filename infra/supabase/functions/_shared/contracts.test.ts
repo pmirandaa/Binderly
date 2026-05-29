@@ -6,9 +6,11 @@ import {
   bulkUpdateCollectionRequest,
   CARD_CONDITIONS,
   COLLECTION_ITEM_SOURCES,
+  COMMUNITY_GRADE_COMPANIES,
   createCustomCollectionRequest,
   GRADE_COMPANIES,
   slugSchema,
+  submitCommunitySubmissionRequest,
   updateCollectionItemRequest,
   updateCustomCollectionRequest,
   updateSmartCollectionExpressionRequest,
@@ -221,6 +223,82 @@ describe('updateSmartCollectionExpressionRequest', () => {
     expect(updateSmartCollectionExpressionRequest.safeParse({ expression: null }).success).toBe(
       true,
     );
+  });
+});
+
+describe('submitCommunitySubmissionRequest', () => {
+  const FRONT = 'https://cdn.binderly.test/front.jpg';
+  const BACK = 'https://cdn.binderly.test/back.jpg';
+  const base = {
+    gradeCompany: 'PSA',
+    certNumber: '12345678',
+    images: { front: FRONT, back: BACK },
+    consent: true,
+  } as const;
+
+  it('accepts a minimal valid payload with an overallGrade', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({ ...base, overallGrade: 9 });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts SGC (superset of the collection grade companies)', () => {
+    expect(COMMUNITY_GRADE_COMPANIES).toContain('SGC');
+    const result = submitCommunitySubmissionRequest.safeParse({
+      ...base,
+      gradeCompany: 'SGC',
+      overallGrade: 10,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects consent !== true', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({
+      ...base,
+      overallGrade: 9,
+      consent: false,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('requires at least one grade signal', () => {
+    const result = submitCommunitySubmissionRequest.safeParse(base);
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts blackLabel as the sole grade signal', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({ ...base, blackLabel: true });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts non-empty subgrades as the sole grade signal', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({
+      ...base,
+      subgrades: { centering: 9.5 },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an off-grid grade (e.g. 8.3)', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({ ...base, overallGrade: 8.3 });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an unknown key (strict)', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({
+      ...base,
+      overallGrade: 9,
+      surprise: true,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('requires front + back images', () => {
+    const result = submitCommunitySubmissionRequest.safeParse({
+      ...base,
+      overallGrade: 9,
+      images: { front: FRONT },
+    });
+    expect(result.success).toBe(false);
   });
 });
 

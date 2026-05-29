@@ -134,6 +134,104 @@ describe('GET /v1/me/collection — list', () => {
   });
 });
 
+describe('GET /v1/me/collection/:id — single-GET (#FU-49)', () => {
+  it('returns the row wrapped in a success envelope', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [{ data: collectionItemRowFixture(), error: null }],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/collection/${FIXTURE_COLLECTION_ITEM_ID}`,
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(response.status).toBe(200);
+    const data = await readSuccessBody<{ id: string; printingId: string }>(response);
+    expect(data.id).toBe(FIXTURE_COLLECTION_ITEM_ID);
+    expect(data.printingId).toBe(FIXTURE_PRINTING_ID);
+  });
+
+  it('queries by id with maybeSingle and filters the table', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [{ data: collectionItemRowFixture(), error: null }],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/collection/${FIXTURE_COLLECTION_ITEM_ID}`,
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    const eqCall = fake.calls.find((c) => c.method === 'eq');
+    expect(eqCall?.args).toEqual(['id', FIXTURE_COLLECTION_ITEM_ID]);
+    expect(fake.calls.some((c) => c.method === 'maybeSingle')).toBe(true);
+  });
+
+  it('returns 404 when the row is absent (or owned by another user via RLS)', async () => {
+    const fake = createFakeSupabase({
+      tableResponses: {
+        collection_item: [{ data: null, error: null }],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/collection/${FIXTURE_COLLECTION_ITEM_ID}`,
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(response.status).toBe(404);
+    const body = await readErrorBody(response);
+    expect(body.error.code).toBe('NOT_FOUND');
+  });
+
+  it('returns 401 for a missing JWT', async () => {
+    const fake = createFakeSupabase();
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: `http://localhost/v1/me/collection/${FIXTURE_COLLECTION_ITEM_ID}`,
+        method: 'GET',
+      }),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('does NOT shadow the literal GET /me/collection/completion route', async () => {
+    // `completion` and `:id` both match a 3-segment GET; the literal
+    // route is registered first, so it must win. The completion handler
+    // reads the MV wrapper views + the `set` catalog — NOT
+    // `collection_item`. We assert the completion path was taken by
+    // confirming a 200 and that the single-GET's `collection_item` read
+    // never happened.
+    const fake = createFakeSupabase({
+      tableResponses: {
+        v_my_set_completion: [{ data: [], error: null }],
+        v_my_global_completion: [{ data: [], error: null }],
+        set: [{ data: [], error: null }],
+      },
+    });
+    const handler = makeHandlerWithFake(fake);
+    const response = await handler(
+      buildRequest({
+        url: 'http://localhost/v1/me/collection/completion',
+        method: 'GET',
+        token: makeFakeJwt(),
+      }),
+    );
+    expect(response.status).toBe(200);
+    expect(fake.calls.some((c) => c.table === 'collection_item')).toBe(false);
+  });
+});
+
 describe('POST /v1/me/collection — add (idempotent)', () => {
   it('inserts a new row and returns 201', async () => {
     const fake = createFakeSupabase({

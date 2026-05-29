@@ -219,6 +219,47 @@ export async function handleListCollection(
 }
 
 // ============================================================
+// GET /me/collection/:id — fetch one row (single-GET, #FU-49)
+// ============================================================
+
+/**
+ * Single-item read. Closes the Q-019 gap: the api-client lacked a
+ * single-GET for a `collection_item`, so repositories had to either
+ * re-page the whole list or reach around the API with a direct
+ * PostgREST read. With this route a consumer can hydrate / refresh one
+ * row by id (e.g. after a deep-link, or to re-validate a cached item)
+ * through the same RLS-gated, typed-DTO path every other endpoint uses.
+ *
+ * RLS keys `auth.uid() = user_id`, so a row owned by another user is
+ * invisible and surfaces as a clean `NOT_FOUND` (we deliberately do not
+ * distinguish "doesn't exist" from "not yours" on a read — that avoids
+ * leaking row existence across users).
+ */
+export async function handleGetCollectionItem(
+  request: Request,
+  match: RouteMatch,
+  ctx: HandlerContext,
+): Promise<Response> {
+  const session = await requireUser(request, ctx.env, ctx.deps);
+  const id = match.params['id'];
+  if (id === undefined) {
+    throw new ApiError('VALIDATION', 'Missing :id path parameter.');
+  }
+  const { data, error } = await session.supabase
+    .from(COLLECTION_ITEM_TABLE)
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error !== null) {
+    throw translatePostgrestError(error);
+  }
+  if (data === null) {
+    throw new ApiError('NOT_FOUND', `collection_item ${id} not found.`);
+  }
+  return apiOk(request, ctx.cors, ctx.requestId, rowToWire(data as CollectionItemRow));
+}
+
+// ============================================================
 // POST /me/collection — add (additive upsert)
 // ============================================================
 

@@ -1,0 +1,144 @@
+# Production build + store submit for the Expo app (@binderly/mobile) → EAS.
+#
+# Deploy strategy: we drive Expo Application Services (EAS) via its CLI from CI.
+# The build profiles + submit targets live in version control
+# (apps/mobile/eas.json) instead of EAS dashboard state, so a release is
+# reproducible and reviewable. `cli.appVersionSource: remote` lets EAS own the
+# iOS buildNumber / Android versionCode (the production profile auto-increments
+# them), so CI never has to mutate app.json.
+#
+# SCAFFOLDING MODE (Stage 11): the live build/submit is GUARDED on the presence
+# of `secrets.EXPO_TOKEN`. Until Pablo provisions an Expo account + access
+# token (see infra/DEPLOYMENT_SECRETS.md + infra/eas/README.md), the `build`
+# job is SKIPPED — never failed — so this workflow is inert and green. The
+# moment EXPO_TOKEN is added (plus the store-credential secrets for submit),
+# builds go live with no YAML change.
+#
+# Cost note: native builds consume EAS build minutes, so this does NOT run on
+# every push. It runs on manual dispatch (choose profile + whether to submit)
+# and is otherwise inert. Store submission is opt-in via the `submit` input so
+# a build never auto-pushes to the App Store / Play Store unexpectedly.
+
+name: Deploy / Mobile (EAS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS build profile (eas.json)"
+        type: choice
+        default: production
+        options:
+          - production
+          - preview
+          - development
+      platform:
+        description: "Target platform(s)"
+        type: choice
+        default: all
+        options:
+          - all
+          - ios
+          - android
+      submit:
+        description: "Submit the build to the stores after it finishes (production only)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-mobile-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate: emit `enabled=true` only when the Expo token secret is present.
+  # Secrets can't be referenced in job-level `if:` directly, so we read the
+  # secret into a step env var and surface a boolean output the build job
+  # depends on. Absent secret → enabled=false → build job is skipped.
+  guard:
+    name: guard (secret presence)
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -n "$EXPO_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "EXPO_TOKEN present — live EAS build will run."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EXPO_TOKEN not set — skipping live EAS build/submit (Stage 11 scaffolding mode). See infra/DEPLOYMENT_SECRETS.md + infra/eas/README.md."
+          fi
+
+  build:
+    name: build (eas build${{ inputs.submit && ' --auto-submit' || '' }})
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      # Store-submit credentials (consumed by eas.json `submit` profile via
+      # env interpolation). Absent unless a submit run needs them; the build
+      # itself doesn't require them.
+      ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+      ASC_API_KEY_ISSUER_ID: ${{ secrets.ASC_API_KEY_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable Corepack and activate pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.9 --activate
+          pnpm --version
+      - name: Resolve pnpm store path
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      # Materialise the file-based store credentials referenced by eas.json's
+      # submit profile ($ASC_API_KEY_PATH / $GOOGLE_SERVICE_ACCOUNT_KEY_PATH).
+      # No-ops when the secrets are absent (i.e. build-only runs).
+      - name: Stage store-submit credential files
+        if: ${{ inputs.submit }}
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          GOOGLE_SERVICE_ACCOUNT_KEY_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_KEY_JSON }}
+        run: |
+          if [ -n "$ASC_API_KEY_P8" ]; then
+            printf '%s' "$ASC_API_KEY_P8" > "$RUNNER_TEMP/asc-api-key.p8"
+            echo "ASC_API_KEY_PATH=$RUNNER_TEMP/asc-api-key.p8" >> "$GITHUB_ENV"
+          fi
+          if [ -n "$GOOGLE_SERVICE_ACCOUNT_KEY_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICE_ACCOUNT_KEY_JSON" > "$RUNNER_TEMP/google-service-account.json"
+            echo "GOOGLE_SERVICE_ACCOUNT_KEY_PATH=$RUNNER_TEMP/google-service-account.json" >> "$GITHUB_ENV"
+          fi
+      - name: EAS build (+ optional store submit)
+        working-directory: apps/mobile
+        run: |
+          eas build \
+            --non-interactive \
+            --no-wait \
+            --platform "${{ inputs.platform }}" \
+            --profile "${{ inputs.profile }}" \
+            ${{ inputs.submit && '--auto-submit' || '' }}

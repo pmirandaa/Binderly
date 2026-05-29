@@ -14,11 +14,13 @@
 // The endpoint is idempotent on `(gradeCompany, certNumber)`: a re-submit
 // returns the existing row with `alreadySubmitted: true`.
 //
-// NOTE: the matching Edge Function handler is a follow-up (#FU-56) — the
-// contract + client surface are pinned now, exactly as the `grading` resource
-// preceded its handler. Until then this resource is exercised against the
-// mocked-fetch test harness; the mobile screen consumes it through an injected
-// `BinderlyClient`, so it is fully testable without the live endpoint.
+// NOTE: the matching Edge Function handler shipped in #FU-55
+// (`infra/supabase/functions/_shared/handlers/communitySubmissions.ts`,
+// route `POST /me/community-submissions`). The contract + client surface here
+// were pinned ahead of it, exactly as the `grading` resource preceded its
+// handler; this resource is also exercised against the mocked-fetch test
+// harness, and the mobile screen consumes it through an injected
+// `BinderlyClient`.
 
 import {
   submitCommunitySubmissionRequest,

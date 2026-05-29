@@ -71,6 +71,46 @@ describe('collection.listCollectionItems', () => {
 });
 
 // ============================================================
+// getCollectionItem (single-GET, #FU-49)
+// ============================================================
+
+describe('collection.getCollectionItem', () => {
+  it('returns the single collection item on happy path', async () => {
+    const { collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_COLLECTION_ITEM) }),
+    );
+    const item = await collection.getCollectionItem({ id: FIXTURE_IDS.collectionItemId });
+    expect(item.id).toBe(FIXTURE_IDS.collectionItemId);
+  });
+
+  it('hits GET /v1/me/collection/:id with the id encoded into the path', async () => {
+    const { fetch, collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_COLLECTION_ITEM) }),
+    );
+    await collection.getCollectionItem({ id: FIXTURE_IDS.collectionItemId });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain(`/v1/me/collection/${FIXTURE_IDS.collectionItemId}`);
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  it('throws ApiNotFoundError on 404', async () => {
+    const { collection } = makeResource(
+      mockFetch({ status: 404, body: errEnvelope({ code: 'NOT_FOUND', message: 'nope' }) }),
+    );
+    await expect(
+      collection.getCollectionItem({ id: FIXTURE_IDS.collectionItemId }),
+    ).rejects.toBeInstanceOf(ApiNotFoundError);
+  });
+
+  it('throws ApiUnauthorizedError on 401', async () => {
+    const { collection } = makeResource(mockFetch({ status: 401 }));
+    await expect(
+      collection.getCollectionItem({ id: FIXTURE_IDS.collectionItemId }),
+    ).rejects.toBeInstanceOf(ApiUnauthorizedError);
+  });
+});
+
+// ============================================================
 // addCollectionItem (write — outbound validation)
 // ============================================================
 
@@ -343,6 +383,46 @@ describe('collection.listCustomCollectionItems', () => {
     });
     expect(list).toHaveLength(1);
     expect(list[0]?.printingId).toBe(FIXTURE_IDS.printingId);
+  });
+});
+
+describe('collection.getCustomCollectionItem', () => {
+  it('returns the single membership row on happy path', async () => {
+    const { collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_CUSTOM_COLLECTION_ITEM) }),
+    );
+    const item = await collection.getCustomCollectionItem({
+      customCollectionId: FIXTURE_IDS.customCollectionId,
+      printingId: FIXTURE_IDS.printingId,
+    });
+    expect(item.printingId).toBe(FIXTURE_IDS.printingId);
+  });
+
+  it('hits GET /v1/me/custom-collections/:id/items/:printingId', async () => {
+    const { fetch, collection } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_CUSTOM_COLLECTION_ITEM) }),
+    );
+    await collection.getCustomCollectionItem({
+      customCollectionId: FIXTURE_IDS.customCollectionId,
+      printingId: FIXTURE_IDS.printingId,
+    });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain(
+      `/v1/me/custom-collections/${FIXTURE_IDS.customCollectionId}/items/${FIXTURE_IDS.printingId}`,
+    );
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  it('throws ApiNotFoundError on 404', async () => {
+    const { collection } = makeResource(
+      mockFetch({ status: 404, body: errEnvelope({ code: 'NOT_FOUND', message: 'nope' }) }),
+    );
+    await expect(
+      collection.getCustomCollectionItem({
+        customCollectionId: FIXTURE_IDS.customCollectionId,
+        printingId: FIXTURE_IDS.printingId,
+      }),
+    ).rejects.toBeInstanceOf(ApiNotFoundError);
   });
 });
 

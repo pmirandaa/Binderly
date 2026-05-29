@@ -11,12 +11,12 @@ exist so that downstream code (flywheel aggregation, pricing comparisons) has a
 single scale to work on *today*, with a clearly-marked seam for the learned
 version.
 
-Replacement path → #FU-58 (learned calibration):
+Replacement path → #FU-59 (learned calibration):
     Once the flywheel accumulates labelled cross-company pairs — the same
     physical card graded by ≥2 companies, or strong card-identity matches via
     #FU-40's printing match — fit per-company (or per-company-per-grade-tier)
     constants by regressing realised market value / agreed identity, and bump
-    ``CALIBRATION_VERSION``.  See Q-022 in open-questions.md.
+    ``CALIBRATION_VERSION``.  See Q-023 in open-questions.md.
 """
 
 from __future__ import annotations
