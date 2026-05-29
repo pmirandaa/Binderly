@@ -15,6 +15,7 @@ export * from './cards.js';
 export * from './collection.js';
 export * from './pricing.js';
 export * from './grading.js';
+export * from './communitySubmission.js';
 export * from './shareables.js';
 export * from './auth.js';
 export * from './entitlements.js';

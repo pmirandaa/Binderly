@@ -63,4 +63,9 @@ export * from './auction_lot_observation.js';
 // ============================================================
 export * from './paddle_webhook_log.js';
 
+// ============================================================
+// === T-GR-COMMUNITY-FLYWHEEL === (user-owned graded-outcome submissions)
+// ============================================================
+export * from './community_submission.js';
+
 export {};

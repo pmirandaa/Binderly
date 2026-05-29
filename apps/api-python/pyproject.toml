@@ -68,7 +68,7 @@ binderly-build-ann-index = "ann.scripts.build_ann_index:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["embeddings*", "ann*", "grading*", "grading.scrapers*", "grading.ml_common*", "grading.corners*"]
+include = ["embeddings*", "ann*", "grading*", "grading.scrapers*", "grading.ml_common*", "grading.corners*", "grading.flywheel*"]
 exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrapers.*.tests*"]
 
 [tool.setuptools.package-data]
@@ -78,6 +78,7 @@ exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrap
 "grading.centering" = ["py.typed"]
 "grading.ml_common" = ["py.typed"]
 "grading.corners" = ["py.typed"]
+"grading.flywheel" = ["py.typed"]
 "grading.scrapers" = ["py.typed"]
 "grading.scrapers.psa" = ["py.typed"]
 "grading.scrapers.ebay" = ["py.typed", "fixtures/*.json"]
@@ -94,6 +95,7 @@ testpaths = [
   "grading/centering/tests",
   "grading/ml_common/tests",
   "grading/corners/tests",
+  "grading/flywheel/tests",
   "grading/surface/tests",
   "grading/aggregate/tests",
   "grading/scrapers/psa/tests",

@@ -929,7 +929,7 @@ tasks:
     stage: 07-grading
     title: Community submission flywheel (paid users upload graded outcomes)
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-GR-AGGREGATE, T-PB-ENTITLEMENTS]
     parallel_safe_with: []
     provides: [grading:flywheel]
