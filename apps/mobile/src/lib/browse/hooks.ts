@@ -11,9 +11,11 @@
 //     paginate in MVP; "More results coming soon" is the documented
 //     placeholder per the task scope.
 //   - `useSetBySlugQuery(slug)` — resolves a `set.canonical_key`
-//     slug to a `SetDto` by consulting the same `/v1/sets` cache.
-//     Avoids a dedicated endpoint round-trip and keeps the
-//     `/sets/[slug]` route human-readable.
+//     slug to a `SetDto` via the shared `cards.getSetBySlug`
+//     api-client method (which scans the bounded `/v1/sets` list and
+//     matches the unique `canonical_key`). The same method backs the
+//     web `/sets/[slug]` route, so both platforms resolve slugs
+//     identically (#FU-64).
 //   - `useCardsInSetQuery(setId)` — first page of the per-set card
 //     list, sorted by `card.number` ascending (the natural set
 //     order).
@@ -26,6 +28,7 @@
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
+import { ApiNotFoundError } from '@binderly/api-client';
 import type {
   CardDto,
   CardWithPrintingsDto,
@@ -86,10 +89,10 @@ export type UseSetBySlugQueryResult = UseQueryResult<SetDto | null, Error>;
 
 /**
  * Resolve a `set.canonical_key` slug (e.g. `en-base1`) to a
- * `SetDto`. We piggy-back on the same `/v1/sets` page rather than
- * minting a dedicated endpoint — keeps the wire surface small and
- * the data flow obvious. Returns `null` (not `undefined`) for
- * "not in the catalog" so callers can pattern-match.
+ * `SetDto` via the shared `cards.getSetBySlug` api-client method.
+ * Returns `null` (not `undefined`) for "not in the catalog" — the
+ * method throws `ApiNotFoundError` on a miss, which we map to `null`
+ * so callers can pattern-match the same way they did before.
  */
 export function useSetBySlugQuery(slug: string | undefined): UseSetBySlugQueryResult {
   const client = useApiClient();
@@ -97,9 +100,12 @@ export function useSetBySlugQuery(slug: string | undefined): UseSetBySlugQueryRe
     enabled: typeof slug === 'string' && slug.length > 0,
     queryKey: BROWSE_QUERY_KEYS.setBySlug(slug ?? ''),
     queryFn: async () => {
-      const page = await client.cards.listSets({ limit: BROWSE_PAGE_LIMIT });
-      const match = page.items.find((set) => set.canonicalKey === slug);
-      return match ?? null;
+      try {
+        return await client.cards.getSetBySlug({ slug: slug as string });
+      } catch (error) {
+        if (error instanceof ApiNotFoundError) return null;
+        throw error;
+      }
     },
   });
 }

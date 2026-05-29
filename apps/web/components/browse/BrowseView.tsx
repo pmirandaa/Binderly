@@ -237,7 +237,7 @@ export function BrowseView({
                 {filtered.map((set) => (
                   <YStack key={set.id} width={260} flexBasis={260}>
                     <SetCard
-                      href={`/sets/${encodeURIComponent(set.id)}`}
+                      href={`/sets/${encodeURIComponent(set.canonicalKey)}`}
                       name={set.name}
                       releaseDateLabel={formatReleaseDate(set.releaseDate)}
                       cardCount={set.total ?? set.printedTotal}

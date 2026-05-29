@@ -1,9 +1,16 @@
 'use client';
 
 // Per-set view — header (name, release date, count, breadcrumb)
-// + grid of printing thumbnails. The view is fed the set id; it
-// fetches via the injected `BrowseApi` so tests can render
-// without a real api-client.
+// + grid of printing thumbnails. The view is fed the set **slug**
+// (`canonicalKey`, e.g. `en-base1`); it resolves the slug → set via
+// the injected `BrowseApi` so tests can render without a real
+// api-client. The slug convention matches mobile's `/sets/[slug]`
+// route (#FU-64).
+//
+// Legacy compatibility: if the route segment is a set **UUID**
+// (old `/sets/[id]` links), the view resolves it by id and
+// `router.replace`s to the canonical slug URL so previously shared
+// UUID links keep working.
 //
 // 404 is signalled by `onNotFound()` — the route file wraps that
 // in `next/navigation`'s `notFound()`. Keeping the navigation
@@ -11,7 +18,8 @@
 // (tests don't have to mock `notFound()`).
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 import { ApiNotFoundError } from '@binderly/api-client';
 import { Text, XStack, YStack } from '@binderly/ui';
@@ -25,10 +33,11 @@ import type { BrowseApi, PrintingsForSet } from '../../lib/browse/api';
 
 export interface SetViewProps {
   api: BrowseApi;
-  setId: string;
+  /** The set's `canonicalKey` slug (e.g. `en-base1`), or a legacy set UUID. */
+  slug: string;
   /**
-   * Called when the api-client reports the set id doesn't exist.
-   * The route file passes a callback that triggers Next.js's
+   * Called when the api-client reports the slug doesn't resolve to a
+   * set. The route file passes a callback that triggers Next.js's
    * `notFound()` rendering the closest `not-found.tsx`.
    */
   onNotFound?: () => void;
@@ -36,23 +45,45 @@ export interface SetViewProps {
 
 type FetchState =
   | { kind: 'loading' }
+  | { kind: 'redirecting' }
   | { kind: 'ready'; data: PrintingsForSet }
   | { kind: 'not-found' }
   | { kind: 'error'; message: string };
 
-export function SetView({ api, setId, onNotFound }: SetViewProps): React.ReactNode {
+/** Matches a canonical RFC-4122 UUID (the legacy `/sets/[id]` shape). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function SetView({ api, slug, onNotFound }: SetViewProps): React.ReactNode {
+  const router = useRouter();
+  // Keep `router` out of the effect deps: `useRouter()` returns a
+  // fresh object on every render (notably under test mocks), and
+  // depending on it would re-run the fetch effect on every render —
+  // an infinite loop. A ref gives the effect the latest router
+  // without making it a dependency.
+  const routerRef = useRef(router);
+  routerRef.current = router;
   const [state, setState] = useState<FetchState>({ kind: 'loading' });
 
   useEffect(() => {
     const controller = new AbortController();
     setState({ kind: 'loading' });
-    api
-      .listPrintingsInSet(setId, controller.signal)
-      .then((data) => {
+
+    async function load(): Promise<void> {
+      try {
+        // Legacy UUID URL → resolve by id and redirect to the slug URL.
+        if (UUID_RE.test(slug)) {
+          const set = await api.getSet(slug, controller.signal);
+          if (controller.signal.aborted) return;
+          setState({ kind: 'redirecting' });
+          routerRef.current.replace(`/sets/${encodeURIComponent(set.canonicalKey)}`);
+          return;
+        }
+        const set = await api.getSetBySlug(slug, controller.signal);
+        if (controller.signal.aborted) return;
+        const data = await api.listPrintingsInSet(set.id, controller.signal);
         if (controller.signal.aborted) return;
         setState({ kind: 'ready', data });
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (controller.signal.aborted) return;
         if (error instanceof DOMException && error.name === 'AbortError') return;
         if (error instanceof ApiNotFoundError) {
@@ -64,11 +95,14 @@ export function SetView({ api, setId, onNotFound }: SetViewProps): React.ReactNo
             ? error.message
             : 'Failed to load this set.';
         setState({ kind: 'error', message });
-      });
+      }
+    }
+
+    void load();
     return (): void => {
       controller.abort();
     };
-  }, [api, setId]);
+  }, [api, slug]);
 
   if (state.kind === 'not-found') {
     // `notFound()` MUST be called during render (per the Next.js
@@ -96,7 +130,7 @@ export function SetView({ api, setId, onNotFound }: SetViewProps): React.ReactNo
     );
   }
 
-  if (state.kind === 'loading') {
+  if (state.kind === 'loading' || state.kind === 'redirecting') {
     return (
       <YStack padding="$6" gap="$4" maxWidth={1200} marginHorizontal="auto" data-testid="set-page">
         <Breadcrumb />

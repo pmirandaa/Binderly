@@ -1,8 +1,9 @@
 // `apps/mobile/src/grading/centering` — public barrel.
 //
-// Exports the session-store seam (replaces the deprecated
-// `__getLastEmittedSession` from `grading/capture`), the centering service
-// contract + factory, the `useCentering` hook, and the `CenteringScreen`.
+// Exports the session-store seam (the router-param hand-off that replaced
+// the removed `__getLastEmittedSession` ref from `grading/capture`), the
+// centering service contract + factory, the `useCentering` hook, and the
+// `CenteringScreen`.
 //
 // Future sibling tasks (T-GR-CORNERS, T-GR-EDGES, T-GR-SURFACE) import
 // `getSession` from here to retrieve the same session by id.

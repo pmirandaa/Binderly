@@ -21,6 +21,7 @@ function makeClient(
   const cards = {
     listSets: vi.fn(),
     getSet: vi.fn(),
+    getSetBySlug: vi.fn(),
     listCardsInSet: vi.fn(),
     getCard: vi.fn(),
     listPrintingsForCard: vi.fn(),
@@ -147,6 +148,27 @@ describe('apiToBrowseApi.getSet', () => {
     const set = await apiToBrowseApi(client).getSet('s-1');
     expect(getSet).toHaveBeenCalledWith({ id: 's-1' });
     expect(set.id).toBe('s-1');
+  });
+});
+
+describe('apiToBrowseApi.getSetBySlug', () => {
+  it('proxies to client.cards.getSetBySlug', async () => {
+    const getSetBySlug = vi.fn().mockResolvedValue(makeSet({ canonicalKey: 'en-base1' }));
+    const client = makeClient({ cards: { getSetBySlug } });
+    const set = await apiToBrowseApi(client).getSetBySlug('en-base1');
+    expect(getSetBySlug).toHaveBeenCalledWith({ slug: 'en-base1' });
+    expect(set.canonicalKey).toBe('en-base1');
+  });
+
+  it('forwards the abort signal when provided', async () => {
+    const getSetBySlug = vi.fn().mockResolvedValue(makeSet());
+    const client = makeClient({ cards: { getSetBySlug } });
+    const controller = new AbortController();
+    await apiToBrowseApi(client).getSetBySlug('en-base1', controller.signal);
+    expect(getSetBySlug).toHaveBeenCalledWith({
+      slug: 'en-base1',
+      signal: controller.signal,
+    });
   });
 });
 

@@ -28,6 +28,14 @@ import type {
 export interface BrowseApi {
   readonly listAllSets: (signal?: AbortSignal) => Promise<SetDto[]>;
   readonly getSet: (id: string, signal?: AbortSignal) => Promise<SetDto>;
+  /**
+   * Resolve a set by its `canonicalKey` slug (e.g. `en-base1`). Backed
+   * by `cards.getSetBySlug` (scans the bounded `/v1/sets` list, matches
+   * the unique `canonical_key`). Throws `ApiNotFoundError` when no set
+   * matches. The `/sets/[slug]` route resolves the slug to a set this
+   * way before loading its printings (#FU-64).
+   */
+  readonly getSetBySlug: (slug: string, signal?: AbortSignal) => Promise<SetDto>;
   readonly listPrintingsInSet: (
     setId: string,
     signal?: AbortSignal,
@@ -92,6 +100,13 @@ export function apiToBrowseApi(client: BinderlyClient): BrowseApi {
     async getSet(id, signal): Promise<SetDto> {
       return client.cards.getSet({
         id,
+        ...(signal !== undefined ? { signal } : {}),
+      });
+    },
+
+    async getSetBySlug(slug, signal): Promise<SetDto> {
+      return client.cards.getSetBySlug({
+        slug,
         ...(signal !== undefined ? { signal } : {}),
       });
     },

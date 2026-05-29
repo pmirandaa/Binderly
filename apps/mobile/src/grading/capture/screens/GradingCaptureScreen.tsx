@@ -55,7 +55,6 @@ import {
 import type { QualityEvaluationOptions } from '../quality.js';
 import type {
   CaptureQualityResult,
-  GradingCaptureSession,
   GradingShot,
   GradingShotKind,
 } from '../types.js';
@@ -63,25 +62,6 @@ import type { Camera } from 'react-native-vision-camera';
 
 /** The centering route path — the destination after a completed capture. */
 const CENTERING_ROUTE_BASE = '/grading/centering';
-
-/**
- * Placeholder session-handoff — kept for one release cycle so no external
- * caller breaks.  Replaced by `storeSession` from the centering barrel.
- *
- * @deprecated Use `storeSession` + `getSession` from
- * `apps/mobile/src/grading/centering/session-store.ts` instead.
- * The route now passes `?sessionId=<id>` and the centering screen reads
- * from the module-scoped store.  This shim will be removed in a follow-up.
- */
-let _legacyLastSession: GradingCaptureSession | null = null;
-/** @deprecated See `storeSession` in the centering module. */
-export function __setLastEmittedSession(session: GradingCaptureSession | null): void {
-  _legacyLastSession = session;
-}
-/** @deprecated See `getSession` in the centering module. */
-export function __getLastEmittedSession(): GradingCaptureSession | null {
-  return _legacyLastSession;
-}
 
 export interface GradingCaptureScreenProps {
   /**
@@ -200,10 +180,8 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
     if (emitted === null) return;
     navigatedRef.current = true;
     // Store the session in the centering module's registry so the centering
-    // screen can retrieve it by id without URL-encoding 4 file URIs.
+    // screen can retrieve it by id without URL-encoding the captured stills.
     storeSession(emitted);
-    // Keep the legacy shim populated for any caller still using it.
-    __setLastEmittedSession(emitted);
     router.push(`${CENTERING_ROUTE_BASE}?sessionId=${encodeURIComponent(emitted.id)}`);
   }, [router, session, session.state.isComplete]);
 

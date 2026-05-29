@@ -10,12 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProvider } from '../../../test-utils/render.js';
 import { setMockCameraPermission } from '../../../test-utils/setup.js';
+import { __resetSessionStore, getSession } from '../../centering/session-store.js';
 import { CAPTURE_KINDS } from '../constants.js';
-import {
-  __getLastEmittedSession,
-  __setLastEmittedSession,
-  GradingCaptureScreen,
-} from '../screens/GradingCaptureScreen.js';
+import { GradingCaptureScreen } from '../screens/GradingCaptureScreen.js';
 
 import type { GradingShotKind } from '../types.js';
 import type { CaptureAttemptInput } from '../use-capture-session.js';
@@ -97,11 +94,11 @@ beforeEach(() => {
   routerMocks.back.mockClear();
   routerMocks.canGoBack.mockClear();
   routerMocks.canGoBack.mockReturnValue(true);
-  __setLastEmittedSession(null);
+  __resetSessionStore();
 });
 
 afterEach(() => {
-  __setLastEmittedSession(null);
+  __resetSessionStore();
 });
 
 describe('<GradingCaptureScreen> — permission branches', () => {
@@ -257,9 +254,18 @@ describe('<GradingCaptureScreen> — capture flow', () => {
     await waitFor(() => {
       expect(routerMocks.push).toHaveBeenCalledTimes(1);
     });
-    const emitted = __getLastEmittedSession();
-    expect(emitted).not.toBeNull();
-    if (emitted === null) return;
+    // The route carries only the lightweight session id; the full
+    // session (with its captured stills) lives in the module-scoped
+    // store keyed by that id (#FU-32).
+    const pushArg = routerMocks.push.mock.calls[0]?.[0] as string;
+    expect(pushArg).toMatch(/^\/grading\/centering\?sessionId=/);
+    const sessionId = decodeURIComponent(
+      new URLSearchParams(pushArg.split('?')[1] ?? '').get('sessionId') ?? '',
+    );
+    expect(sessionId.length).toBeGreaterThan(0);
+    const emitted = getSession(sessionId);
+    expect(emitted).toBeDefined();
+    if (emitted === undefined) return;
     expect(routerMocks.push).toHaveBeenCalledWith(
       `/grading/centering?sessionId=${encodeURIComponent(emitted.id)}`,
     );

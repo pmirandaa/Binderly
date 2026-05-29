@@ -107,11 +107,7 @@ export type { CaptureStepIndicatorProps } from './components/CaptureStepIndicato
 export { GradingCameraSurface } from './components/GradingCameraSurface.js';
 export type { GradingCameraSurfaceProps } from './components/GradingCameraSurface.js';
 
-export {
-  __getLastEmittedSession,
-  __setLastEmittedSession,
-  GradingCaptureScreen,
-} from './screens/GradingCaptureScreen.js';
+export { GradingCaptureScreen } from './screens/GradingCaptureScreen.js';
 export type { GradingCaptureScreenProps } from './screens/GradingCaptureScreen.js';
 
 export { GradingCaptureReviewScreen } from './screens/GradingCaptureReviewScreen.js';

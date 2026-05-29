@@ -1,4 +1,5 @@
-// Session store — replaces the deprecated `__getLastEmittedSession` seam.
+// Session store — the router-param hand-off seam (replaced the removed
+// `__getLastEmittedSession` module-scoped ref; see #FU-32 closure below).
 //
 // A module-scoped `Map<string, GradingCaptureSession>` keyed by session id.
 // Written by the capture screen on completion; read by any downstream
@@ -19,12 +20,12 @@
 //
 // # #FU-32 closure
 //
-// This module closes the follow-up registered in T-GR-CAPTURE-UX's "Notes
-// from execution": the `@deprecated FU-T-GR-CENTERING-ROUTING` comment on
-// the `lastEmittedSession` module-level variable.  The deprecated exports
-// (`__getLastEmittedSession`, `__setLastEmittedSession`) remain in the
-// capture barrel for one release cycle so no external caller breaks — see
-// T-GR-CENTERING.md § Acceptance criteria.
+// This module is the real router-param hand-off that replaced the
+// module-scoped `__getLastEmittedSession` / `__setLastEmittedSession` ref
+// that T-GR-CAPTURE-UX shipped tagged `@deprecated`.  Those exports have
+// now been removed entirely (T-ROUTING-CLEANUP / #FU-32): the capture
+// screen calls `storeSession(emitted)` and routes with `?sessionId=<id>`;
+// every downstream grading screen retrieves the session via `getSession`.
 
 import type { SessionStore } from './types.js';
 import type { GradingCaptureSession } from '../capture/types.js';

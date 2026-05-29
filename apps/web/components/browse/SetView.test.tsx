@@ -13,14 +13,17 @@ import {
 } from '../../lib/browse/fixtures';
 import { renderWithProviders } from '../../test-utils/render';
 
+const { routerReplace } = vi.hoisted(() => ({ routerReplace: vi.fn() }));
+
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-  usePathname: () => '/sets/abc',
+  useRouter: () => ({ push: vi.fn(), replace: routerReplace, back: vi.fn() }),
+  usePathname: () => '/sets/en-swsh10',
   useSearchParams: () => new URLSearchParams(),
 }));
 
 const set = makeSet({
   id: 'set-x',
+  canonicalKey: 'en-swsh10',
   name: 'Astral Radiance',
   releaseDate: '2022-05-27',
   language: 'en',
@@ -46,7 +49,7 @@ describe('SetView — success path', () => {
         },
       },
     });
-    renderWithProviders(<SetView api={api} setId="set-x" />);
+    renderWithProviders(<SetView api={api} slug="en-swsh10" />);
     await waitFor(() => {
       expect(screen.getByTestId('set-header-name')).toBeInTheDocument();
     });
@@ -72,7 +75,7 @@ describe('SetView — success path', () => {
         },
       },
     });
-    renderWithProviders(<SetView api={api} setId="set-x" />);
+    renderWithProviders(<SetView api={api} slug="en-swsh10" />);
     await waitFor(() => {
       expect(screen.getAllByTestId('printing-thumbnail')).toHaveLength(3);
     });
@@ -88,7 +91,7 @@ describe('SetView — success path', () => {
     const api = createFakeBrowseApi({
       setsBySetId: { 'set-x': { set, cards: [] } },
     });
-    renderWithProviders(<SetView api={api} setId="set-x" />);
+    renderWithProviders(<SetView api={api} slug="en-swsh10" />);
     await waitFor(() => {
       expect(screen.getByTestId('set-back-link')).toBeInTheDocument();
     });
@@ -99,7 +102,7 @@ describe('SetView — success path', () => {
     const api = createFakeBrowseApi({
       setsBySetId: { 'set-x': { set, cards: [] } },
     });
-    renderWithProviders(<SetView api={api} setId="set-x" />);
+    renderWithProviders(<SetView api={api} slug="en-swsh10" />);
     await waitFor(() => {
       expect(screen.getByTestId('set-empty')).toBeInTheDocument();
     });
@@ -114,7 +117,7 @@ describe('SetView — 404 + error', () => {
       new ApiNotFoundError('set not found'),
     );
     renderWithProviders(
-      <SetView api={api} setId="missing" onNotFound={onNotFound} />,
+      <SetView api={api} slug="en-missing" onNotFound={onNotFound} />,
     );
     await waitFor(() => {
       expect(onNotFound).toHaveBeenCalledTimes(1);
@@ -126,21 +129,38 @@ describe('SetView — 404 + error', () => {
     api.listPrintingsInSet = vi.fn().mockRejectedValue(
       new ApiNotFoundError('set not found'),
     );
-    renderWithProviders(<SetView api={api} setId="missing" />);
+    renderWithProviders(<SetView api={api} slug="en-missing" />);
     await waitFor(() => {
       expect(screen.getByTestId('set-error')).toBeInTheDocument();
     });
   });
 
   it('renders an error state when the fetch rejects with a generic Error', async () => {
-    const api = createFakeBrowseApi();
+    // Seed the set so the slug resolves, then make the printings fetch
+    // reject with a non-404 error.
+    const api = createFakeBrowseApi({
+      setsBySetId: { 'set-x': { set, cards: [] } },
+    });
     api.listPrintingsInSet = basePrintingsForSet().mockRejectedValue(
       new Error('database unreachable'),
     );
-    renderWithProviders(<SetView api={api} setId="set-x" />);
+    renderWithProviders(<SetView api={api} slug="en-swsh10" />);
     await waitFor(() => {
       expect(screen.getByTestId('set-error')).toHaveTextContent('database unreachable');
     });
+  });
+
+  it('redirects a legacy UUID URL to the canonical slug', async () => {
+    routerReplace.mockClear();
+    const uuid = '11111111-1111-1111-1111-111111111111';
+    const api = createFakeBrowseApi({
+      sets: [makeSet({ id: uuid, canonicalKey: 'en-swsh10' })],
+    });
+    renderWithProviders(<SetView api={api} slug={uuid} />);
+    await waitFor(() => {
+      expect(routerReplace).toHaveBeenCalledWith('/sets/en-swsh10');
+    });
+    expect(api.getSet).toHaveBeenCalledWith(uuid, expect.anything());
   });
 });
 
@@ -158,7 +178,7 @@ describe('SetView — variant labels', () => {
         },
       },
     });
-    renderWithProviders(<SetView api={api} setId="set-x" />);
+    renderWithProviders(<SetView api={api} slug="en-swsh10" />);
     await waitFor(() => {
       expect(screen.getByTestId('printing-thumbnail-variant')).toHaveTextContent(
         'reverse holo',

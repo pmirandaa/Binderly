@@ -1416,3 +1416,37 @@ fully tested both tiers), and update rules/06 to note the free/Pro split.
 Revisit (1)/(2) after the first round of scanner user-testing.
 
 **Pablo's answer:** _(empty until answered)_
+
+## Q-031 — Should `cards.getSetBySlug` keep its bounded `/v1/sets` catalog scan, or move to a PostgREST `canonical_key=eq` filter / dedicated by-slug endpoint? (T-GR-CENTERING-ROUTING + /sets slug alignment / #FU-64)
+
+**Context.** #FU-64 aligned `/sets/*` onto the `canonicalKey` slug
+convention across web + mobile and centralized slug→set resolution in a
+new shared `cards.getSetBySlug` api-client method. Because the catalog
+`/v1/sets` route is served directly by PostgREST (no bespoke handler) and
+the `listSets` query surface only exposes `cursor`/`limit`/`language`, the
+method resolves a slug by **paginating the bounded catalog and matching on
+the unique `canonical_key`** (cap: `MAX_SET_SCAN_PAGES = 100` ≈ 10k rows;
+EN+JP sets total well under 1000, so in practice 1–2 pages). This is O(catalog)
+per cold resolution rather than O(1), and re-scans on every cache miss.
+
+**Why the scan (reasonable default).** Zero backend/contract change, no
+migration, identical behavior on web + mobile, and the catalog is small +
+TanStack-Query-cached on mobile. PostgREST *does* support a direct filter
+(`GET /v1/sets?canonical_key=eq.en-base1&limit=1`), which would make this
+O(1) — but plumbing an arbitrary-column filter through `listSets`/the
+request layer (or minting a `/v1/sets/by-slug/:slug` view) is more surface
+than the unblocked half of #FU-18 warranted.
+
+**Open questions for Pablo:**
+1. Is the bounded client-side scan acceptable long-term, or should slug
+   resolution become a single `canonical_key=eq` PostgREST filter (the
+   cheapest O(1) option, no migration)?
+2. If we want it server-side, prefer (a) extending `listSets` with an
+   optional `canonicalKey` filter param, or (b) a dedicated by-slug view/
+   endpoint? Logged as **#FU-69** for the optimization.
+
+**Recommendation.** Keep the scan for now (small bounded catalog, cached),
+and take the `canonical_key=eq` filter as the cheap follow-up (#FU-69) if
+slug-page latency ever shows up in metrics.
+
+**Pablo's answer:** _(empty until answered)_

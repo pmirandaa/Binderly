@@ -20,7 +20,7 @@ const notFoundSpy = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
-  usePathname: () => '/sets/abc',
+  usePathname: () => '/sets/en-swsh10',
   useSearchParams: () => new URLSearchParams(),
   notFound: () => notFoundSpy(),
 }));
@@ -28,7 +28,12 @@ vi.mock('next/navigation', () => ({
 const fakeApi = createFakeBrowseApi({
   setsBySetId: {
     'set-x': {
-      set: makeSet({ id: 'set-x', name: 'Astral Radiance', releaseDate: '2022-05-27' }),
+      set: makeSet({
+        id: 'set-x',
+        canonicalKey: 'en-swsh10',
+        name: 'Astral Radiance',
+        releaseDate: '2022-05-27',
+      }),
       cards: [
         makeCardWithPrintings({ id: 'c1', name: 'Pikachu', number: '1' }, [
           makePrinting({ id: 'p1' }),
@@ -50,20 +55,20 @@ vi.mock('../../../lib/api-client', () => ({
   getApiClient: () => ({}),
 }));
 
-describe('/sets/[id] route entrypoint', () => {
-  it('renders the SetView wired to the (mocked) api-client', async () => {
-    renderWithProviders(<SetPage params={{ id: 'set-x' }} />);
+describe('/sets/[slug] route entrypoint', () => {
+  it('renders the SetView wired to the (mocked) api-client, resolving the slug', async () => {
+    renderWithProviders(<SetPage params={{ slug: 'en-swsh10' }} />);
     await waitFor(() => {
       expect(screen.getByTestId('set-header-name')).toHaveTextContent('Astral Radiance');
     });
   });
 
-  it('triggers Next.js notFound() when the api-client raises ApiNotFoundError', async () => {
+  it('triggers Next.js notFound() when the slug does not resolve to a set', async () => {
     notFoundSpy.mockClear();
-    fakeApi.listPrintingsInSet.mockRejectedValueOnce(
+    fakeApi.getSetBySlug.mockRejectedValueOnce(
       new ApiNotFoundError('set not found'),
     );
-    renderWithProviders(<SetPage params={{ id: 'unknown' }} />);
+    renderWithProviders(<SetPage params={{ slug: 'en-unknown' }} />);
     await waitFor(() => {
       expect(notFoundSpy).toHaveBeenCalled();
     });
