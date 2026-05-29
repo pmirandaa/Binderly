@@ -165,6 +165,54 @@ already set in `apps/mobile/app.json`.
 
 ---
 
+## 6. Monitoring — Sentry errors + PostHog analytics (`deploy-monitoring.yml`, per-app observability init)
+
+Observability ships **inert** across all three runtimes: the init seams
+in `apps/web/lib/observability/`, `apps/mobile/src/lib/observability/`,
+and `apps/api-python/observability/` are **no-ops until a DSN / key is
+present**. The release-tracking workflow (`deploy-monitoring.yml`) is
+guarded on `SENTRY_AUTH_TOKEN` and **skipped (not failed)** until it's
+set. Provider SDKs are deliberately not yet dependencies — the go-live
+wiring (which SDK to install where, and the per-app init diff) is in
+`infra/monitoring/README.md`.
+
+### Runtime DSN / keys (set on each platform, NOT GitHub secrets)
+
+Error *ingestion* needs only the DSN; analytics needs the PostHog key.
+These are public-by-design and set per platform (Vercel project env /
+EAS Secrets / Fly secrets). The app bundlers read the prefixed mirrors
+(`NEXT_PUBLIC_*` / `EXPO_PUBLIC_*`); the repo-canonical names are in
+`context/secrets-and-env.md`.
+
+| Env var | Scope | Required | What it's for |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SENTRY_DSN` | Vercel (web) | for errors | Sentry browser/server DSN. |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Vercel (web) | for analytics | PostHog project API key. |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Vercel (web) | no | PostHog host (defaults to `https://us.i.posthog.com`). |
+| `EXPO_PUBLIC_SENTRY_DSN` | EAS (mobile) | for errors | Sentry DSN for the Expo app. |
+| `EXPO_PUBLIC_POSTHOG_KEY` | EAS (mobile) | for analytics | PostHog project API key. |
+| `EXPO_PUBLIC_POSTHOG_HOST` | EAS (mobile) | no | PostHog host (default as above). |
+| `API_PYTHON_SENTRY_DSN` | Fly (python) | for errors | Sentry DSN for the Python service (effective once the Q-021 HTTP entrypoint lands). |
+
+### Release-tracking secrets (`deploy-monitoring.yml`, GitHub repo secrets)
+
+Live release/commit-association job guarded on `SENTRY_AUTH_TOKEN`.
+
+| Secret | ⬜ | What it's for | Where to get it |
+| --- | --- | --- | --- |
+| `SENTRY_AUTH_TOKEN` | ⬜ | Auth for `getsentry/action-release` to create a release + associate commits (and, at go-live, upload source maps). | Sentry → Settings → Auth Tokens → Create (scopes: `project:releases`, `org:read`). |
+| `SENTRY_ORG` | ⬜ | Sentry org slug. | Sentry → Settings → General. |
+| `SENTRY_PROJECT` | ⬜ | Sentry project slug. | Sentry → Projects. |
+
+**⚠️ Python error ingestion (Q-021):** `API_PYTHON_SENTRY_DSN` only takes
+effect once the api-python ASGI HTTP entrypoint lands (there's no
+long-lived process to instrument today). The init seam +
+`init_sentry()` are scaffolded; wire `init_sentry()` into the FastAPI
+startup and add `sentry-sdk` to `pyproject.toml` then — see Q-021 /
+#FU-53 and `infra/monitoring/README.md`.
+
+---
+
 ## Go-live order (recommended)
 
 1. **R2** buckets + custom domain + keys → set web `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`.
@@ -175,7 +223,12 @@ already set in `apps/mobile/app.json`.
 5. **EAS** Expo account + `EXPO_TOKEN` + `eas init` / `build:configure` +
    signing credentials → run `deploy-mobile` (`workflow_dispatch`) to build;
    add the ASC/Play submit secrets before the first store submission.
-6. Run each deploy workflow once via `workflow_dispatch` to verify, then let
+6. **Monitoring** Sentry org/projects + PostHog project → set the runtime
+   DSN/keys per platform (§6) and add `SENTRY_AUTH_TOKEN` / `SENTRY_ORG` /
+   `SENTRY_PROJECT` for release tracking. Install the provider SDKs + wire
+   the init hooks per `infra/monitoring/README.md`. (Python error ingest
+   waits on the Q-021 entrypoint.)
+7. Run each deploy workflow once via `workflow_dispatch` to verify, then let
    merge-to-`main` drive subsequent web/db deploys (the Stage 11 go-live
    follow-up). Mobile stays manual-dispatch (build minutes / store cadence).
 

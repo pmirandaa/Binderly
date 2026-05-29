@@ -1145,11 +1145,11 @@ tasks:
     stage: 11-deployment
     title: Sentry + PostHog wiring across web/mobile/python
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-DP-VERCEL, T-DP-FLY, T-DP-EAS]
     parallel_safe_with: []
     provides: [deploy:monitoring]
     owns_paths: [packages/observability/, apps/web/lib/observability/, apps/mobile/src/lib/observability/]
     task_file: tasks/11-deployment/T-DP-MONITORING.md
     est_effort: M
-    stub: true
+    stub: false

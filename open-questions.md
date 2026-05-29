@@ -1117,9 +1117,59 @@ OG-theming wire-up is **#FU-62**, T-SH-OG-THEME-WIRE.)
 
 ---
 
-## Q-025 — `/cards/[*]` detail entity: printing-centric (web) vs card-centric (mobile)?
+## Q-025 — Production health-check + alerting story is scaffolded but not yet operational (T-DP-MONITORING)
+
+**Status:** open — scaffold shipped, follow-up logged (#FU-63), non-blocking
+
+**Context.** `rules/11-deployment.md` ("Done when") calls for a
+5-minute production health check (curl + DB ping + R2 read) that runs on
+a cron and **pages on failure**, plus cost/budget alerts at 50% on
+Supabase / Fly / R2 / Vercel. T-DP-MONITORING scaffolds the observability
+init seams (Sentry/PostHog, inert until secrets) and a cheap liveness
+endpoint (`GET /api/health` on web), but stops short of an active
+synthetic monitor + pager.
+
+**What's missing (the actual follow-up, #FU-63):**
+
+1. **A deep health check, not just liveness.** `GET /api/health` is a
+   dependency-free 200 (proves the Next.js server is up). The "Done when"
+   check additionally pings Postgres and reads from R2 — that needs a
+   small authenticated route (or an external synthetic monitor running
+   the three probes) so a degraded-but-up backend is caught.
+2. **The Python service has no HTTP entrypoint (Q-021 / #FU-53),** so its
+   `/healthz` can't be probed until that lands. The monitor's
+   Python target is blocked on Q-021.
+3. **Pager wiring.** Which on-call channel (Sentry alerts → Slack/email,
+   or an uptime provider's incident flow)? No paging integration exists.
+4. **Cost/budget alerts** (Supabase/Fly/R2/Vercel at 50%) are a
+   dashboard-config task on each platform — owned by Pablo's go-live, not
+   code.
+
+**Options for the synthetic monitor:**
+- (a) External uptime SaaS (Better Stack / UptimeRobot) hitting
+  `/api/health` + a future deep-check route. Lowest effort; off-platform.
+- (b) A scheduled GitHub Actions cron (`workflow_dispatch` + `schedule`)
+  running the three probes and opening an incident / pinging a webhook on
+  failure. Keeps it in-repo but burns Actions minutes (currently at
+  ~90% quota — see `status.md`).
+- (c) Supabase scheduled Edge Function (pg_cron / `cron.schedule`) doing
+  the DB+R2 probe close to the data.
+
+**Recommendation.** Defer to **#FU-63 (T-DP-HEALTH-CHECK)** post-secrets:
+the inert scaffolding (liveness endpoint + Sentry error capture) is
+enough to detect hard-down + crashes once DSNs are set; the cron+pager
+synthetic check is a go-live hardening step that depends on the Q-021
+Python entrypoint and on Pablo choosing a pager channel.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-026 — `/cards/[*]` detail entity: printing-centric (web) vs card-centric (mobile)?
 
 **Status:** open — raised by T-POLISH-SWEEP while consolidating #FU-18.
+(Numbering: authored as Q-025, renumbered to **Q-026** at merge — a
+sibling T-DP-MONITORING claimed Q-025 + #FU-63; this FU is **#FU-64**.)
 
 **Context.** #FU-18 asked to consolidate the web-vs-mobile URL
 convention for `/sets/[*]` and `/cards/[*]`. Investigation found two
@@ -1163,10 +1213,10 @@ out of scope for a polish sweep and genuinely ambiguous.
 **Interim shipped.** Nothing changed in this sweep — the divergence is
 SSR-hidden (routes aren't linked from primary nav in a user-visible way
 yet) and low-priority per status.md follow-up #18. The sets-alignment
-half and the cards entity-decision half are logged together as **#FU-63**.
+half and the cards entity-decision half are logged together as **#FU-64**.
 
 **Recommendation.** Pablo (or a product owner) picks the card-detail
-entity model (Option 1 vs 2 vs 3). Once decided, #FU-63 does the sets
+entity model (Option 1 vs 2 vs 3). Once decided, #FU-64 does the sets
 slug-alignment (safe, client-only) **and** the chosen card migration in
 one cross-platform pass (likely adding `getSetBySlug` / `getCardBySlug`
 endpoints — a backend task, no migration needed since `canonical_key`
