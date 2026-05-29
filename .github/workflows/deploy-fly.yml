@@ -1,0 +1,66 @@
+# Production deploy for the Binderly Python service (apps/api-python) → Fly.io.
+#
+# SCAFFOLDING MODE (Stage 11): the live deploy is GUARDED on the presence of
+# `secrets.FLY_API_TOKEN`. Until Pablo provisions the Fly app + token (see
+# infra/DEPLOYMENT_SECRETS.md), the `deploy` job is SKIPPED — never failed.
+#
+# ADDITIONAL PREREQUISITE (Q-021): a live deploy also needs the api-python
+# package to expose an ASGI HTTP entrypoint (`binderly_api.main:app`) so the
+# container binds :8080 and the /healthz check passes. That entrypoint is a
+# documented follow-up (Python track). Until it lands, even with the token a
+# deploy would fail the healthcheck — so go-live is gated on BOTH the token
+# and the entrypoint. The workflow YAML itself is correct + valid now.
+
+name: Deploy / Fly (Python service)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api-python/**"
+      - "infra/fly/**"
+      - ".github/workflows/deploy-fly.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-fly-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: guard (secret presence)
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -n "$FLY_API_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "FLY_API_TOKEN present — live deploy will run."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::FLY_API_TOKEN not set — skipping live Fly deploy (Stage 11 scaffolding mode). See infra/DEPLOYMENT_SECRETS.md + Q-021."
+          fi
+
+  deploy:
+    name: deploy (flyctl)
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Deploy to Fly
+        # Remote builder builds infra/fly/Dockerfile from the repo-root
+        # context, then releases. `--config` points at our fly.toml.
+        run: flyctl deploy --remote-only --config infra/fly/fly.toml

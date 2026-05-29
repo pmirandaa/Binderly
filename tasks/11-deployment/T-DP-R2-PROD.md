@@ -3,82 +3,60 @@
 **Stage:** 11-deployment
 **Agent role:** devops
 **Effort:** S
-**Status:** STUB — must be elaborated by the orchestrator before dispatch.
 
----
+## Hard dependencies
+- T-DL-IMAGE-PIPELINE (merged — the pipeline that writes catalog images to R2)
 
-> ## STUB — Orchestrator instructions
->
-> This task file is intentionally incomplete. The orchestrator agent
-> elaborates it into a full task per the template in
-> `AGENT_ORCHESTRATOR.md` § 7 (Full task template) **at the moment all
-> hard dependencies have merged AND this task is in the next batch to
-> dispatch**.
->
-> **Steps to elaborate:**
->
-> 1. Read `PROJECT.md` (especially § 4 (Infra & Deployment), § 17 (Build Phases)) and any
->    referenced sections.
-> 2. Read `rules/11-deployment.md` (the stage rules).
-> 3. Read every context file referenced by the stage rules.
-> 4. Read the merged code from each `depends_on` task — the actual
->    diffs that landed, not just their task files. Reality may have
->    diverged from the original plan; align this task with what
->    actually exists.
-> 5. If the work needs additional sub-tasks not in
->    `dependencies.yaml`, add them as additional stub entries (in the
->    same docs commit) before dispatching this one.
-> 6. Rewrite this file using the full template. Replace the entire
->    "STUB" section above with the elaborated task. Keep the
->    metadata at the top (Stage, Agent role, Effort) accurate.
-> 7. **Acceptance criteria must be testable.** If you cannot write
->    testable criteria, the task is too big — split it.
-> 8. Commit as `docs(tasks): elaborate T-DP-R2-PROD`.
-> 9. Then dispatch the sub-agent.
->
-> **Escalate instead of guessing if:**
->
-> - A product decision is required (feature ambiguity, tradeoff between
->   two valid approaches, scope question).
-> - The merged dependencies suggest the task as scoped is no longer
->   correct or necessary.
-> - The work as scoped would require touching paths outside this
->   task's `owns_paths` and other tasks own them.
->
-> Append to `open-questions.md` and skip this task in the iteration.
+## Soft dependencies
+- T-DP-VERCEL (the web app + OG route read catalog images cross-origin from R2)
 
----
+## Required reading
+- PROJECT.md § 2 (IP posture — re-host images), § 4 (Infra), § 14 (Shareables/OG)
+- rules/11-deployment.md (esp. "R2 public bucket misconfiguration leaking data")
+- infra/r2/README.md (the bucket layout + path scheme this mirrors for prod)
+- data-pipeline image storage (`S3ImageStorage` — bucket + publicUrlPrefix contract)
 
-## Provisional metadata (from `dependencies.yaml`)
+## Goal
+Document and provide policy files for the **production** Cloudflare R2 setup:
+the bucket layout (mirroring what the image pipeline writes), a CORS policy
+JSON (so the web app + OG image route can read catalog images), a
+lifecycle/retention note, and a least-privilege access-key provisioning doc
+(separate read-only public key vs read-write pipeline key). **Docs + policy
+files only — no live keys.**
 
-**Hard dependencies:**
+## Deliverables
+- `infra/r2/production/README.md` — prod bucket layout (`images`, `models`,
+  `ann` public-read; `user-uploads` is Supabase Storage, not R2), public bucket
+  vs custom domain (`images.binderly.app`), and how it maps to the local MinIO buckets.
+- `infra/r2/production/cors.json` — CORS policy for the `images` bucket
+  (GET/HEAD from the web origins + OG route), pasteable into the R2 dashboard / `wrangler`.
+- `infra/r2/production/lifecycle.json` — lifecycle/retention rules (abort
+  incomplete multipart uploads; keep catalog images indefinitely; note on `original` variant).
+- `infra/r2/production/access-keys.md` — least-privilege key provisioning:
+  a read-only key (public delivery / web), a read-write key (pipeline writes),
+  which GitHub secrets each maps to, and the rotation story.
 
-- T-DL-IMAGE-PIPELINE
+## Acceptance criteria
+- [ ] `cors.json` and `lifecycle.json` are valid JSON matching R2's S3-compatible schema.
+- [ ] Bucket layout mirrors `infra/r2/README.md` (`images`/`models`/`ann` public; `user-uploads` excluded).
+- [ ] Access-key doc specifies separate least-privilege read-only vs read-write keys + their GitHub secret names.
+- [ ] Public-read vs private posture is explicit (catalog public; user photos never on R2 public).
+- [ ] No live keys committed. No changes outside `owns_paths` (+ shared `infra/DEPLOYMENT_SECRETS.md`).
 
-**Parallel-safe with:** T-DP-VERCEL, T-DP-FLY, T-DP-SUPABASE-PROD
-
-**Owns paths:**
-
-- `infra/r2/production/`
-
-## Provisional goal
-
-R2 production buckets + access keys.
-
-(One paragraph from the orchestrator goes here at elaboration time
-describing the problem this task solves and how it fits into the
-stage.)
-
-## Provisional reading list
-
-- PROJECT.md § 4 (Infra & Deployment), § 17 (Build Phases)
-- rules/11-deployment.md
-- (context files added at elaboration time based on the stage rules)
+## Out of scope
+- Provisioning the real R2 account / buckets / keys (Pablo, go-live).
+- The custom-domain DNS setup beyond documenting `images.binderly.app`.
+- User-upload storage (Supabase Storage, owned elsewhere).
 
 ## Branch & PR
-
-- Branch: `agent/T-DP-R2-PROD`
-- PR title: `T-DP-R2-PROD: R2 production buckets + access keys`
+- Branch: `agent/T-DP-INFRA`
+- PR title: `feat(deploy): T-DP-VERCEL/FLY/SUPABASE-PROD/R2-PROD — Stage 11 deployment scaffolding (secrets pending)`
 
 ## Notes from execution
-_(empty until the sub-agent runs)_
+The image pipeline writes keys under `printings/{set_canonical_key}/{variant_key}/{variant}.webp`
+into the `images` bucket (see `infra/r2/README.md`). Production delivery is via
+the public bucket fronted by the `images.binderly.app` custom domain, which is
+already allow-listed in `apps/web/next.config.mjs` `images.remotePatterns`. The
+web app reads `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`; the pipeline writes with an
+R2 access-key pair (account-scoped S3 credentials). Two keys keep the public
+delivery path from ever holding write scope.
