@@ -42,4 +42,21 @@ export default [
       'no-restricted-imports': 'off',
     },
   },
+  {
+    // Node-only build/maintenance scripts (e.g. the #FU-11 no-env build
+    // guard). These run under Node directly, log progress, and signal
+    // failure via `process.exit`, so they need Node globals and a relaxed
+    // console rule — unlike the browser/RSC app code above.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      sourceType: 'module',
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ];
