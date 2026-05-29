@@ -1,41 +1,46 @@
-// Satori-safe OG palette export. T-SH-THEMES.
+// Flat palette export for the OG-image worker.
 //
-// The OG image worker (`apps/web/lib/og/render.tsx`) runs under
-// Satori, which supports only a strict subset of CSS and CANNOT import
-// the React `<ShareableThemeProvider>` (it pulls in `@binderly/ui`'s
-// Tamagui runtime). This module exposes the theme colours as a flat,
-// dependency-light object so a follow-up can re-theme the OG hero
-// without dragging the provider into the edge/worker bundle.
-//
-// Out of scope for T-SH-THEMES (see the task's "Out of scope"): the OG
-// render itself stays on the brand palette today; this is the seam.
+// `apps/web/lib/og/` (Satori) only understands an inline-style CSS
+// subset and can't pull tokens through the Tamagui runtime, so it
+// hardcodes its brand colours. Rather than edit `lib/og/` heavily,
+// this module exposes each theme's palette as a flat, Satori-friendly
+// struct whose field names mirror `lib/og/brand.ts` (`background`,
+// `surface`, `text`, `textMuted`, `accent`) so the OG hero can be
+// wired to respect a shareable's theme in a follow-up
+// (T-SH-OG-THEME-WIRE) without any registry churn.
 
-import { resolveTheme } from './registry';
+import { resolveTheme, type Theme } from './registry';
 
-/** The flat, Satori-safe palette for an OG card. Plain hex strings. */
+import type { ShareableTheme } from '@binderly/api-contracts';
+
+/** The minimal palette an OG card needs. Mirrors `lib/og/brand.ts`. */
 export interface OgPalette {
   readonly background: string;
   readonly surface: string;
   readonly text: string;
   readonly textMuted: string;
   readonly accent: string;
-  readonly border: string;
+  readonly onAccent: string;
+}
+
+/** Project a Theme onto the flat OG palette. */
+export function ogPaletteFromTheme(theme: Theme): OgPalette {
+  return {
+    background: theme.palette.background,
+    surface: theme.palette.surface,
+    text: theme.palette.text,
+    textMuted: theme.palette.textMuted,
+    accent: theme.palette.accent,
+    onAccent: theme.palette.onAccent,
+  };
 }
 
 /**
- * Resolve an OG palette for a theme id. Unknown / null ids fall back to
- * the `default` theme (same posture as `resolveTheme`). Returns only
- * colour primitives — no font stack (Satori loads fonts separately) and
- * no React.
+ * Resolve a (possibly stale/unknown) theme id to its OG palette.
+ * Falls back to the default theme's palette for unknown ids.
  */
-export function ogPaletteForTheme(id: string | null | undefined): OgPalette {
-  const theme = resolveTheme(id);
-  return {
-    background: theme.background,
-    surface: theme.surface,
-    text: theme.text,
-    textMuted: theme.textMuted,
-    accent: theme.accent,
-    border: theme.border,
-  };
+export function ogPaletteForTheme(
+  id: ShareableTheme | string | null | undefined,
+): OgPalette {
+  return ogPaletteFromTheme(resolveTheme(id));
 }

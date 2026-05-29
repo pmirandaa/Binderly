@@ -1,120 +1,109 @@
 'use client';
 
-// `<ThemePicker>` — the Pro-gated theme gallery the shareable settings
-// row editor renders. T-SH-THEMES.
+// Pro-gated theme gallery for the owner settings surface.
 //
-// Renders one selectable swatch per theme as an ARIA radio-group. Free
-// users may preview every theme but only `default` is selectable; a tap
-// on a locked (non-default) theme surfaces the upgrade prompt and does
-// NOT change the draft selection (no non-default persist on free).
+// Replaces the old `'default'`-only `<select>` placeholder. Every
+// theme renders as a clickable thumbnail so a free user can *preview*
+// the whole gallery — but the `shareable_themes` gate (T-PB-GATING's
+// `useGate`) decides whether a Pro theme can actually be applied:
+//   - Pro / unlocked → selecting any theme calls `onSelect`.
+//   - Free / locked  → selecting a Pro theme is a no-op for
+//     persistence and surfaces the shared `<UpgradePrompt>` instead;
+//     the free `default` stays selectable.
 //
-// ── Gating ──────────────────────────────────────────────────────────
-// The verdict comes from `@binderly/feature-flags`' pure
-// `evaluateGate(...)` decision core — the same core the `useGate` hook
-// wraps — fed by the owner's already-fetched subscription `tier`. The
-// settings surface holds the authoritative tier, so we gate on it
-// directly rather than firing a second `/v1/me/entitlements` read deep
-// in a nested editor. Fail-closed: an absent / free tier locks every
-// non-default theme. The public render path enforces the same gate
-// server-side via `resolvePublicTheme`.
+// Gating path: this consumes the merged `useGate('shareable_themes')`
+// hook from `@/lib/gating` (T-PB-GATING, iter 34) — not the
+// entitlements fallback.
 
 import { useState } from 'react';
 
-import type { ShareableTheme } from '@binderly/api-contracts';
-import type { Tier } from '@binderly/entitlements';
-import { evaluateGate } from '@binderly/feature-flags';
+import { type ShareableTheme } from '@binderly/api-contracts';
 import { Text, XStack, YStack } from '@binderly/ui';
 
-import { THEME_LIST } from './registry';
-import { ThemeSwatch } from './ThemeSwatch';
-import { UpgradePrompt } from '../../../lib/gating/Gate';
+import { THEME_LIST, type Theme } from './registry';
+import { ThemeThumbnail } from './ThemeThumbnail';
+import { UpgradePrompt, useGate } from '../../../lib/gating';
 
 import type { ReactNode } from 'react';
 
 export interface ThemePickerProps {
+  /** The currently-selected theme id. */
   readonly value: ShareableTheme;
-  readonly onChange: (next: ShareableTheme) => void;
-  /** Owner's tier — gates non-default theme selection. */
-  readonly tier?: Tier;
-  /** Disable interaction (e.g. while a save is in flight). */
-  readonly disabled?: boolean;
+  /** Called when a selectable theme is picked. Pro themes only fire when unlocked. */
+  readonly onSelect: (theme: ShareableTheme) => void;
+  /** Testid prefix for the picker + its options. */
+  readonly testId?: string;
 }
 
 export function ThemePicker({
   value,
-  onChange,
-  tier = 'free',
-  disabled = false,
+  onSelect,
+  testId = 'theme-picker',
 }: ThemePickerProps): ReactNode {
-  const allowed = evaluateGate({ tier }, 'shareable_themes').allowed;
-  const [showPrompt, setShowPrompt] = useState(false);
+  const { result } = useGate('shareable_themes');
+  const unlocked = result.allowed;
+  const [blockedAttempt, setBlockedAttempt] = useState(false);
 
-  function handlePick(themeId: ShareableTheme, locked: boolean): void {
-    if (disabled) return;
-    if (locked) {
-      setShowPrompt(true);
+  function handlePick(theme: Theme): void {
+    if (theme.pro && !unlocked) {
+      setBlockedAttempt(true);
       return;
     }
-    setShowPrompt(false);
-    onChange(themeId);
+    setBlockedAttempt(false);
+    onSelect(theme.id);
   }
 
   return (
-    <YStack gap="$2" data-testid="theme-picker-block">
-      <Text variant="caption" tone="muted">
-        Theme{allowed ? '' : ' · Pro unlocks more'}
-      </Text>
-      <XStack
-        gap="$3"
-        flexWrap="wrap"
-        role="radiogroup"
-        aria-label="Shareable theme"
-        data-testid="theme-picker"
-      >
+    <YStack gap="$3" data-testid={testId}>
+      <Text variant="caption">Theme</Text>
+
+      <XStack gap="$3" flexWrap="wrap" data-testid={`${testId}-gallery`}>
         {THEME_LIST.map((theme) => {
-          const locked = theme.id !== 'default' && !allowed;
           const selected = theme.id === value;
+          const locked = theme.pro && !unlocked;
           return (
             <button
               key={theme.id}
               type="button"
-              role="radio"
-              aria-checked={selected}
-              aria-label={`${theme.label} theme${locked ? ' (Pro)' : ''}`}
-              data-testid={`theme-picker-option-${theme.id}`}
+              onClick={() => handlePick(theme)}
+              data-testid={`${testId}-option-${theme.id}`}
+              data-selected={selected ? 'true' : 'false'}
               data-locked={locked ? 'true' : 'false'}
-              disabled={disabled}
-              onClick={() => handlePick(theme.id, locked)}
+              aria-pressed={selected}
+              aria-label={`${theme.name}${theme.pro ? ' (Pro)' : ''}`}
               style={{
+                background: 'transparent',
+                border: 'none',
+                padding: 0,
+                margin: 0,
+                cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
-                alignItems: 'center',
-                gap: 6,
-                padding: 8,
-                borderRadius: 12,
-                cursor: disabled ? 'default' : 'pointer',
-                background: 'transparent',
-                border: selected
-                  ? `2px solid ${theme.accent}`
-                  : '2px solid transparent',
-                opacity: locked ? 0.55 : 1,
+                alignItems: 'flex-start',
+                gap: 4,
               }}
             >
-              <ThemeSwatch theme={theme} />
+              <ThemeThumbnail theme={theme} selected={selected} />
               <Text variant="bodySmall" tone={locked ? 'muted' : undefined}>
-                {theme.label}
-                {locked ? ' · Pro' : ''}
+                {theme.name}
+                {theme.pro ? ' · Pro' : ''}
               </Text>
             </button>
           );
         })}
       </XStack>
-      {showPrompt && !allowed ? (
+
+      {!unlocked ? (
+        <Text variant="bodySmall" tone="muted" data-testid={`${testId}-free-hint`}>
+          Themes are a Pro feature. Preview any theme here — upgrade to apply it to your public page.
+        </Text>
+      ) : null}
+
+      {blockedAttempt && !unlocked ? (
         <UpgradePrompt
           feature="shareable_themes"
           reason="requires_pro"
-          testId="theme-upgrade-prompt"
-          ctaLabel="Unlock themes with Pro"
+          testId={`${testId}-upgrade`}
         />
       ) : null}
     </YStack>

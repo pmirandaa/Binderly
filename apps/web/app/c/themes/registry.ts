@@ -1,146 +1,185 @@
-// Typed theme registry for the public shareable page
-// (`/c/{handle}/{slug}`). T-SH-THEMES.
+// Public-shareable theme registry — the typed source of truth for
+// the visual variants a Pro user can apply to `/c/{handle}/{slug}`.
 //
-// Each `Theme` is a flat bag of design tokens (colours + font) the
-// SSR-safe `<ShareableThemeProvider>` applies to a frame element and
-// `<ShareableView>` reads for per-element colours. Tokens are concrete
-// hex strings sourced from the `@binderly/ui` palette so the shareable
-// surface stays visually consistent with the rest of Binderly while
-// remaining import-light (no Tamagui runtime needed on the OG worker —
-// see `og-palette.ts`).
+// Each theme is a flat token bundle (palette + font pairing + header
+// treatment + card frame). No gradient/box-shadow slop — the themes
+// lean flat and tasteful; a theme only reaches for an accent band
+// when its identity genuinely calls for it.
 //
-// Gating note: the *picker* is Pro-gated (only `default` is free) via
-// `@binderly/feature-flags`; the *render* enforcement is
-// `resolvePublicTheme(id, ownerIsPro)`, which force-defaults a provably
-// non-pro owner's stored theme server-side at render time
-// (rules/08-shareables.md: "themes are paid-only, enforced server-side
-// at render time").
+// The id space is pinned to `SHAREABLE_THEMES` in
+// `@binderly/api-contracts` so the server-side gate
+// (`theme: 'gold'` from a free user) and the client renderer agree on
+// the exact same set without the UI package having to be consulted.
+//
+// `resolveTheme` makes a stale/unknown `theme_id` non-fatal (always a
+// valid Theme back). `resolvePublicTheme` layers the free-tier
+// downgrade on top so a non-Pro owner's page reverts to `default`.
 
-import { palette } from '@binderly/ui';
+import { type ShareableTheme } from '@binderly/api-contracts';
 
-import type { ShareableTheme } from '@binderly/api-contracts';
-
-/**
- * The flat token bag every shareable theme provides. Colour tokens are
- * concrete CSS colour strings; `fontFamily` is a CSS font-family stack.
- */
-export interface Theme {
-  /** The contract theme id this token bag implements. */
-  readonly id: ShareableTheme;
-  /** Human label rendered in the picker. */
-  readonly label: string;
-  /** One-line picker description. */
-  readonly description: string;
-  /** Page background. */
+/** Flat colour tokens a theme paints the public surface with. */
+export interface ThemePalette {
   readonly background: string;
-  /** Card / panel surface. */
   readonly surface: string;
-  /** Muted surface (empty states, footers). */
   readonly surfaceMuted: string;
-  /** Hairline / card border. */
   readonly border: string;
-  /** Primary body + heading text. */
   readonly text: string;
-  /** Secondary / caption text. */
   readonly textMuted: string;
-  /** Accent used for emphasis (links, focus). */
   readonly accent: string;
-  /** CSS font-family stack applied to the frame. */
-  readonly fontFamily: string;
+  /** Foreground colour that sits legibly on top of `accent`. */
+  readonly onAccent: string;
 }
 
-const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-const SERIF = 'Georgia, Cambria, "Times New Roman", Times, serif';
-const MONO = '"SFMono-Regular", ui-monospace, Menlo, Consolas, "Liberation Mono", monospace';
+/** Heading + body font stacks. Web-safe stacks only — no webfont load. */
+export interface ThemeFonts {
+  readonly heading: string;
+  readonly body: string;
+}
 
 /**
- * The `default` theme — the only theme free users get. A clean,
- * neutral light surface that matches the in-app light theme.
+ * Header treatment:
+ *   - `plain` — header text sits directly on the page background.
+ *   - `band`  — a thin accent band runs across the top of the page.
  */
+export type HeaderTreatment = 'plain' | 'band';
+
+/**
+ * Card framing for the snapshot / member cards:
+ *   - `outlined` — 1px border, no fill emphasis (the default look).
+ *   - `flat`     — filled surface, borderless.
+ *   - `soft`     — filled surface with a hairline border.
+ */
+export type CardFrame = 'outlined' | 'flat' | 'soft';
+
+/** A fully-resolved, typed theme. */
+export interface Theme {
+  readonly id: ShareableTheme;
+  readonly name: string;
+  readonly description: string;
+  /** Free tier may only persist/render `pro: false` themes. */
+  readonly pro: boolean;
+  readonly palette: ThemePalette;
+  readonly fonts: ThemeFonts;
+  readonly header: HeaderTreatment;
+  readonly cardFrame: CardFrame;
+}
+
+const SANS = 'Inter, system-ui, -apple-system, "Segoe UI", sans-serif';
+const SERIF = 'Georgia, "Iowan Old Style", "Times New Roman", serif';
+
 export const DEFAULT_THEME: Theme = {
   id: 'default',
-  label: 'Default',
-  description: 'Clean and neutral. Free on every plan.',
-  background: palette.white,
-  surface: palette.neutral['50'],
-  surfaceMuted: palette.neutral['100'],
-  border: palette.neutral['200'],
-  text: palette.neutral['900'],
-  textMuted: palette.neutral['600'],
-  accent: palette.teal['500'],
-  fontFamily: SANS,
+  name: 'Classic',
+  description: 'Clean light surface — the free default everyone starts on.',
+  pro: false,
+  palette: {
+    background: '#FFFFFF',
+    surface: '#F8FAFC',
+    surfaceMuted: '#F1F5F9',
+    border: '#E2E8F0',
+    text: '#0F172A',
+    textMuted: '#64748B',
+    accent: '#0FA3A3',
+    onAccent: '#FFFFFF',
+  },
+  fonts: { heading: SANS, body: SANS },
+  header: 'plain',
+  cardFrame: 'outlined',
 };
 
-const DARK_THEME: Theme = {
+export const DARK_THEME: Theme = {
   id: 'dark',
-  label: 'Midnight',
-  description: 'High-contrast dark surface.',
-  background: palette.neutral['950'],
-  surface: palette.neutral['900'],
-  surfaceMuted: palette.neutral['800'],
-  border: palette.neutral['700'],
-  text: palette.neutral['50'],
-  textMuted: palette.neutral['400'],
-  accent: palette.teal['400'],
-  fontFamily: SANS,
+  name: 'Midnight',
+  description: 'Deep slate dark mode with a cool cyan accent.',
+  pro: true,
+  palette: {
+    background: '#0B1120',
+    surface: '#111827',
+    surfaceMuted: '#1E293B',
+    border: '#334155',
+    text: '#F8FAFC',
+    textMuted: '#94A3B8',
+    accent: '#38BDF8',
+    onAccent: '#04121F',
+  },
+  fonts: { heading: SANS, body: SANS },
+  header: 'band',
+  cardFrame: 'flat',
 };
 
-const PAPER_THEME: Theme = {
+export const PAPER_THEME: Theme = {
   id: 'paper',
-  label: 'Paper',
-  description: 'Warm, editorial, serif type.',
-  background: palette.amber['50'],
-  surface: palette.white,
-  surfaceMuted: palette.amber['100'],
-  border: palette.amber['200'],
-  text: palette.neutral['900'],
-  textMuted: palette.amber['800'],
-  accent: palette.amber['600'],
-  fontFamily: SERIF,
+  name: 'Vintage Paper',
+  description: 'Warm off-white stock with a serif voice — a binder feel.',
+  pro: true,
+  palette: {
+    background: '#F5EFE0',
+    surface: '#FBF7EC',
+    surfaceMuted: '#EFE6D2',
+    border: '#D9C9A3',
+    text: '#3D3527',
+    textMuted: '#7A6E55',
+    accent: '#B5651D',
+    onAccent: '#FBF7EC',
+  },
+  fonts: { heading: SERIF, body: SERIF },
+  header: 'plain',
+  cardFrame: 'soft',
 };
 
-const NEON_THEME: Theme = {
+export const NEON_THEME: Theme = {
   id: 'neon',
-  label: 'Neon',
-  description: 'Electric violet on near-black, mono type.',
-  background: palette.neutral['950'],
-  surface: palette.violet['950'],
-  surfaceMuted: palette.violet['900'],
-  border: palette.violet['700'],
-  text: palette.violet['50'],
-  textMuted: palette.violet['300'],
-  accent: palette.teal['400'],
-  fontFamily: MONO,
+  name: 'Holo',
+  description: 'Near-black canvas with a punchy magenta holo accent.',
+  pro: true,
+  palette: {
+    background: '#0A0A12',
+    surface: '#14111F',
+    surfaceMuted: '#1F1A2E',
+    border: '#3A2F5C',
+    text: '#F5F3FF',
+    textMuted: '#A99FD6',
+    accent: '#FF2EC4',
+    onAccent: '#0A0A12',
+  },
+  fonts: { heading: SANS, body: SANS },
+  header: 'band',
+  cardFrame: 'flat',
 };
 
-const GOLD_THEME: Theme = {
+export const GOLD_THEME: Theme = {
   id: 'gold',
-  label: 'Gold',
-  description: 'Luxe gold accents on slate.',
-  background: palette.neutral['900'],
-  surface: palette.neutral['800'],
-  surfaceMuted: palette.neutral['700'],
-  border: palette.amber['500'],
-  text: palette.amber['50'],
-  textMuted: palette.amber['200'],
-  accent: palette.amber['400'],
-  fontFamily: SERIF,
+  name: 'Gold Foil',
+  description: 'Espresso-dark with a brushed-gold accent for grails.',
+  pro: true,
+  palette: {
+    background: '#14110A',
+    surface: '#1E1809',
+    surfaceMuted: '#2A2210',
+    border: '#4D3F1A',
+    text: '#FBF6E8',
+    textMuted: '#C9B98A',
+    accent: '#E8B341',
+    onAccent: '#14110A',
+  },
+  fonts: { heading: SERIF, body: SANS },
+  header: 'band',
+  cardFrame: 'outlined',
 };
 
-/**
- * Every theme keyed by its contract id. Exhaustive over
- * `SHAREABLE_THEMES`; adding a contract theme without a registry entry
- * is a compile error (the `Record<ShareableTheme, Theme>` annotation).
- */
+/** Lookup keyed by the canonical `ShareableTheme` id. */
 export const THEMES: Readonly<Record<ShareableTheme, Theme>> = {
   default: DEFAULT_THEME,
   dark: DARK_THEME,
   paper: PAPER_THEME,
   neon: NEON_THEME,
   gold: GOLD_THEME,
-} as const;
+};
 
-/** Themes in picker display order (default first). */
+/** The free fallback id. */
+export const DEFAULT_THEME_ID: ShareableTheme = 'default';
+
+/** Stable display order for the gallery (default first). */
 export const THEME_LIST: readonly Theme[] = [
   DEFAULT_THEME,
   DARK_THEME,
@@ -149,32 +188,41 @@ export const THEME_LIST: readonly Theme[] = [
   GOLD_THEME,
 ];
 
-/**
- * Resolve a (possibly unknown / null) theme id to a concrete `Theme`.
- * Unknown ids and `null`/`undefined` fall back to `default` so a
- * backend drift or a row written before the theme shipped never throws
- * at render time.
- */
-export function resolveTheme(id: string | null | undefined): Theme {
-  if (id === null || id === undefined) return DEFAULT_THEME;
-  return (THEMES as Record<string, Theme>)[id] ?? DEFAULT_THEME;
+/** Ids that require Pro to persist/render. */
+export const PRO_THEME_IDS: readonly ShareableTheme[] = THEME_LIST.filter(
+  (t) => t.pro,
+).map((t) => t.id);
+
+/** Narrowing guard — is `id` a real, registered theme id? */
+export function isKnownThemeId(id: unknown): id is ShareableTheme {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(THEMES, id);
 }
 
 /**
- * Server-side free-downgrade seam. The public render path calls this so
- * a provably non-pro owner's stored non-default theme reverts to
- * `default` (rules/08-shareables.md: themes are enforced server-side at
- * render time).
- *
- *   - `ownerIsPro === false` → force `default` (free owner downgrade).
- *   - `ownerIsPro === true`  → render the stored theme.
- *   - `ownerIsPro == null`   → owner tier not yet sourced on the public
- *     payload (Q-022 / `T-BE-SHAREABLE-OWNER-TIER`); interim behaviour
- *     renders the stored theme for everyone.
+ * Resolve any (possibly stale / null / unknown) id to a concrete
+ * theme. Falls back to `default` so an invalid stored `theme_id`
+ * never breaks the public page.
+ */
+export function resolveTheme(id: ShareableTheme | string | null | undefined): Theme {
+  if (isKnownThemeId(id)) return THEMES[id];
+  return DEFAULT_THEME;
+}
+
+/**
+ * Resolve the theme for the PUBLIC render with free-tier
+ * enforcement folded in:
+ *   - `ownerIsPro === false` → force `default` (a downgraded owner's
+ *     themed page reverts cleanly, regardless of stored id).
+ *   - `ownerIsPro === true`  → render the resolved stored theme.
+ *   - `ownerIsPro === null`  → owner tier unknown to the public
+ *     payload (see Q-022 / T-BE-SHAREABLE-OWNER-TIER). Interim: render
+ *     the resolved stored theme for everyone. The day the payload
+ *     carries the tier, passing `false` flips the downgrade on with no
+ *     further change here.
  */
 export function resolvePublicTheme(
-  id: string | null | undefined,
-  ownerIsPro: boolean | null | undefined,
+  id: ShareableTheme | string | null | undefined,
+  ownerIsPro: boolean | null,
 ): Theme {
   if (ownerIsPro === false) return DEFAULT_THEME;
   return resolveTheme(id);
