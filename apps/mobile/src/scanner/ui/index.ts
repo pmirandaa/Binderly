@@ -4,8 +4,15 @@
 // deep imports into individual component files are not part of the
 // public surface.
 
+export { CardThumbnail } from './CardThumbnail.js';
+export type { CardThumbnailProps } from './CardThumbnail.js';
+
 export { DisambigPicker, buildDisambigCandidates } from './DisambigPicker.js';
-export type { DisambigCandidate, DisambigPickerProps } from './DisambigPicker.js';
+export type {
+  DisambigCandidate,
+  DisambigLookupResult,
+  DisambigPickerProps,
+} from './DisambigPicker.js';
 
 export { HoldSteadyHint, MatchOverlay } from './MatchOverlay.js';
 export type { MatchOverlayProps } from './MatchOverlay.js';
