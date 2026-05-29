@@ -24,13 +24,40 @@
 //   - `gap` works; nested flex works.
 //   - `borderRadius` + `boxShadow` work.
 
-import { BRAND, BRAND_BACKGROUND_GRADIENT } from './brand';
+import { BRAND } from './brand';
 import { formatHeaderTally, publicShareUrl } from '../share/format';
 
+import type { OgPalette } from '../../app/c/themes/og-palette';
 import type { PublicSharePayload } from '../share/api';
 
 const SIZE_PX = { width: 1200, height: 630 } as const;
 export const OG_SIZE = SIZE_PX;
+
+/**
+ * The brand palette the OG card falls back to when no theme palette
+ * is supplied (the production fallback render + any test that renders
+ * the card without a theme). Mirrors `lib/og/brand.ts`; structurally a
+ * superset-compatible `OgPalette`. Themed renders pass the resolved
+ * `ogPaletteForTheme(...)` palette instead (#FU-62 / T-SH-OG-THEME-WIRE).
+ */
+export const DEFAULT_OG_PALETTE: OgPalette = {
+  background: BRAND.background,
+  surface: BRAND.surface,
+  text: BRAND.text,
+  textMuted: BRAND.textMuted,
+  accent: BRAND.primary,
+  onAccent: BRAND.background,
+};
+
+/**
+ * The card background gradient, derived from the active palette so a
+ * themed share unfurls in its own colours rather than the fixed brand
+ * gradient. background → surface → accent (the same 3-stop, 135°
+ * structure the brand gradient used).
+ */
+export function ogBackgroundGradient(palette: OgPalette): string {
+  return `linear-gradient(135deg, ${palette.background} 0%, ${palette.surface} 60%, ${palette.accent} 100%)`;
+}
 
 export interface OgRenderInput {
   readonly handle: string;
@@ -42,6 +69,13 @@ export interface OgRenderInput {
    * URIs upstream when the user has fewer than 4 owned items.
    */
   readonly thumbnailUris: ReadonlyArray<string>;
+  /**
+   * The resolved theme palette to paint the hero with (#FU-62). The
+   * route resolves the shareable's `theme` → `ogPaletteForTheme` with
+   * the same free-tier downgrade the public page applies. Optional so
+   * callers (and tests) that don't theme fall back to the brand palette.
+   */
+  readonly palette?: OgPalette;
 }
 
 /**
@@ -66,6 +100,7 @@ export function buildStatLine(payload: PublicSharePayload): string {
  */
 export function renderOgImage(input: OgRenderInput): React.ReactElement {
   const { handle, slug, payload, thumbnailUris } = input;
+  const palette = input.palette ?? DEFAULT_OG_PALETTE;
   const ownerLabel = payload.owner.displayName ?? `@${payload.owner.handle}`;
   const stat = buildStatLine(payload);
   const url = publicShareUrl(handle, slug);
@@ -79,21 +114,27 @@ export function renderOgImage(input: OgRenderInput): React.ReactElement {
         flexDirection: 'column',
         justifyContent: 'space-between',
         padding: '64px',
-        backgroundImage: BRAND_BACKGROUND_GRADIENT,
-        backgroundColor: BRAND.background,
-        color: BRAND.text,
+        backgroundImage: ogBackgroundGradient(palette),
+        backgroundColor: palette.background,
+        color: palette.text,
         fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif',
       }}
     >
-      <Header handle={handle} />
-      <Title title={payload.collectionTitle} ownerLabel={ownerLabel} />
-      <ThumbnailRow uris={thumbnailUris} />
-      <Footer url={url} stat={stat} />
+      <Header handle={handle} palette={palette} />
+      <Title title={payload.collectionTitle} ownerLabel={ownerLabel} palette={palette} />
+      <ThumbnailRow uris={thumbnailUris} palette={palette} />
+      <Footer url={url} stat={stat} palette={palette} />
     </div>
   );
 }
 
-function Header({ handle }: { handle: string }): React.ReactElement {
+function Header({
+  handle,
+  palette,
+}: {
+  readonly handle: string;
+  readonly palette: OgPalette;
+}): React.ReactElement {
   return (
     <div
       style={{
@@ -104,12 +145,12 @@ function Header({ handle }: { handle: string }): React.ReactElement {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <Logo />
+        <Logo palette={palette} />
         <div
           style={{
             fontSize: '36px',
             fontWeight: 700,
-            color: BRAND.text,
+            color: palette.text,
             letterSpacing: '-0.5px',
           }}
         >
@@ -121,7 +162,7 @@ function Header({ handle }: { handle: string }): React.ReactElement {
           display: 'flex',
           alignItems: 'center',
           fontSize: '24px',
-          color: BRAND.textMuted,
+          color: palette.textMuted,
         }}
       >
         Pokémon collection by @{handle}
@@ -130,18 +171,18 @@ function Header({ handle }: { handle: string }): React.ReactElement {
   );
 }
 
-function Logo(): React.ReactElement {
+function Logo({ palette }: { readonly palette: OgPalette }): React.ReactElement {
   return (
     <div
       style={{
         width: '64px',
         height: '64px',
         borderRadius: '14px',
-        background: BRAND.primary,
+        background: palette.accent,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        color: BRAND.background,
+        color: palette.onAccent,
         fontSize: '34px',
         fontWeight: 800,
         letterSpacing: '-1px',
@@ -155,9 +196,11 @@ function Logo(): React.ReactElement {
 function Title({
   title,
   ownerLabel,
+  palette,
 }: {
   readonly title: string;
   readonly ownerLabel: string;
+  readonly palette: OgPalette;
 }): React.ReactElement {
   return (
     <div
@@ -171,7 +214,7 @@ function Title({
       <div
         style={{
           fontSize: '24px',
-          color: BRAND.textMuted,
+          color: palette.textMuted,
           textTransform: 'uppercase',
           letterSpacing: '4px',
         }}
@@ -185,7 +228,7 @@ function Title({
           fontWeight: 800,
           lineHeight: 1.05,
           letterSpacing: '-2px',
-          color: BRAND.text,
+          color: palette.text,
           maxWidth: '1080px',
         }}
       >
@@ -197,8 +240,10 @@ function Title({
 
 function ThumbnailRow({
   uris,
+  palette,
 }: {
   readonly uris: ReadonlyArray<string>;
+  readonly palette: OgPalette;
 }): React.ReactElement {
   // Always render 4 tiles for visual consistency. Callers
   // pre-pad with placeholder URIs.
@@ -213,13 +258,19 @@ function ThumbnailRow({
       }}
     >
       {tiles.map((src, idx) => (
-        <Tile key={`tile-${idx.toString()}`} src={src} />
+        <Tile key={`tile-${idx.toString()}`} src={src} palette={palette} />
       ))}
     </div>
   );
 }
 
-function Tile({ src }: { readonly src: string }): React.ReactElement {
+function Tile({
+  src,
+  palette,
+}: {
+  readonly src: string;
+  readonly palette: OgPalette;
+}): React.ReactElement {
   // Satori (the engine behind next/og) does NOT understand
   // next/image — it can only consume bare <img> tags whose `src`
   // is a `data:` URI. The next/no-img-element rule therefore does
@@ -234,7 +285,7 @@ function Tile({ src }: { readonly src: string }): React.ReactElement {
         borderRadius: '14px',
         overflow: 'hidden',
         boxShadow: '0 12px 32px rgba(0, 0, 0, 0.45)',
-        backgroundColor: BRAND.surface,
+        backgroundColor: palette.surface,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -256,9 +307,11 @@ function Tile({ src }: { readonly src: string }): React.ReactElement {
 function Footer({
   url,
   stat,
+  palette,
 }: {
   readonly url: string;
   readonly stat: string;
+  readonly palette: OgPalette;
 }): React.ReactElement {
   return (
     <div
@@ -267,12 +320,12 @@ function Footer({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-end',
-        color: BRAND.textDim,
+        color: palette.textMuted,
         fontSize: '24px',
       }}
     >
       <div style={{ display: 'flex' }}>binderly.app{url}</div>
-      <div style={{ display: 'flex', fontWeight: 600, color: BRAND.text }}>
+      <div style={{ display: 'flex', fontWeight: 600, color: palette.text }}>
         {stat}
       </div>
     </div>

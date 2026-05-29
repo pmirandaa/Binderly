@@ -10,10 +10,19 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { ogPaletteForTheme } from '../../../app/c/themes/og-palette';
+import { GOLD_THEME } from '../../../app/c/themes/registry';
 import { makePublicSharePayload } from '../../share/fixtures';
+import { BRAND } from '../brand';
 import { renderOgFallback } from '../fallback';
 import { PLACEHOLDER_DATA_URI } from '../placeholder';
-import { renderOgImage, OG_SIZE, buildStatLine } from '../render';
+import {
+  renderOgImage,
+  OG_SIZE,
+  buildStatLine,
+  DEFAULT_OG_PALETTE,
+  ogBackgroundGradient,
+} from '../render';
 
 const FOUR_PLACEHOLDERS = [
   PLACEHOLDER_DATA_URI,
@@ -174,6 +183,20 @@ describe('renderOgImage — content', () => {
     expect(html).toContain('linear-gradient');
   });
 
+  it('defaults to the brand palette colours when no palette is supplied', () => {
+    const html = renderToStaticMarkup(
+      renderOgImage({
+        handle: 'pablo',
+        slug: 'binder',
+        payload,
+        thumbnailUris: FOUR_PLACEHOLDERS,
+      }),
+    );
+    // Brand background + brand teal accent (the default-palette fallback).
+    expect(html).toContain(BRAND.background);
+    expect(html).toContain(BRAND.primary);
+  });
+
   it('falls back to @{handle} when displayName is null', () => {
     const payloadNoName = makePublicSharePayload({
       owner: {
@@ -194,6 +217,73 @@ describe('renderOgImage — content', () => {
       }),
     );
     expect(html).toContain('@someone');
+  });
+});
+
+describe('ogBackgroundGradient', () => {
+  it('derives a 3-stop 135° gradient from the palette', () => {
+    const gradient = ogBackgroundGradient(GOLD_THEME.palette);
+    expect(gradient).toContain('linear-gradient(135deg');
+    expect(gradient).toContain(GOLD_THEME.palette.background);
+    expect(gradient).toContain(GOLD_THEME.palette.surface);
+    expect(gradient).toContain(GOLD_THEME.palette.accent);
+  });
+
+  it('DEFAULT_OG_PALETTE mirrors the brand tokens', () => {
+    expect(DEFAULT_OG_PALETTE.background).toBe(BRAND.background);
+    expect(DEFAULT_OG_PALETTE.surface).toBe(BRAND.surface);
+    expect(DEFAULT_OG_PALETTE.text).toBe(BRAND.text);
+    expect(DEFAULT_OG_PALETTE.accent).toBe(BRAND.primary);
+  });
+});
+
+describe('renderOgImage — theme palette wiring (#FU-62)', () => {
+  const payload = makePublicSharePayload();
+
+  it('paints the hero with the supplied theme palette colours', () => {
+    const palette = ogPaletteForTheme('gold');
+    const html = renderToStaticMarkup(
+      renderOgImage({
+        handle: 'pablo',
+        slug: 'binder',
+        payload,
+        thumbnailUris: FOUR_PLACEHOLDERS,
+        palette,
+      }),
+    );
+    // Gold theme background + accent appear; the brand defaults do not
+    // dominate the hero.
+    expect(html).toContain(GOLD_THEME.palette.background);
+    expect(html).toContain(GOLD_THEME.palette.accent);
+  });
+
+  it('renders a palette-derived gradient (not the fixed brand gradient)', () => {
+    const palette = ogPaletteForTheme('gold');
+    const html = renderToStaticMarkup(
+      renderOgImage({
+        handle: 'pablo',
+        slug: 'binder',
+        payload,
+        thumbnailUris: FOUR_PLACEHOLDERS,
+        palette,
+      }),
+    );
+    expect(html).toContain('linear-gradient');
+    expect(html).toContain(GOLD_THEME.palette.accent);
+  });
+
+  it('uses the wordmark/title text colour from the palette', () => {
+    const palette = ogPaletteForTheme('gold');
+    const html = renderToStaticMarkup(
+      renderOgImage({
+        handle: 'pablo',
+        slug: 'binder',
+        payload,
+        thumbnailUris: FOUR_PLACEHOLDERS,
+        palette,
+      }),
+    );
+    expect(html).toContain(GOLD_THEME.palette.text);
   });
 });
 

@@ -19,9 +19,15 @@ import { describe, expect, it, vi } from 'vitest';
 
 
 import { renderOgRoute } from './route';
+import { GOLD_THEME, DEFAULT_THEME } from '../../../../../../app/c/themes/registry';
 import { FALLBACK_CACHE_CONTROL, SUCCESS_CACHE_CONTROL } from '../../../../../../lib/og/cache-headers';
 import { PLACEHOLDER_DATA_URI } from '../../../../../../lib/og/placeholder';
-import { makePublicSharePayload, makePublicShareMember } from '../../../../../../lib/share/fixtures';
+import {
+  makePublicSharePayload,
+  makePublicShareMember,
+  makePublicShareOwner,
+  makeShareableDto,
+} from '../../../../../../lib/share/fixtures';
 
 import type { PublicSharePayload } from '../../../../../../lib/share/api';
 import type { ReactElement } from 'react';
@@ -337,6 +343,57 @@ describe('GET — `is_public=false` (private) hides the payload', () => {
     })) as FakeImageResponse;
     const text = await response.text();
     expect(text).not.toContain(secret);
+    expect(response.headers.get('cache-control')).toBe(FALLBACK_CACHE_CONTROL);
+  });
+});
+
+describe('GET — theme palette wiring (#FU-62)', () => {
+  function themedPayload(theme: string, tier: 'free' | 'pro'): PublicSharePayload {
+    return makePublicSharePayload({
+      shareable: { ...makeShareableDto(), theme: theme as never },
+      owner: makePublicShareOwner({ tier }),
+    });
+  }
+
+  it('paints the hero with the shareable theme palette for a Pro owner', async () => {
+    const response = (await renderOgRoute('pablo', 'binder', {
+      fetchPayload: async () => themedPayload('gold', 'pro'),
+      fetchImages: async () => [PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI],
+      ImageResponseImpl: FakeImageResponseCtor,
+    })) as FakeImageResponse;
+    const body = await response.text();
+    expect(body).toContain(GOLD_THEME.palette.accent);
+    expect(body).toContain(GOLD_THEME.palette.background);
+  });
+
+  it('downgrades a FREE owner with a stored Pro theme to the default palette (#FU-61)', async () => {
+    const response = (await renderOgRoute('pablo', 'binder', {
+      fetchPayload: async () => themedPayload('gold', 'free'),
+      fetchImages: async () => [PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI],
+      ImageResponseImpl: FakeImageResponseCtor,
+    })) as FakeImageResponse;
+    const body = await response.text();
+    // The Pro gold accent must NOT leak onto a free owner's unfurl;
+    // the default palette accent is used instead.
+    expect(body).not.toContain(GOLD_THEME.palette.accent);
+    expect(body).toContain(DEFAULT_THEME.palette.accent);
+  });
+
+  it('renders the default palette for a free owner on the default theme', async () => {
+    const response = (await renderOgRoute('pablo', 'binder', {
+      fetchPayload: async () => themedPayload('default', 'free'),
+      fetchImages: async () => [PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI, PLACEHOLDER_DATA_URI],
+      ImageResponseImpl: FakeImageResponseCtor,
+    })) as FakeImageResponse;
+    const body = await response.text();
+    expect(body).toContain(DEFAULT_THEME.palette.background);
+  });
+
+  it('still serves the brand fallback (not a theme palette) when payload is null', async () => {
+    const response = await renderOgRoute('unknown', 'thing', {
+      fetchPayload: async () => null,
+      ImageResponseImpl: FakeImageResponseCtor,
+    });
     expect(response.headers.get('cache-control')).toBe(FALLBACK_CACHE_CONTROL);
   });
 });

@@ -119,6 +119,31 @@ export function formatCurrentPriceComputedAt(iso: string, locale = 'en-US'): str
 }
 
 /**
+ * Format the `lastObservationAt` ISO timestamp from
+ * `printingCurrentPriceDto` (the `mv_current_price` v2 enrichment,
+ * migration `0028` / #FU-5) as a short "Apr 5, 2026" date.
+ *
+ * This is the truest "last seen in the wild" recency — `MAX(observed_at)`
+ * from the raw observation log — surfaced as the "Last seen" line on the
+ * card-detail price block (Q-028 resolution: the headline `freshness`
+ * band stays anchored on `computedAt` for backward-compatibility, while
+ * `lastObservationAt` is exposed explicitly so users still get
+ * observation recency without re-tuning the freshness buckets).
+ *
+ * Returns `null` for missing / null / unparseable input so the caller
+ * can suppress the whole line rather than render a bad date.
+ */
+export function formatLastSeenAt(
+  iso: string | null | undefined,
+  locale = 'en-US',
+): string | null {
+  if (iso === null || iso === undefined) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return new Intl.DateTimeFormat(locale, RELEASE_DATE_FORMAT).format(new Date(ms));
+}
+
+/**
  * Pick the user-visible name of a printing for alt text /
  * tooltips. Falls back to the variant key when the parent card
  * isn't joined.
