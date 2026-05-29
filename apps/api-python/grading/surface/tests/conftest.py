@@ -10,7 +10,7 @@ import pytest
 from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.image_loader import ImageLoader
 from grading.ml_common.types import LabelledGradingSample
-from grading.surface.dataset import SurfaceDataset, SurfaceMergedDataLoader
+from grading.surface.dataset import SurfaceDataset
 from grading.surface.model import SurfaceModel
 from grading.surface.types import NUM_SURFACE_SHOTS_V1
 
@@ -107,7 +107,7 @@ def auction_rows():
 
 @pytest.fixture
 def labelled_samples(psa_rows, ebay_rows, auction_rows):
-    loader = SurfaceMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="surface")
     return loader.load_labelled()
 
 

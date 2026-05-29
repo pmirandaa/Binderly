@@ -74,7 +74,7 @@ class TestEvalEdgesModel:
         pytest.importorskip("onnxruntime")
 
         from grading.edges.train import train_edges_model
-        from grading.edges.dataset import EdgesMergedDataLoader
+        from grading.ml_common.data_loader import MergedDataLoader
         from grading.ml_common.types import TrainingConfig
 
         config = TrainingConfig(num_epochs=1, batch_size=4)
@@ -95,6 +95,6 @@ class TestEvalEdgesModel:
             auction_rows=auction_rows,
             patch_size=PATCH_SIZE,
         )
-        loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+        loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
         expected_n = len(loader.load_labelled())
         assert metrics["n_samples"] == pytest.approx(expected_n)

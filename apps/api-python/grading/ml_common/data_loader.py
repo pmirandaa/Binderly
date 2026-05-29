@@ -2,7 +2,13 @@
 
 Each loader normalises rows from its source table into ``LabelledGradingSample``.
 ``MergedDataLoader`` unions all three sources and filters to rows labelled for
-the requested sub-grade (default: ``'corners'``).
+the requested sub-grade.
+
+The sub-grade to extract is parameterised by ``subgrade_key`` (one of
+``'corners'`` / ``'edges'`` / ``'surface'``; default ``'corners'``).  This is
+the single shared code path for all three sub-grade models — corners, edges,
+and surface each instantiate ``MergedDataLoader(..., subgrade_key=...)`` rather
+than maintaining a parallel loader (see #FU-44 / Q-017).
 
 In production the loaders would receive database rows (dicts from psycopg /
 asyncpg / Supabase REST). For testing they accept in-memory lists of dicts,
@@ -11,18 +17,24 @@ making them fully mockable without a DB connection.
 Schema references
 -----------------
 - ``grading_training_sample`` (source='psa_cert', grade_company='PSA'):
-    subgrades JSONB → {corners: float, ...}, images JSONB → {front: str, ...}
+    subgrades JSONB → {<subgrade_key>: float, ...},
+    images JSONB → {front: str, ..., <subgrade_key>: str[]}
 - ``ebay_graded_listing_observation``:
-    parsed_sub_grades JSONB → {corners: float, ...}, thumbnail_url text
+    parsed_sub_grades JSONB → {<subgrade_key>: float, ...}, thumbnail_url text
 - ``auction_lot_observation``:
-    parsed_sub_grades JSONB → {corners: float, ...}, lot_image_urls text[]
+    parsed_sub_grades JSONB → {<subgrade_key>: float, ...}, lot_image_urls text[]
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
 from grading.ml_common.types import LabelledGradingSample
+
+# The sub-grade label keys understood by every loader.  These match the JSON
+# keys used in ``subgrades`` / ``parsed_sub_grades`` across all three scraper
+# tables (see schema references above).
+SubgradeKey = Literal["corners", "edges", "surface"]
 
 
 # ---------------------------------------------------------------------------
@@ -37,10 +49,15 @@ class PSADataLoader:
         rows: List of dicts matching the ``grading_training_sample`` column map.
             In production, supply rows fetched from the DB.  In tests, supply
             synthetic dicts.
+        subgrade_key: Which sub-grade label to extract from ``subgrades``
+            (and which per-subgrade image array to append from ``images``).
     """
 
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
+    def __init__(
+        self, rows: list[dict[str, Any]], subgrade_key: SubgradeKey = "corners"
+    ) -> None:
         self._rows = rows
+        self._subgrade_key = subgrade_key
 
     def load(self) -> list[LabelledGradingSample]:
         samples: list[LabelledGradingSample] = []
@@ -48,19 +65,19 @@ class PSADataLoader:
             if row.get("grade_company") != "PSA":
                 continue
             subgrades: dict = row.get("subgrades") or {}
-            corners_score = subgrades.get("corners")
+            subgrade_score = subgrades.get(self._subgrade_key)
             images: dict = row.get("images") or {}
             urls: list[str] = [v for v in images.values() if isinstance(v, str)]
-            corners_arr = images.get("corners")
-            if isinstance(corners_arr, list):
-                urls.extend(str(u) for u in corners_arr if u)
+            subgrade_arr = images.get(self._subgrade_key)
+            if isinstance(subgrade_arr, list):
+                urls.extend(str(u) for u in subgrade_arr if u)
             samples.append(
                 LabelledGradingSample(
                     source="psa_cert",
                     source_id=str(row.get("source_id", "")),
                     grade_company="PSA",
                     overall_grade=_to_float(row.get("grade")),
-                    corners_score=_to_float(corners_score),
+                    subgrade_score=_to_float(subgrade_score),
                     image_urls=urls,
                     printing_id=row.get("printing_id"),
                     raw_metadata=row.get("raw_metadata") or {},
@@ -82,16 +99,20 @@ class EbayDataLoader:
 
     Args:
         rows: List of dicts matching the ``ebay_graded_listing_observation`` schema.
+        subgrade_key: Which sub-grade label to extract from ``parsed_sub_grades``.
     """
 
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
+    def __init__(
+        self, rows: list[dict[str, Any]], subgrade_key: SubgradeKey = "corners"
+    ) -> None:
         self._rows = rows
+        self._subgrade_key = subgrade_key
 
     def load(self) -> list[LabelledGradingSample]:
         samples: list[LabelledGradingSample] = []
         for row in self._rows:
             sub: dict = row.get("parsed_sub_grades") or {}
-            corners_score = sub.get("corners")
+            subgrade_score = sub.get(self._subgrade_key)
             thumbnail = row.get("thumbnail_url")
             urls: list[str] = [thumbnail] if thumbnail else []
             company = row.get("parsed_grading_company") or "OTHER"
@@ -101,7 +122,7 @@ class EbayDataLoader:
                     source_id=str(row.get("listing_id", "")),
                     grade_company=company,
                     overall_grade=_to_float(row.get("parsed_overall_grade")),
-                    corners_score=_to_float(corners_score),
+                    subgrade_score=_to_float(subgrade_score),
                     image_urls=urls,
                     printing_id=row.get("printing_id"),
                     raw_metadata={"title": row.get("title", "")},
@@ -125,16 +146,20 @@ class AuctionDataLoader:
 
     Args:
         rows: List of dicts matching the ``auction_lot_observation`` schema.
+        subgrade_key: Which sub-grade label to extract from ``parsed_sub_grades``.
     """
 
-    def __init__(self, rows: list[dict[str, Any]]) -> None:
+    def __init__(
+        self, rows: list[dict[str, Any]], subgrade_key: SubgradeKey = "corners"
+    ) -> None:
         self._rows = rows
+        self._subgrade_key = subgrade_key
 
     def load(self) -> list[LabelledGradingSample]:
         samples: list[LabelledGradingSample] = []
         for row in self._rows:
             sub: dict = row.get("parsed_sub_grades") or {}
-            corners_score = sub.get("corners")
+            subgrade_score = sub.get(self._subgrade_key)
             image_urls: list[str] = list(row.get("lot_image_urls") or [])
             house = row.get("auction_house") or "unknown"
             source = f"auction_{house}"
@@ -145,7 +170,7 @@ class AuctionDataLoader:
                     source_id=str(row.get("lot_id", "")),
                     grade_company=company,
                     overall_grade=_to_float(row.get("parsed_overall_grade")),
-                    corners_score=_to_float(corners_score),
+                    subgrade_score=_to_float(subgrade_score),
                     image_urls=image_urls,
                     printing_id=row.get("printing_id"),
                     raw_metadata={"lot_title": row.get("lot_title", "")},
@@ -163,15 +188,20 @@ class AuctionDataLoader:
 
 
 class MergedDataLoader:
-    """Union of PSA + eBay + Auction loaders, filtered by sub-grade column.
+    """Union of PSA + eBay + Auction loaders, keyed to one sub-grade.
+
+    This is the shared loader for all three sub-grade models.  Pass
+    ``subgrade_key='corners' | 'edges' | 'surface'`` to select which label
+    column every underlying loader extracts; ``load_labelled()`` then returns
+    only the rows that carry a non-null value for that sub-grade.
 
     Args:
         psa_rows: ``grading_training_sample`` rows (PSA).
         ebay_rows: ``ebay_graded_listing_observation`` rows.
         auction_rows: ``auction_lot_observation`` rows.
-        subgrade_column: Which sub-grade label to filter on.  Rows that lack
-            a non-null value for this sub-grade are excluded from the labelled
-            subset returned by ``load_labelled()``.
+        subgrade_key: Which sub-grade label to extract + filter on.  Rows that
+            lack a non-null value for this sub-grade are excluded from the
+            labelled subset returned by ``load_labelled()``.
     """
 
     def __init__(
@@ -179,25 +209,24 @@ class MergedDataLoader:
         psa_rows: list[dict[str, Any]],
         ebay_rows: list[dict[str, Any]],
         auction_rows: list[dict[str, Any]],
-        subgrade_column: str = "corners",
+        subgrade_key: SubgradeKey = "corners",
     ) -> None:
-        self._psa = PSADataLoader(psa_rows)
-        self._ebay = EbayDataLoader(ebay_rows)
-        self._auction = AuctionDataLoader(auction_rows)
-        self._subgrade_column = subgrade_column
+        self._psa = PSADataLoader(psa_rows, subgrade_key)
+        self._ebay = EbayDataLoader(ebay_rows, subgrade_key)
+        self._auction = AuctionDataLoader(auction_rows, subgrade_key)
+        self._subgrade_key = subgrade_key
+
+    @property
+    def subgrade_key(self) -> SubgradeKey:
+        return self._subgrade_key
 
     def load_all(self) -> list[LabelledGradingSample]:
         """Return all samples regardless of label availability."""
         return self._psa.load() + self._ebay.load() + self._auction.load()
 
     def load_labelled(self) -> list[LabelledGradingSample]:
-        """Return only samples with a non-null ``corners_score`` (or the
-        requested sub-grade column for future sub-grades).
-
-        For T-GR-CORNERS the filter is always on ``corners_score``.
-        T-GR-EDGES / T-GR-SURFACE subclass or parameterise differently.
-        """
-        return [s for s in self.load_all() if s.is_labelled_for_corners()]
+        """Return only samples carrying a non-null label for ``subgrade_key``."""
+        return [s for s in self.load_all() if s.is_labelled()]
 
     def load(self) -> list[LabelledGradingSample]:
         return self.load_labelled()

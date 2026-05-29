@@ -17,9 +17,10 @@ from typing import Any
 
 import numpy as np
 
+from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.eval_metrics import summarise_metrics
 from grading.ml_common.model_export import load_onnx_session, run_onnx_inference
-from grading.surface.dataset import SurfaceDataset, SurfaceMergedDataLoader
+from grading.surface.dataset import SurfaceDataset
 from grading.surface.types import NUM_SURFACE_SHOTS_V1
 
 
@@ -44,7 +45,7 @@ def eval_surface_model(
     Returns:
         Dict of eval metrics (see ``summarise_metrics``).
     """
-    loader = SurfaceMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="surface")
     labelled = loader.load_labelled()
     if not labelled:
         raise ValueError("No labelled surface samples found.")

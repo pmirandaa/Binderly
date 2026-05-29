@@ -1,12 +1,17 @@
-"""Tests for surface/dataset.py — SurfaceDataset + SurfaceMergedDataLoader."""
+"""Tests for surface/dataset.py — SurfaceDataset + the shared surface-keyed loader.
+
+Surface training data is loaded via ``MergedDataLoader(subgrade_key='surface')``
+(the shared ml_common loader; see #FU-44 / Q-017).
+"""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
+from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.types import LabelledGradingSample
-from grading.surface.dataset import SurfaceDataset, SurfaceMergedDataLoader
+from grading.surface.dataset import SurfaceDataset
 from grading.surface.tests.conftest import (
     INPUT_DIM,
     PATCH_SIZE,
@@ -61,14 +66,14 @@ class TestSurfaceDataset:
                 source_id="1",
                 grade_company="PSA",
                 overall_grade=9.0,
-                corners_score=None,
+                subgrade_score=None,
             ),
             LabelledGradingSample(
                 source="psa_cert",
                 source_id="2",
                 grade_company="PSA",
                 overall_grade=9.0,
-                corners_score=8.5,
+                subgrade_score=8.5,
             ),
         ]
         ds = SurfaceDataset(samples, image_loader=mock_loader, patch_size=PATCH_SIZE)
@@ -81,7 +86,7 @@ class TestSurfaceDataset:
                 source_id="3",
                 grade_company="PSA",
                 overall_grade=8.0,
-                corners_score=7.5,
+                subgrade_score=7.5,
                 image_urls=[],
             )
         ]
@@ -97,7 +102,7 @@ class TestSurfaceDataset:
                 source_id="4",
                 grade_company="PSA",
                 overall_grade=9.0,
-                corners_score=9.0,
+                subgrade_score=9.0,
                 image_urls=["mock://a.jpg", "mock://b.jpg", "mock://c.jpg"],
             )
         ]
@@ -123,7 +128,7 @@ class TestSurfaceDataset:
                 source_id="5",
                 grade_company="PSA",
                 overall_grade=8.0,
-                corners_score=8.0,
+                subgrade_score=8.0,
                 image_urls=["mock://single.jpg"],
             )
         ]
@@ -133,54 +138,60 @@ class TestSurfaceDataset:
 
 
 # ---------------------------------------------------------------------------
-# SurfaceMergedDataLoader
+# Surface-keyed MergedDataLoader  (subgrade_key='surface')
 # ---------------------------------------------------------------------------
+
+
+def _surface_loader(psa=None, ebay=None, auction=None):
+    return MergedDataLoader(
+        psa or [], ebay or [], auction or [], subgrade_key="surface"
+    )
 
 
 class TestSurfaceMergedDataLoader:
     def test_load_labelled_psa_only(self):
-        loader = SurfaceMergedDataLoader(_make_psa_rows(5), [], [])
+        loader = _surface_loader(psa=_make_psa_rows(5))
         labelled = loader.load_labelled()
         assert len(labelled) == 5
 
     def test_load_labelled_ebay_only(self):
-        loader = SurfaceMergedDataLoader([], _make_ebay_rows(6), [])
+        loader = _surface_loader(ebay=_make_ebay_rows(6))
         labelled = loader.load_labelled()
         assert len(labelled) == 6
 
     def test_load_labelled_auction_only(self):
-        loader = SurfaceMergedDataLoader([], [], _make_auction_rows(7))
+        loader = _surface_loader(auction=_make_auction_rows(7))
         labelled = loader.load_labelled()
         assert len(labelled) == 7
 
     def test_load_labelled_merges_all_sources(self):
-        loader = SurfaceMergedDataLoader(
-            _make_psa_rows(4), _make_ebay_rows(3), _make_auction_rows(5)
+        loader = _surface_loader(
+            psa=_make_psa_rows(4), ebay=_make_ebay_rows(3), auction=_make_auction_rows(5)
         )
         labelled = loader.load_labelled()
         assert len(labelled) == 12
 
     def test_rows_without_surface_excluded(self):
-        loader = SurfaceMergedDataLoader(_make_rows_without_surface(5), [], [])
+        loader = _surface_loader(psa=_make_rows_without_surface(5))
         labelled = loader.load_labelled()
         assert len(labelled) == 0
 
     def test_load_all_includes_unlabelled(self):
-        loader = SurfaceMergedDataLoader(_make_rows_without_surface(3), _make_ebay_rows(2), [])
+        loader = _surface_loader(psa=_make_rows_without_surface(3), ebay=_make_ebay_rows(2))
         all_samples = loader.load_all()
         labelled = loader.load_labelled()
         assert len(all_samples) == 5
         assert len(labelled) == 2
 
     def test_len_matches_labelled(self):
-        loader = SurfaceMergedDataLoader(_make_psa_rows(4), _make_ebay_rows(3), [])
+        loader = _surface_loader(psa=_make_psa_rows(4), ebay=_make_ebay_rows(3))
         assert len(loader) == 7
 
     def test_load_and_load_labelled_equivalent(self):
-        loader = SurfaceMergedDataLoader(_make_psa_rows(5), [], [])
+        loader = _surface_loader(psa=_make_psa_rows(5))
         assert loader.load() == loader.load_labelled()
 
-    def test_surface_score_stored_in_corners_score_field(self):
+    def test_surface_score_stored_in_subgrade_score_field(self):
         psa_rows = [
             {
                 "source_id": "PSA-SURF-001",
@@ -192,10 +203,10 @@ class TestSurfaceMergedDataLoader:
                 "raw_metadata": {},
             }
         ]
-        loader = SurfaceMergedDataLoader(psa_rows, [], [])
+        loader = _surface_loader(psa=psa_rows)
         labelled = loader.load_labelled()
         assert len(labelled) == 1
-        assert labelled[0].corners_score == pytest.approx(8.5)
+        assert labelled[0].subgrade_score == pytest.approx(8.5)
 
     def test_ebay_surface_score_stored_correctly(self):
         ebay_rows = [
@@ -209,11 +220,11 @@ class TestSurfaceMergedDataLoader:
                 "title": "test",
             }
         ]
-        loader = SurfaceMergedDataLoader([], ebay_rows, [])
+        loader = _surface_loader(ebay=ebay_rows)
         labelled = loader.load_labelled()
         assert len(labelled) == 1
-        assert labelled[0].corners_score == pytest.approx(7.5)
+        assert labelled[0].subgrade_score == pytest.approx(7.5)
 
     def test_empty_all_sources_returns_empty(self):
-        loader = SurfaceMergedDataLoader([], [], [])
+        loader = _surface_loader()
         assert len(loader.load_labelled()) == 0
