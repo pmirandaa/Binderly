@@ -52,6 +52,19 @@ calls:
 | DELETE | `/v1/me/custom-collections/:id/items/:printingId` | remove a printing           |
 | GET    | `/v1/me/custom-collections/:id/smart-rule`        | read the rule               |
 | PUT    | `/v1/me/custom-collections/:id/smart-rule`        | replace the rule expression |
+| GET    | `/v1/me/entitlements`                             | RC-derived entitlement read (T-PB-ENTITLEMENTS) |
+
+> **`GET /v1/me/entitlements`** (T-PB-ENTITLEMENTS) reads RevenueCat —
+> the unified source of truth — via the RC REST subscriber endpoint and
+> returns `entitlementsDto` (`{ tier, activeFeatures, source, checkedAt }`).
+> It mirrors the small RC read + canonical PROJECT.md § 16 feature model
+> from `@binderly/entitlements` (the production Deno bundle can't import
+> workspace packages — same reason `_shared/contracts.ts` mirrors
+> `@binderly/api-contracts`). **Fail-closed / env-degrade:** when
+> `REVENUECAT_SECRET_API_KEY` is unset, or RC errors / times out /
+> returns a malformed body, the handler returns
+> `{ tier: 'free', source: 'fallback' }` with a **200** (never a 500) +
+> a logged warning. Auth still fails closed (401 for anonymous callers).
 
 Every response is the canonical
 `@binderly/api-contracts` envelope:
@@ -214,6 +227,8 @@ Expected `200` (or `201` on a fresh insert) with body
 | `SUPABASE_ANON_KEY`         | The anon key (set automatically by the CLI)               |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service-role key — `supabase secrets set` for production  |
 | `CORS_ALLOW_ORIGINS`        | Comma-separated list, `*` for permissive (default in dev) |
+| `REVENUECAT_SECRET_API_KEY` | **Optional.** RC secret REST key for `/v1/me/entitlements`. Unset → endpoint fail-closes to free tier (never 500). |
+| `REVENUECAT_API_BASE_URL`   | **Optional.** RC REST base URL override (defaults to `https://api.revenuecat.com`). |
 
 ## Deployment
 

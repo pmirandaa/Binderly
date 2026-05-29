@@ -39,11 +39,22 @@ export function buildEnv(getEnv: (name: string) => string | undefined): EdgeFunc
     );
   }
   const corsConfig = parseCorsConfig(corsAllowOriginsRaw);
+  // RevenueCat secret key is OPTIONAL — the entitlements handler
+  // fail-closes to free tier when it's absent (dev / not-yet-
+  // provisioned). Never throw on a missing RC key.
+  const revenueCatSecretApiKey = getEnv('REVENUECAT_SECRET_API_KEY');
+  const revenueCatApiBaseUrl = getEnv('REVENUECAT_API_BASE_URL');
   return {
     supabaseUrl,
     supabaseAnonKey,
     supabaseServiceRoleKey,
     corsAllowOrigins: corsConfig.allowOrigins,
+    ...(revenueCatSecretApiKey !== undefined && revenueCatSecretApiKey.length > 0
+      ? { revenueCatSecretApiKey }
+      : {}),
+    ...(revenueCatApiBaseUrl !== undefined && revenueCatApiBaseUrl.length > 0
+      ? { revenueCatApiBaseUrl }
+      : {}),
   };
 }
 

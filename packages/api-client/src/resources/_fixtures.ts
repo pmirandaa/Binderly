@@ -243,6 +243,30 @@ export const VALID_SUBSCRIPTION = {
   lastEventAt: null,
 };
 
+export const VALID_ENTITLEMENTS_FREE = {
+  tier: 'free' as const,
+  activeFeatures: [] as const,
+  source: 'revenuecat' as const,
+  checkedAt: NOW,
+};
+
+export const VALID_ENTITLEMENTS_PRO = {
+  tier: 'pro' as const,
+  activeFeatures: [
+    'stack_scanner',
+    'grading_prediction',
+    'unlimited_custom_collections',
+    'save_smart_collections',
+    'unlimited_shareables',
+    'shareable_themes',
+    'pricing_history',
+    'export_data',
+    'cloud_ai_scan',
+  ] as const,
+  source: 'revenuecat' as const,
+  checkedAt: NOW,
+};
+
 export const VALID_PAGE = <T>(items: T[]): { items: T[]; nextCursor: string | null } => ({
   items,
   nextCursor: null,

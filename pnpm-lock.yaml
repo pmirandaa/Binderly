@@ -555,6 +555,36 @@ importers:
         specifier: 5.9.3
         version: 5.9.3
 
+  packages/entitlements:
+    devDependencies:
+      '@binderly/eslint-config':
+        specifier: workspace:*
+        version: link:../config/eslint
+      '@binderly/prettier-config':
+        specifier: workspace:*
+        version: link:../config/prettier
+      '@binderly/tsconfig':
+        specifier: workspace:*
+        version: link:../config/tsconfig
+      '@types/node':
+        specifier: 22.19.17
+        version: 22.19.17
+      '@vitest/coverage-v8':
+        specifier: 2.1.9
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.17)(jsdom@25.0.1)(lightningcss@1.27.0)(terser@5.46.2))
+      eslint:
+        specifier: 9.39.4
+        version: 9.39.4
+      prettier:
+        specifier: 3.8.3
+        version: 3.8.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 2.1.9
+        version: 2.1.9(@types/node@22.19.17)(jsdom@25.0.1)(lightningcss@1.27.0)(terser@5.46.2)
+
   packages/pricing-display:
     devDependencies:
       '@binderly/eslint-config':

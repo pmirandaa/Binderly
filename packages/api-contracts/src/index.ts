@@ -17,3 +17,4 @@ export * from './pricing.js';
 export * from './grading.js';
 export * from './shareables.js';
 export * from './auth.js';
+export * from './entitlements.js';

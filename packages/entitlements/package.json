@@ -1,0 +1,42 @@
+{
+  "name": "@binderly/entitlements",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Unified Binderly entitlement model: the canonical free/pro tier + paid-feature surface (PROJECT.md § 16), pure feature-gate helpers, and a resilient, fail-closed RevenueCat REST read client. RevenueCat is the single source of truth; this package is the shared read path web, mobile, and the edge function all program against.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "prettier": "@binderly/prettier-config",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "lint": "eslint --max-warnings=0 .",
+    "format": "prettier --write .",
+    "format:write": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@binderly/eslint-config": "workspace:*",
+    "@binderly/prettier-config": "workspace:*",
+    "@binderly/tsconfig": "workspace:*",
+    "@types/node": "22.19.17",
+    "@vitest/coverage-v8": "2.1.9",
+    "eslint": "9.39.4",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "vitest": "2.1.9"
+  }
+}
