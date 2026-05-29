@@ -17,7 +17,10 @@
 //     brief). Renders "No price data yet" copy.
 //   - error: retry affordance + the underlying error message.
 //   - success: median price as the headline + range chips
-//     (low / high) when present + a freshness badge.
+//     (low / high) when present + a freshness badge + (when the
+//     mv_current_price v2 trend fields are present, #FU-5 / #FU-66)
+//     the headline 30-day trend arrow + signed % change and a
+//     "Last seen" line from `lastObservationAt` (see Q-028).
 //
 // All amounts arrive as `numeric(12,2)` strings on the wire (per
 // the Drizzle posture in `mv_current_price`); we parse to a
@@ -35,7 +38,11 @@ import type {
 } from '@binderly/api-contracts';
 import {
   formatPrice,
+  formatTrendPercent,
+  hasRenderableTrend,
   isSupportedCurrency,
+  trendArrow,
+  trendDirectionLabel,
   type SupportedCurrency,
 } from '@binderly/pricing-display';
 import { Card, Spinner, Text, XStack, YStack } from '@binderly/ui';
@@ -93,6 +100,7 @@ function PriceBlockReady(props: PriceBlockReadyProps): ReactNode {
   const formattedMedian = formatAmount(price.medianPrice, currency);
   const formattedLow = formatAmount(price.lowPrice, currency);
   const formattedHigh = formatAmount(price.highPrice, currency);
+  const lastSeen = formatLastSeen(price.lastObservationAt);
 
   // No median ⇒ the row exists (the endpoint replied 200) but
   // every aggregate column is null because the rollup job emitted
@@ -118,6 +126,11 @@ function PriceBlockReady(props: PriceBlockReadyProps): ReactNode {
           <Text variant="title" tone="default" testID={`${testID}-median`}>
             {formattedMedian}
           </Text>
+          <TrendLine
+            direction={price.trendDirection}
+            trend30dPct={price.trend30dPct}
+            testID={`${testID}-trend`}
+          />
         </YStack>
         <YStack gap="$1" alignItems="flex-end">
           <Text variant="caption" tone="muted">
@@ -133,7 +146,48 @@ function PriceBlockReady(props: PriceBlockReadyProps): ReactNode {
       <Text variant="caption" tone="muted" testID={`${testID}-samples`}>
         Based on {price.sampleCount} sample{price.sampleCount === 1 ? '' : 's'}
       </Text>
+      {lastSeen !== null ? (
+        <Text variant="caption" tone="muted" testID={`${testID}-last-seen`}>
+          Last seen {lastSeen}
+        </Text>
+      ) : null}
     </Card>
+  );
+}
+
+const TREND_TONE = {
+  up: 'success',
+  down: 'error',
+  flat: 'muted',
+} as const;
+
+interface TrendLineProps {
+  readonly direction: PrintingCurrentPriceDto['trendDirection'];
+  readonly trend30dPct: PrintingCurrentPriceDto['trend30dPct'];
+  readonly testID: string;
+}
+
+/**
+ * Headline 30-day trend (mv_current_price v2 / #FU-5, surfaced by
+ * #FU-66). The server pre-buckets `trendDirection` with a ±1% dead-band
+ * (computed in SQL — the client never re-derives it) and emits the
+ * signed `trend30dPct`. Suppressed when the direction is `unknown` /
+ * absent or the percentage can't be formatted.
+ */
+function TrendLine(props: TrendLineProps): ReactNode {
+  const { direction, trend30dPct, testID } = props;
+  if (direction === undefined || !hasRenderableTrend(direction)) return null;
+  const pct = formatTrendPercent(trend30dPct);
+  if (pct === null) return null;
+  return (
+    <Text
+      variant="caption"
+      tone={TREND_TONE[direction]}
+      testID={testID}
+      accessibilityLabel={`30-day price trend ${trendDirectionLabel(direction)} ${pct}`}
+    >
+      {trendArrow(direction)} {pct} 30d
+    </Text>
   );
 }
 
@@ -257,6 +311,27 @@ function freshnessLabel(freshness: PrintingCurrentPriceFreshness): string {
     case 'stale_old':
       return 'Stale (30d+)';
   }
+}
+
+const LAST_SEEN_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  year: 'numeric',
+  month: 'short',
+  day: 'numeric',
+};
+
+/**
+ * Format the `lastObservationAt` ISO timestamp (mv_current_price v2 /
+ * #FU-5) as a short "May 20, 2026" date for the "Last seen" line.
+ * Q-028 resolution: the headline freshness badge stays anchored on
+ * `computedAt`; `lastObservationAt` is surfaced explicitly as the
+ * truer observation recency. Returns `null` for missing / unparseable
+ * input so the caller can omit the line.
+ */
+function formatLastSeen(iso: string | null | undefined): string | null {
+  if (iso === null || iso === undefined) return null;
+  const ms = Date.parse(iso);
+  if (Number.isNaN(ms)) return null;
+  return new Intl.DateTimeFormat('en-US', LAST_SEEN_DATE_FORMAT).format(new Date(ms));
 }
 
 function explainNoData(

@@ -14,6 +14,15 @@ export { convertPrice, convertPriceRange, bestEffortConvert } from './convert.js
 
 export { formatPrice, isSupportedCurrency, isWellFormedCurrencyCode } from './format.js';
 
+export {
+  formatTrendPercent,
+  hasRenderableTrend,
+  trendArrow,
+  trendDirectionLabel,
+} from './trend.js';
+
+export type { PriceTrendDirection } from './trend.js';
+
 export { convertCurrentPriceRow } from './row-helpers.js';
 
 export {

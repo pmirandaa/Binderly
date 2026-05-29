@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { makeSet } from './fixtures';
 import {
   formatCurrentPriceComputedAt,
+  formatLastSeenAt,
   formatReleaseDate,
   freshnessLabel,
   languageLabel,
@@ -105,5 +106,22 @@ describe('formatCurrentPriceComputedAt', () => {
 
   it('returns the raw string when the input is unparseable', () => {
     expect(formatCurrentPriceComputedAt('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('formatLastSeenAt', () => {
+  it('renders an ISO timestamp as a short date', () => {
+    expect(formatLastSeenAt('2026-05-20T09:30:00.000Z', 'en-US')).toMatch(
+      /May 20, 2026/,
+    );
+  });
+
+  it('returns null for null / undefined input', () => {
+    expect(formatLastSeenAt(null)).toBeNull();
+    expect(formatLastSeenAt(undefined)).toBeNull();
+  });
+
+  it('returns null for an unparseable string', () => {
+    expect(formatLastSeenAt('not-a-date')).toBeNull();
   });
 });

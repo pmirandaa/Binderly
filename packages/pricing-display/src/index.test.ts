@@ -16,6 +16,13 @@ describe('@binderly/pricing-display — public surface', () => {
     expect(typeof pkg.isWellFormedCurrencyCode).toBe('function');
   });
 
+  it('exports the trend-formatting helpers (#FU-66)', () => {
+    expect(typeof pkg.formatTrendPercent).toBe('function');
+    expect(typeof pkg.trendArrow).toBe('function');
+    expect(typeof pkg.trendDirectionLabel).toBe('function');
+    expect(typeof pkg.hasRenderableTrend).toBe('function');
+  });
+
   it('exports the named constants', () => {
     expect(pkg.FX_BASE_CURRENCY).toBe('USD');
     expect(pkg.DEFAULT_LOCALE).toBe('en-US');
@@ -43,6 +50,10 @@ describe('@binderly/pricing-display — public surface', () => {
       'isSupportedCurrency',
       'isWellFormedCurrencyCode',
       'convertCurrentPriceRow',
+      'formatTrendPercent',
+      'hasRenderableTrend',
+      'trendArrow',
+      'trendDirectionLabel',
       'DEFAULT_FALLBACK_WINDOW_DAYS',
       'DEFAULT_LOCALE',
       'FX_BASE_CURRENCY',

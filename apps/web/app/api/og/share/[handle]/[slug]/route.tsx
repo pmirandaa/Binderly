@@ -20,6 +20,8 @@
 
 import { ImageResponse } from 'next/og';
 
+import { ogPaletteFromTheme } from '../../../../../../app/c/themes/og-palette';
+import { resolvePublicTheme } from '../../../../../../app/c/themes/registry';
 import { FALLBACK_CACHE_CONTROL, SUCCESS_CACHE_CONTROL } from '../../../../../../lib/og/cache-headers';
 import { fetchOgPayload, type FetchOgPayloadOptions } from '../../../../../../lib/og/data';
 import { renderOgFallback } from '../../../../../../lib/og/fallback';
@@ -94,9 +96,17 @@ export async function renderOgRoute(
     thumbnailUris.push(PLACEHOLDER_DATA_URI);
   }
 
+  // Resolve the shareable's theme → OG palette, applying the SAME
+  // free-tier downgrade as the public page (#FU-61 / Q-024): a free
+  // owner's stored Pro theme is not honored — the hero reverts to the
+  // default palette. Mirrors `ShareableView`'s `resolvePublicTheme`.
+  const palette = ogPaletteFromTheme(
+    resolvePublicTheme(payload.shareable.theme, payload.owner.tier === 'pro'),
+  );
+
   try {
     return new ImageResponseCtor(
-      renderOgImage({ handle, slug, payload, thumbnailUris }),
+      renderOgImage({ handle, slug, payload, thumbnailUris, palette }),
       {
         width: OG_SIZE.width,
         height: OG_SIZE.height,

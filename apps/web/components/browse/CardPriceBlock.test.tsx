@@ -200,6 +200,117 @@ describe('CardPriceBlock — present state', () => {
   });
 });
 
+describe('CardPriceBlock — trend (#FU-66 / Q-028)', () => {
+  function renderPresent(
+    overrides: Partial<PrintingCurrentPriceDto> = {},
+  ): void {
+    const price = makePrintingCurrentPrice({
+      printingId: PRINTING_ID,
+      ...overrides,
+    });
+    const api = createFakeBrowseApi({
+      currentPricesByPrintingId: { [PRINTING_ID]: price },
+    });
+    renderWithProviders(<CardPriceBlock api={api} printingId={PRINTING_ID} />);
+  }
+
+  it('renders the up trend with an arrow + signed % change', async () => {
+    renderPresent({ trendDirection: 'up', trend30dPct: '8.40' });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-trend-up')).toBeInTheDocument();
+    });
+    const chip = screen.getByTestId('card-prices-trend-up');
+    expect(chip.textContent).toContain('+8.40%');
+    expect(chip.textContent).toContain('\u25B2');
+    expect(chip.textContent).toContain('30d');
+  });
+
+  it('renders the down trend with the negative % change', async () => {
+    renderPresent({ trendDirection: 'down', trend30dPct: '-4.20' });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-trend-down')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('card-prices-trend-down').textContent).toContain(
+      '-4.20%',
+    );
+  });
+
+  it('renders the flat trend', async () => {
+    renderPresent({ trendDirection: 'flat', trend30dPct: '0.30' });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-trend-flat')).toBeInTheDocument();
+    });
+  });
+
+  it('suppresses the trend chip when direction is unknown', async () => {
+    renderPresent({ trendDirection: 'unknown', trend30dPct: null });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-present')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('card-prices-trend-unknown')).toBeNull();
+    expect(screen.queryByTestId('card-prices-trend-up')).toBeNull();
+  });
+
+  it('suppresses the trend chip when the DTO carries no trend fields (backward-compat)', async () => {
+    renderPresent({ trendDirection: undefined, trend30dPct: undefined });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-present')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('card-prices-trend-up')).toBeNull();
+    expect(screen.queryByTestId('card-prices-trend-down')).toBeNull();
+    expect(screen.queryByTestId('card-prices-trend-flat')).toBeNull();
+  });
+
+  it('suppresses the trend chip when direction is present but % is unformattable', async () => {
+    renderPresent({ trendDirection: 'up', trend30dPct: null });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-present')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('card-prices-trend-up')).toBeNull();
+  });
+});
+
+describe('CardPriceBlock — last seen (#FU-66 / Q-028)', () => {
+  function renderPresent(
+    overrides: Partial<PrintingCurrentPriceDto> = {},
+  ): void {
+    const price = makePrintingCurrentPrice({
+      printingId: PRINTING_ID,
+      ...overrides,
+    });
+    const api = createFakeBrowseApi({
+      currentPricesByPrintingId: { [PRINTING_ID]: price },
+    });
+    renderWithProviders(<CardPriceBlock api={api} printingId={PRINTING_ID} />);
+  }
+
+  it('renders the last-seen line from lastObservationAt', async () => {
+    renderPresent({ lastObservationAt: '2026-05-20T09:30:00.000Z' });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-last-seen')).toBeInTheDocument();
+    });
+    expect(screen.getByTestId('card-prices-last-seen').textContent).toMatch(
+      /Last seen.*May 20, 2026/,
+    );
+  });
+
+  it('omits the last-seen line when lastObservationAt is absent', async () => {
+    renderPresent({ lastObservationAt: undefined });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-present')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('card-prices-last-seen')).toBeNull();
+  });
+
+  it('omits the last-seen line when lastObservationAt is null', async () => {
+    renderPresent({ lastObservationAt: null });
+    await waitFor(() => {
+      expect(screen.getByTestId('card-prices-present')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('card-prices-last-seen')).toBeNull();
+  });
+});
+
 describe('CardPriceBlock — api wiring', () => {
   it('calls api.getCurrentPrice with the printingId + AbortSignal', async () => {
     const api = createFakeBrowseApi();

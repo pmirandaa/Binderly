@@ -3,19 +3,32 @@
 // Headline current-price block on the card-detail page. Renders
 // loading / 404 / error / present states sourced from
 // `BrowseApi.getCurrentPrice` (which wraps the V2 endpoint
-// shipped by T-BE-EDGE-FUNCTIONS-V2 — PR #68). The trends
-// columns named in `context/data-model.md § mv_current_price`
-// are NOT carried by the V2 DTO yet (see Q-013); the surface
-// is forward-compatible if a follow-up adds them.
+// shipped by T-BE-EDGE-FUNCTIONS-V2 — PR #68).
+//
+// The `mv_current_price` v2 trend + freshness columns (migration
+// `0028` / #FU-5) are surfaced here (#FU-66 / Q-028): the headline
+// arrow + signed 30-day % change reads from the server-bucketed
+// `trendDirection` + `trend30dPct` (the ±1% dead-band lives in SQL),
+// and a "Last seen" line reads from `lastObservationAt`. The existing
+// `freshness` badge stays anchored on `computedAt` (backward-compatible)
+// — see Q-028 for the full display-semantics rationale.
 
 import { useEffect, useState } from 'react';
 
 import type { PrintingCurrentPriceDto } from '@binderly/api-contracts';
-import { formatPrice, isSupportedCurrency } from '@binderly/pricing-display';
+import {
+  formatPrice,
+  formatTrendPercent,
+  hasRenderableTrend,
+  isSupportedCurrency,
+  trendArrow,
+  trendDirectionLabel,
+} from '@binderly/pricing-display';
 import { Card, Text, XStack, YStack } from '@binderly/ui';
 
 import {
   formatCurrentPriceComputedAt,
+  formatLastSeenAt,
   freshnessLabel,
 } from '../../lib/browse/format';
 
@@ -130,6 +143,7 @@ function PresentBody({ price }: { price: PrintingCurrentPriceDto }): React.React
     );
   }
   const safe = isSupportedCurrency(price.currency);
+  const lastSeen = formatLastSeenAt(price.lastObservationAt);
   return (
     <YStack gap="$2" data-testid="card-prices-present">
       <XStack gap="$3" flexWrap="wrap" alignItems="baseline">
@@ -138,6 +152,10 @@ function PresentBody({ price }: { price: PrintingCurrentPriceDto }): React.React
             {formatPrice(median, price.currency)}
           </Text>
         ) : null}
+        <TrendChip
+          direction={price.trendDirection}
+          trend30dPct={price.trend30dPct}
+        />
         <FreshnessChip freshness={price.freshness} />
       </XStack>
       {low !== null && high !== null && safe ? (
@@ -149,7 +167,57 @@ function PresentBody({ price }: { price: PrintingCurrentPriceDto }): React.React
         {price.sampleCount} observation{price.sampleCount === 1 ? '' : 's'} · updated{' '}
         {formatCurrentPriceComputedAt(price.computedAt)}
       </Text>
+      {lastSeen !== null ? (
+        <Text variant="caption" tone="muted" data-testid="card-prices-last-seen">
+          Last seen {lastSeen}
+        </Text>
+      ) : null}
     </YStack>
+  );
+}
+
+const TREND_TONE = {
+  up: 'success',
+  down: 'error',
+  flat: 'muted',
+} as const;
+
+/**
+ * Headline 30-day trend: the server-bucketed `trendDirection`
+ * (±1% dead-band, computed in `mv_current_price`) renders the arrow
+ * + colour, and `trend30dPct` renders the signed % change. Suppressed
+ * entirely when the direction is `unknown` / absent (no 30-day
+ * reference) or the percentage is unformattable.
+ */
+function TrendChip({
+  direction,
+  trend30dPct,
+}: {
+  direction: PrintingCurrentPriceDto['trendDirection'];
+  trend30dPct: PrintingCurrentPriceDto['trend30dPct'];
+}): React.ReactNode {
+  if (direction === undefined || !hasRenderableTrend(direction)) return null;
+  const pct = formatTrendPercent(trend30dPct);
+  if (pct === null) return null;
+  const tone = TREND_TONE[direction];
+  return (
+    <XStack
+      paddingHorizontal="$2"
+      paddingVertical="$1"
+      backgroundColor="$surfaceMuted"
+      borderRadius={6}
+      gap="$1"
+      alignItems="baseline"
+      data-testid={`card-prices-trend-${direction}`}
+      aria-label={`30-day price trend ${trendDirectionLabel(direction)} ${pct}`}
+    >
+      <Text variant="caption" tone={tone}>
+        {trendArrow(direction)} {pct}
+      </Text>
+      <Text variant="caption" tone="muted">
+        30d
+      </Text>
+    </XStack>
   );
 }
 
