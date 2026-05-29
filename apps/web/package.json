@@ -21,6 +21,8 @@
   "dependencies": {
     "@binderly/api-client": "workspace:*",
     "@binderly/api-contracts": "workspace:*",
+    "@binderly/entitlements": "workspace:*",
+    "@binderly/feature-flags": "workspace:*",
     "@binderly/pricing-display": "workspace:*",
     "@binderly/set-completion": "workspace:*",
     "@binderly/smart-collection-dsl": "workspace:*",

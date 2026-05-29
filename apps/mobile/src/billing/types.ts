@@ -23,6 +23,14 @@
 // one-file-grep-able for T-PB-PADDLE and T-PB-ENTITLEMENTS
 // reviewers.
 
+import {
+  ALL_PAID_FEATURES,
+  PRO_ENTITLEMENT_ID,
+  type PaidFeature,
+  type ProEntitlementId,
+  type Tier,
+} from '@binderly/entitlements';
+
 import type {
   CustomerInfo,
   PurchasesEntitlementInfo,
@@ -40,60 +48,28 @@ export type {
 };
 
 // ============================================================
-// Entitlement identifier contract
+// Entitlement identifier contract + paid-feature surface
 // ============================================================
 //
-// RevenueCat's "entitlement" abstraction is the cross-store, cross-
-// platform identifier we key on. Per `rules/10-paywall-billing.md`
-// we use the string `'pro'`.
+// MIGRATED (T-PB-GATING): the canonical entitlement id, tier, and the
+// paid-feature surface now live in `@binderly/entitlements` (the single
+// source of truth, derived from PROJECT.md § 16). This module re-exports
+// them so existing billing imports (`./types.js` consumers) keep working
+// while there is exactly one definition across web, mobile, and the edge
+// runtime.
 //
-// **CONTRACT FOR T-PB-PADDLE (parallel worker):** Paddle's
-// webhook-side grant logic on web must grant the same RC
-// entitlement identifier when a Paddle subscription is created /
-// renewed (RC's Paddle integration handles this automatically when
-// the Paddle products are mapped to the `pro` entitlement in the
-// RevenueCat dashboard). Both T-PB-PADDLE and the future
-// T-PB-ENTITLEMENTS service read this same string.
-
-/** The RevenueCat entitlement identifier that unlocks all paid features. */
-export const PRO_ENTITLEMENT_ID = 'pro' as const;
-export type ProEntitlementId = typeof PRO_ENTITLEMENT_ID;
-
-// ============================================================
-// Derived tier + paid-feature surface
-// ============================================================
-
-/** Pricing tier derived from active RevenueCat entitlements. */
-export type Tier = 'free' | 'pro';
-
-/**
- * Names of paid features `usePaidFeature(...)` exposes. Initial v1
- * surface drawn from `PROJECT.md § 16` (Freemium plan). Adding a
- * new feature here is a strict-type widening, so T-PB-GATING gets
- * a compile error on unknown features rather than silently
- * granting them.
- */
-export type PaidFeature =
-  | 'unlimited_custom_collections'
-  | 'unlimited_shareables'
-  | 'stack_scanner'
-  | 'grading_prediction'
-  | 'pricing_graphs'
-  | 'export_csv'
-  | 'remove_branding'
-  | 'cloud_ai_scan_fallback';
-
-/** Allow `PaidFeature` consumers to enumerate every paid surface. */
-export const ALL_PAID_FEATURES: readonly PaidFeature[] = [
-  'unlimited_custom_collections',
-  'unlimited_shareables',
-  'stack_scanner',
-  'grading_prediction',
-  'pricing_graphs',
-  'export_csv',
-  'remove_branding',
-  'cloud_ai_scan_fallback',
-] as const;
+// The mobile union was previously an 8-entry list with different names; it
+// is now the canonical 9-entry union. Rename map (see the package README):
+//   pricing_graphs          → pricing_history
+//   export_csv              → export_data
+//   remove_branding         → shareable_themes
+//   cloud_ai_scan_fallback  → cloud_ai_scan
+//   (new)                   → save_smart_collections
+//
+// **CONTRACT FOR T-PB-PADDLE / T-PB-ENTITLEMENTS:** the RC entitlement
+// identifier remains the literal `'pro'` (`PRO_ENTITLEMENT_ID`).
+export { ALL_PAID_FEATURES, PRO_ENTITLEMENT_ID };
+export type { PaidFeature, ProEntitlementId, Tier };
 
 // ============================================================
 // Hook payloads

@@ -1065,7 +1065,7 @@ tasks:
     stage: 10-paywall-billing
     title: Free vs paid feature gating across web and mobile
     agent_role: frontend-web
-    status: pending
+    status: merged
     depends_on: [T-PB-ENTITLEMENTS]
     parallel_safe_with: []
     provides: [billing:gating]
