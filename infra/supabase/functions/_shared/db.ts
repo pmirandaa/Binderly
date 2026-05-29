@@ -37,6 +37,16 @@ export interface EdgeFunctionEnv {
   readonly supabaseServiceRoleKey: string;
   /** CORS allow-list — comma-separated list, `'*'` for "any". */
   readonly corsAllowOrigins: readonly string[];
+  /**
+   * RevenueCat **secret** REST API key, used by the entitlements
+   * handler to read the source-of-truth entitlement state. OPTIONAL:
+   * when unset (dev / not-yet-provisioned) the entitlements endpoint
+   * degrades to free tier (fail-closed) rather than 500ing. Mirrors
+   * the env-degrade posture T-PB-REVENUECAT + T-PB-PADDLE both use.
+   */
+  readonly revenueCatSecretApiKey?: string;
+  /** RevenueCat REST base URL override (defaults to api.revenuecat.com). */
+  readonly revenueCatApiBaseUrl?: string;
 }
 
 /**
@@ -49,9 +59,21 @@ export type CreateClientFn = (
   options?: Parameters<typeof supabaseCreateClient>[2],
 ) => SupabaseClient;
 
-/** Dependencies the factories accept for testability. */
+/**
+ * Minimal `fetch`-like callable used by handlers that make outbound
+ * HTTP calls (e.g. the entitlements handler reading RevenueCat). Tests
+ * inject a stub; production falls through to `globalThis.fetch`.
+ */
+export type EdgeFetch = (
+  input: string,
+  init: { method: string; headers: Record<string, string> },
+) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
+
+/** Dependencies the factories + handlers accept for testability. */
 export interface ClientFactoryDeps {
   readonly createClient?: CreateClientFn;
+  /** Outbound fetch seam — only the entitlements handler uses it today. */
+  readonly fetch?: EdgeFetch;
 }
 
 /**

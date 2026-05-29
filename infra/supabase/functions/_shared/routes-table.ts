@@ -16,6 +16,7 @@ import {
 } from './handlers/collection.ts';
 import { handleGetCollectionCompletion } from './handlers/completion.ts';
 import { handleGetPrintingCurrentPrice } from './handlers/currentPrice.ts';
+import { handleGetMyEntitlements } from './handlers/entitlements.ts';
 import { handleGetPublicShareable } from './handlers/publicShareable.ts';
 import { handleSmartCollectionsPreview } from './handlers/smartPreview.ts';
 import {
@@ -122,4 +123,7 @@ export const ROUTES: readonly ContextualRoute[] = [
 
   // ---- smart collections preview (T-BE-EDGE-FUNCTIONS-V2) ----
   entry('POST', '/smart-collections/preview', handleSmartCollectionsPreview),
+
+  // ---- entitlements — unified RC read path (T-PB-ENTITLEMENTS) ----
+  entry('GET', '/me/entitlements', handleGetMyEntitlements),
 ];

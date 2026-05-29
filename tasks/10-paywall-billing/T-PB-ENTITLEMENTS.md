@@ -111,4 +111,36 @@ if:
   (brand-new user) and treat-as-free vs lazy-create is a product call.
 
 ## Notes from execution
-_(appended by the sub-agent — see bottom of file)_
+
+- **PaidFeature reconciliation:** the canonical union (PROJECT.md § 16,
+  9 entries) is the source of truth and replaces mobile's 8-entry union.
+  Rename map (mobile → canonical): `pricing_graphs` → `pricing_history`,
+  `export_csv` → `export_data`, `remove_branding` → `shareable_themes`,
+  `cloud_ai_scan_fallback` → `cloud_ai_scan`; `save_smart_collections`
+  is **added** (mobile lacked it; § 16 "Smart collections (saved)" is
+  pro-only). The 4 unchanged: `stack_scanner`, `grading_prediction`,
+  `unlimited_custom_collections`, `unlimited_shareables`. Migrating
+  `apps/mobile/src/billing/` to import this union is **T-PB-GATING's**
+  job (out of scope here) — documented in the package README.
+- **Path divergence from the stub:** the stub named
+  `infra/supabase/functions/entitlements/`, but the merged Edge
+  functions are a **single `v1` mux** (`v1/index.ts` + `_shared/handlers/`
+  + a routes table). I matched reality: added
+  `_shared/handlers/entitlements.ts`, registered `GET /me/entitlements`
+  in `_shared/routes-table.ts`, and threaded the optional
+  `REVENUECAT_SECRET_API_KEY` through `EdgeFunctionEnv` / `buildEnv`
+  (additive, never throws when unset). The handler **mirrors** the RC
+  read + canonical model (the production Deno bundle can't import the
+  workspace package — same constraint that makes `_shared/contracts.ts`
+  a mirror of `@binderly/api-contracts`); a parity test pins the mirror
+  to § 16.
+- **Fail-closed:** `readEntitlement` and the edge handler never throw /
+  never 500 on a read. Any RC failure (missing key, network, non-200,
+  malformed body) → `{ tier: 'free', source: 'fallback' }` + 200. New
+  users with no RC subscriber read as free via RC's lazily-empty
+  subscriber response (no creation step needed → no product decision →
+  no Q raised).
+- **Tests:** `@binderly/entitlements` 73 (≥40 target); api-contracts
+  +8 (258 total); api-client +7 (270 total); edge-fn +16 (329 total).
+  Lint / typecheck / build all green locally (Node 22.13.0; GitHub
+  Actions not used per iter-24+ quota policy).

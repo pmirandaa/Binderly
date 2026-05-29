@@ -334,6 +334,7 @@ describe('v1 mux — does not autoboot Deno.serve in node', () => {
       ['GET', '/printings/:id/current-price'],
       ['GET', '/c/:handle/:slug'],
       ['POST', '/smart-collections/preview'],
+      ['GET', '/me/entitlements'],
     ];
     for (const [method, pattern] of expectedPatterns) {
       const found = routes.find((r) => r.method === method && r.pattern === pattern);

@@ -1052,7 +1052,7 @@ tasks:
     stage: 10-paywall-billing
     title: Unified entitlement service (RC as source of truth)
     agent_role: backend
-    status: pending
+    status: merged
     depends_on: [T-PB-REVENUECAT, T-PB-PADDLE]
     parallel_safe_with: []
     provides: [billing:entitlements]
