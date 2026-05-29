@@ -10,7 +10,6 @@ from grading.ml_common.data_loader import (
     MergedDataLoader,
     PSADataLoader,
 )
-from grading.ml_common.types import LabelledGradingSample
 
 
 # ---------------------------------------------------------------------------
@@ -113,11 +112,18 @@ class TestPSADataLoader:
         assert all(s.source == "psa_cert" for s in samples)
         assert len(samples) == 2
 
-    def test_corners_score_parsed(self):
+    def test_subgrade_score_parsed(self):
         loader = PSADataLoader(_psa_rows())
         samples = loader.load()
-        assert samples[0].corners_score == 8.5
-        assert samples[1].corners_score == 9.5
+        assert samples[0].subgrade_score == 8.5
+        assert samples[1].subgrade_score == 9.5
+
+    def test_subgrade_key_selects_column(self):
+        # Default key is 'corners'; an explicit key reads a different column.
+        edges = PSADataLoader(_psa_rows(), subgrade_key="edges").load()
+        assert edges[0].subgrade_score == 9.0
+        surface = PSADataLoader(_psa_rows(), subgrade_key="surface").load()
+        assert surface[0].subgrade_score == 8.5
 
     def test_image_urls_extracted(self):
         loader = PSADataLoader(_psa_rows())
@@ -133,10 +139,10 @@ class TestPSADataLoader:
         loader = PSADataLoader(_psa_rows())
         assert len(loader) == 2
 
-    def test_missing_corners_score_is_none(self):
+    def test_missing_subgrade_score_is_none(self):
         rows = [{"source_id": "x", "grade_company": "PSA", "grade": "8.0", "subgrades": {}, "images": {}, "printing_id": None, "raw_metadata": {}}]
         samples = PSADataLoader(rows).load()
-        assert samples[0].corners_score is None
+        assert samples[0].subgrade_score is None
 
 
 # ---------------------------------------------------------------------------
@@ -154,10 +160,10 @@ class TestEbayDataLoader:
         samples = EbayDataLoader(_ebay_rows()).load()
         assert all(s.source == "ebay_sold" for s in samples)
 
-    def test_corners_score(self):
+    def test_subgrade_score(self):
         samples = EbayDataLoader(_ebay_rows()).load()
-        assert samples[0].corners_score == 7.5
-        assert samples[1].corners_score is None
+        assert samples[0].subgrade_score == 7.5
+        assert samples[1].subgrade_score is None
 
     def test_null_thumbnail_produces_empty_urls(self):
         samples = EbayDataLoader(_ebay_rows()).load()
@@ -179,9 +185,15 @@ class TestAuctionDataLoader:
         samples = AuctionDataLoader(_auction_rows()).load()
         assert len(samples[0].image_urls) == 2
 
-    def test_empty_sub_grades_gives_none_corners(self):
+    def test_empty_sub_grades_gives_none_score(self):
         samples = AuctionDataLoader(_auction_rows()).load()
-        assert samples[1].corners_score is None
+        assert samples[1].subgrade_score is None
+
+    def test_subgrade_key_selects_column(self):
+        # pwcc lot has edges=9.5 but goldin lot has no edges → filtered None.
+        edges = AuctionDataLoader(_auction_rows(), subgrade_key="edges").load()
+        assert edges[0].subgrade_score == 9.5
+        assert edges[1].subgrade_score is None
 
 
 # ---------------------------------------------------------------------------
@@ -195,10 +207,10 @@ class TestMergedDataLoader:
         all_samples = loader.load_all()
         assert len(all_samples) == 6
 
-    def test_labelled_filters_to_corners(self):
+    def test_labelled_filters_to_subgrade(self):
         loader = MergedDataLoader(_psa_rows(), _ebay_rows(), _auction_rows())
         labelled = loader.load_labelled()
-        assert all(s.corners_score is not None for s in labelled)
+        assert all(s.subgrade_score is not None for s in labelled)
 
     def test_len_matches_labelled_count(self):
         loader = MergedDataLoader(_psa_rows(), _ebay_rows(), _auction_rows())
@@ -208,3 +220,13 @@ class TestMergedDataLoader:
         loader = MergedDataLoader([], [], [])
         assert loader.load_labelled() == []
         assert len(loader) == 0
+
+    def test_subgrade_key_exposed_and_keys_loaders(self):
+        loader = MergedDataLoader(
+            _psa_rows(), _ebay_rows(), _auction_rows(), subgrade_key="edges"
+        )
+        assert loader.subgrade_key == "edges"
+        # Only rows carrying an 'edges' sub-grade survive the labelled filter.
+        labelled = loader.load_labelled()
+        assert labelled
+        assert all(s.subgrade_score is not None for s in labelled)

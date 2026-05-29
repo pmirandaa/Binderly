@@ -17,7 +17,8 @@ from typing import Any
 
 import numpy as np
 
-from grading.edges.dataset import EdgesDataset, EdgesMergedDataLoader
+from grading.edges.dataset import EdgesDataset
+from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.eval_metrics import summarise_metrics
 from grading.ml_common.model_export import load_onnx_session, run_onnx_inference
 
@@ -41,7 +42,7 @@ def eval_edges_model(
     Returns:
         Dict of eval metrics (see ``summarise_metrics``).
     """
-    loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
     labelled = loader.load_labelled()
     if not labelled:
         raise ValueError("No labelled edges samples found.")

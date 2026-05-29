@@ -1,14 +1,17 @@
 """Types specific to the edges sub-grade module.
 
-``EdgesLabelledSample``: normalised training row with an ``edges_score`` field.
 ``EdgesRequest``: input to the inference engine — four edge-strip URIs.
 ``EdgesSubgrade``: one strip's predicted score + confidence band.
 ``EdgesPrediction``: full prediction with four per-strip bands + aggregate.
+
+The edges training row is the shared ``grading.ml_common.LabelledGradingSample``
+(loaded via ``MergedDataLoader(..., subgrade_key='edges')``); the previously
+edges-specific ``EdgesLabelledSample`` was removed by #FU-44 (Q-017).
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 from grading.ml_common.types import ConfidenceBand
@@ -24,40 +27,6 @@ STRIP_THICKNESS_PX = 32
 """Strip thickness in pixels at the 256 px normalised image resolution.
 Represents ~2.5 mm of real card material on a standard 63 × 88 mm card.
 Top/bottom strips: 256 × 32 px.  Left/right strips: 32 × 256 px."""
-
-
-# ---------------------------------------------------------------------------
-# Training data
-# ---------------------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class EdgesLabelledSample:
-    """Normalised training/eval row for the edges sub-grade.
-
-    Mirrors ``ml_common.LabelledGradingSample`` but with ``edges_score``
-    instead of ``corners_score``.  Introduced here because ml_common's
-    ``LabelledGradingSample`` is hard-coded to the corners sub-grade column
-    (see Q-44 in open-questions.md).
-
-    Sources:
-    - PSA cert lookup → ``source = 'psa_cert'``
-    - eBay sold listing → ``source = 'ebay_sold'``
-    - Auction (PWCC / Goldin) → ``source = 'auction_pwcc'`` / ``'auction_goldin'``
-    """
-
-    source: str
-    source_id: str
-    grade_company: str
-    overall_grade: Optional[float]
-    edges_score: Optional[float]
-    image_urls: list[str] = field(default_factory=list)
-    printing_id: Optional[str] = None
-    raw_metadata: dict = field(default_factory=dict)
-
-    def is_labelled_for_edges(self) -> bool:
-        """True when this row can be used as an edges training example."""
-        return self.edges_score is not None
 
 
 # ---------------------------------------------------------------------------

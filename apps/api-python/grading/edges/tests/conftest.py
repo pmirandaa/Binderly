@@ -7,9 +7,9 @@ from typing import Any
 import numpy as np
 import pytest
 
-from grading.edges.dataset import EdgesDataset, EdgesMergedDataLoader
+from grading.edges.dataset import EdgesDataset
 from grading.edges.model import EdgesModel
-from grading.edges.types import EdgesLabelledSample
+from grading.ml_common.data_loader import MergedDataLoader
 from grading.ml_common.image_loader import ImageLoader
 
 
@@ -86,7 +86,7 @@ def auction_rows():
 
 @pytest.fixture
 def labelled_samples(psa_rows, ebay_rows, auction_rows):
-    loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
     return loader.load_labelled()
 
 

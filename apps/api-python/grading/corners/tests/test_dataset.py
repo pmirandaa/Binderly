@@ -46,14 +46,14 @@ class TestCornersDataset:
                 source_id="1",
                 grade_company="PSA",
                 overall_grade=9.0,
-                corners_score=None,
+                subgrade_score=None,
             ),
             LabelledGradingSample(
                 source="psa_cert",
                 source_id="2",
                 grade_company="PSA",
                 overall_grade=9.0,
-                corners_score=8.5,
+                subgrade_score=8.5,
             ),
         ]
         ds = CornersDataset(samples, image_loader=mock_loader, patch_size=PATCH_SIZE)
@@ -66,7 +66,7 @@ class TestCornersDataset:
                 source_id="3",
                 grade_company="PSA",
                 overall_grade=8.0,
-                corners_score=7.5,
+                subgrade_score=7.5,
                 image_urls=[],
             )
         ]

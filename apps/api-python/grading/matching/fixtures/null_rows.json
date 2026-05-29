@@ -1,0 +1,43 @@
+{
+  "grading_training_sample": [
+    {
+      "id": "gts-0001",
+      "printing_id": null,
+      "raw_metadata": { "title": "1999 Pokemon Base Set Blastoise #2 Unlimited Holo" }
+    },
+    {
+      "id": "gts-0002",
+      "printing_id": null,
+      "raw_metadata": {}
+    }
+  ],
+  "ebay_graded_listing_observation": [
+    {
+      "id": "ebay-0001",
+      "printing_id": null,
+      "title": "PSA 9 Venusar Base Set #15 Holo Unlimited"
+    },
+    {
+      "id": "ebay-0002",
+      "printing_id": null,
+      "title": "PSA 10 Mewtwo Neo Genesis #10 Holo"
+    },
+    {
+      "id": "ebay-0003",
+      "printing_id": "99999999-9999-9999-9999-999999999999",
+      "title": "PSA 10 Charizard Base Set #4 already-matched"
+    }
+  ],
+  "auction_lot_observation": [
+    {
+      "id": "lot-0001",
+      "printing_id": null,
+      "lot_title": "PSA 10 GEM MT Pokemon Base Set Charizard #4"
+    },
+    {
+      "id": "lot-0002",
+      "printing_id": null,
+      "lot_title": "BGS 9.5 Charizard Base Set #4 Shadowless 1st Edition"
+    }
+  ]
+}

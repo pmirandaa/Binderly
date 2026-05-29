@@ -62,7 +62,7 @@ def train_corners_model(
     if config is None:
         config = TrainingConfig(subgrade_column="corners", patch_size=patch_size)
 
-    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_column="corners")
+    loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="corners")
     labelled = loader.load_labelled()
 
     if not labelled:

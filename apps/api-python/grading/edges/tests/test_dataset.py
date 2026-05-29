@@ -1,14 +1,20 @@
-"""Tests for edges/dataset.py."""
+"""Tests for edges/dataset.py.
+
+Edges training data flows through the shared
+``grading.ml_common.MergedDataLoader`` keyed to ``subgrade_key='edges'``
+(see #FU-44 / Q-017); these tests exercise the edges keying + ``EdgesDataset``.
+"""
 
 from __future__ import annotations
 
 import numpy as np
 import pytest
 
-from grading.edges.dataset import EdgesDataset, EdgesMergedDataLoader, _to_float
+from grading.edges.dataset import EdgesDataset
 from grading.edges.tests.conftest import INPUT_DIM, PATCH_SIZE, _make_psa_rows
-from grading.edges.types import EdgesLabelledSample, NUM_STRIPS
-from grading.ml_common.image_loader import ImageLoader
+from grading.edges.types import NUM_STRIPS
+from grading.ml_common.data_loader import MergedDataLoader
+from grading.ml_common.types import LabelledGradingSample
 
 
 class TestEdgesDataset:
@@ -41,19 +47,19 @@ class TestEdgesDataset:
 
     def test_unlabelled_samples_excluded(self, mock_loader):
         samples = [
-            EdgesLabelledSample(
+            LabelledGradingSample(
                 source="psa_cert",
                 source_id="1",
                 grade_company="PSA",
                 overall_grade=9.0,
-                edges_score=None,
+                subgrade_score=None,
             ),
-            EdgesLabelledSample(
+            LabelledGradingSample(
                 source="psa_cert",
                 source_id="2",
                 grade_company="PSA",
                 overall_grade=9.0,
-                edges_score=8.5,
+                subgrade_score=8.5,
             ),
         ]
         ds = EdgesDataset(samples, image_loader=mock_loader, patch_size=PATCH_SIZE)
@@ -61,12 +67,12 @@ class TestEdgesDataset:
 
     def test_no_image_urls_uses_placeholder(self, mock_loader):
         samples = [
-            EdgesLabelledSample(
+            LabelledGradingSample(
                 source="psa_cert",
                 source_id="3",
                 grade_company="PSA",
                 overall_grade=8.0,
-                edges_score=7.5,
+                subgrade_score=7.5,
                 image_urls=[],
             )
         ]
@@ -86,10 +92,12 @@ class TestEdgesDataset:
 
 
 class TestEdgesMergedDataLoader:
+    """The edges loader is now ``MergedDataLoader(subgrade_key='edges')``."""
+
     def test_load_labelled_filters_unlabelled(self, psa_rows, ebay_rows, auction_rows):
-        loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+        loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
         labelled = loader.load_labelled()
-        assert all(s.edges_score is not None for s in labelled)
+        assert all(s.subgrade_score is not None for s in labelled)
 
     def test_load_all_includes_unlabelled(self):
         psa_rows = [
@@ -103,7 +111,7 @@ class TestEdgesMergedDataLoader:
                 "raw_metadata": {},
             }
         ]
-        loader = EdgesMergedDataLoader(psa_rows, [], [])
+        loader = MergedDataLoader(psa_rows, [], [], subgrade_key="edges")
         all_samples = loader.load_all()
         labelled = loader.load_labelled()
         assert len(all_samples) >= len(labelled)
@@ -111,11 +119,11 @@ class TestEdgesMergedDataLoader:
         assert len(labelled) == 0
 
     def test_len_counts_labelled_only(self, psa_rows, ebay_rows, auction_rows):
-        loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+        loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
         assert len(loader) == len(loader.load_labelled())
 
     def test_merges_all_three_sources(self, psa_rows, ebay_rows, auction_rows):
-        loader = EdgesMergedDataLoader(psa_rows, ebay_rows, auction_rows)
+        loader = MergedDataLoader(psa_rows, ebay_rows, auction_rows, subgrade_key="edges")
         labelled = loader.load_labelled()
         sources = {s.source for s in labelled}
         assert "psa_cert" in sources
@@ -124,13 +132,13 @@ class TestEdgesMergedDataLoader:
 
     def test_psa_only_works(self):
         psa_rows = _make_psa_rows(5)
-        loader = EdgesMergedDataLoader(psa_rows, [], [])
+        loader = MergedDataLoader(psa_rows, [], [], subgrade_key="edges")
         labelled = loader.load_labelled()
         assert len(labelled) == 5
         assert all(s.source == "psa_cert" for s in labelled)
 
     def test_empty_all_sources(self):
-        loader = EdgesMergedDataLoader([], [], [])
+        loader = MergedDataLoader([], [], [], subgrade_key="edges")
         assert loader.load_labelled() == []
 
     def test_non_psa_rows_excluded_from_psa_loader(self):
@@ -145,20 +153,6 @@ class TestEdgesMergedDataLoader:
                 "raw_metadata": {},
             }
         ]
-        loader = EdgesMergedDataLoader(rows, [], [])
+        loader = MergedDataLoader(rows, [], [], subgrade_key="edges")
         labelled = loader.load_labelled()
         assert len(labelled) == 0
-
-
-class TestToFloat:
-    def test_none_returns_none(self):
-        assert _to_float(None) is None
-
-    def test_string_float_parses(self):
-        assert _to_float("8.5") == pytest.approx(8.5)
-
-    def test_int_converts(self):
-        assert _to_float(9) == pytest.approx(9.0)
-
-    def test_invalid_string_returns_none(self):
-        assert _to_float("not_a_number") is None

@@ -993,3 +993,26 @@ as the Stage 11 go-live follow-up; the deploy-fly workflow stays inert until
 both `FLY_API_TOKEN` and the entrypoint exist.
 
 **Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-022 — Cross-company grade calibration constants are unvalidated placeholders (T-GR-GRADE-CALIBRATION / #FU-56)
+
+**Raised:** 2026-05-29 (iter 34, by the grading-data-hygiene worker)
+**Blocking:** No — `grading/calibration/` ships as a scaffold with a documented placeholder affine map (PSA-anchored, per-company `slope`/`intercept`), so downstream flywheel/pricing code has a single normalised scale to consume today. Nothing depends on the constants being *correct* yet.
+
+**Context:**
+
+#FU-56 asked for a cross-company calibration module mapping `company + grade → normalised internal scale` (PSA-equivalent `[1.0, 10.0]`). PSA/BGS/CGC/SGC grade on different, differently-strict scales, so a mixed corpus (community flywheel, cross-company pricing) needs one scale before grades can be compared/aggregated.
+
+The shipped v0 (`grading/calibration/calibration.py` `PLACEHOLDER_CALIBRATIONS`) is a per-company affine transform with **heuristic constants** drawn from rough market cross-grade lore (e.g. BGS 9.5 ≈ PSA 10 → BGS gets a small positive intercept). These are explicitly NOT a data fit, carry low `confidence`, and are clamped to `[1, 10]`. The affine map is expressed as a numpy dot product so a learned weight vector can drop in without changing call sites.
+
+**Open question:**
+
+1. Where does the labelled cross-company training signal come from? Options: (a) the same physical card graded by ≥2 companies (rare but cleanest), (b) card-identity matches across companies via #FU-40's printing match + realised market value as the regression target, (c) curated expert equivalence tables. Each has different bias/coverage.
+2. Granularity: is a single per-company affine enough, or do we need per-company-**per-grade-tier** constants (cross-grade equivalence is non-linear at the very top — the 9.5↔10 band behaves differently from the mid-scale)?
+3. Should the normalised scale stay PSA-anchored, or move to a company-neutral latent scale once learned?
+
+**Proposed resolution → #FU-58 (learned cross-company calibration):** once the flywheel accumulates enough labelled cross-company pairs, fit the constants (per-company or per-company-per-tier), inject the fitted table into `GradeCalibrator(calibrations=...)`, and bump `CALIBRATION_VERSION` from `v0-placeholder`. Tracked as #FU-58 in `status.md`'s Known Follow-ups.
+
+**Status: open** (non-blocking; placeholder scaffold is sufficient until labelled cross-company data exists).

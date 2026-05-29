@@ -26,6 +26,7 @@ from grading.ml_common.data_loader import (
     EbayDataLoader,
     MergedDataLoader,
     PSADataLoader,
+    SubgradeKey,
 )
 from grading.ml_common.eval_metrics import (
     confusion_matrix_grades,
@@ -55,6 +56,7 @@ __all__ = [
     "EbayDataLoader",
     "AuctionDataLoader",
     "MergedDataLoader",
+    "SubgradeKey",
     # image loader
     "ImageLoader",
     # eval metrics
