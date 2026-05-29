@@ -993,3 +993,43 @@ as the Stage 11 go-live follow-up; the deploy-fly workflow stays inert until
 both `FLY_API_TOKEN` and the entrypoint exist.
 
 **Pablo's answer:** _(empty until answered)_
+
+## Q-022 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
+
+**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-57)
+
+**Context.** T-SH-THEMES must force-render the `default` theme on the
+public page `/c/{handle}/{slug}` when the shareable's owner is NOT pro
+(so a downgraded owner's themed page reverts cleanly, server-side). The
+resolver is already written for this: `resolvePublicTheme(themeId,
+ownerIsPro)` returns `default` when `ownerIsPro === false`.
+
+**Problem.** The merged read path does not surface the owner's tier on
+the public payload. `PublicSharePayload` (`apps/web/lib/share/api.ts`)
+and `publicShareableDto` (`@binderly/api-contracts`) expose only
+`{ handle, displayName, avatarUrl, bio }` for the owner — no tier. The
+anonymous edge handler (`infra/supabase/functions/.../publicShareable`)
+resolves `(handle, slug) → (profile, shareable)` but never reads the
+owner's entitlement. Adding the tier requires a backend edge-function +
+contract change, which is outside T-SH-THEMES' `owns_paths`.
+
+**Options.**
+1. Add `owner.tier` (or `ownerIsPro: boolean`) to `publicShareableDto`
+   + the edge handler (entitlements read for the resolved owner).
+   `ShareableView` then passes it to `resolvePublicTheme`. (Recommended.)
+2. A dedicated `GET /v1/c/{handle}/{slug}/owner-tier` lookup. (Extra
+   round-trip; rejected.)
+
+**Interim shipped.** `ShareableView` calls
+`resolvePublicTheme(theme, null)` — renders the stored theme for
+everyone. The `ownerIsPro === false` downgrade branch is already wired,
+so once the payload carries the tier, flipping `null → ownerIsPro`
+enforces the downgrade with no further change to the theme system.
+
+**Recommendation.** Option 1, tracked by **T-BE-SHAREABLE-OWNER-TIER**
+(#FU-57). Settings-side gating (persisting a non-default theme) is
+already enforced via the `shareable_themes` gate, so the only gap is the
+public-render downgrade for an already-persisted theme after a
+downgrade.
+
+> **Q-022 numbering correction:** the follow-up tracked here is **#FU-58** (T-BE-SHAREABLE-OWNER-TIER), not #FU-57 — #FU-57 was claimed by T-PB-GATING (continuous stack-scanner gate) at its merge. The OG-theming wire-up is #FU-59 (T-SH-OG-THEME-WIRE).

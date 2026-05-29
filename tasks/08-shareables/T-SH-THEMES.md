@@ -70,9 +70,9 @@ upsell.
   which the public share payload does not expose (see **Q-022**).
   Interim: `resolvePublicTheme(id, null)` renders the stored theme for
   everyone; the downgrade branch is already wired for `ownerIsPro ===
-  false`. Tracked by **T-BE-SHAREABLE-OWNER-TIER** (#FU-57).
+  false`. Tracked by **T-BE-SHAREABLE-OWNER-TIER** (#FU-58).
 - **OG image theming** — palette is exported but not yet wired into
-  the OG hero. Tracked by **T-SH-OG-THEME-WIRE** (#FU-58).
+  the OG hero. Tracked by **T-SH-OG-THEME-WIRE** (#FU-59).
 
 ## Branch & PR
 

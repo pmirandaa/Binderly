@@ -969,14 +969,13 @@ tasks:
     stage: 08-shareables
     title: Themed shareables (paid)
     agent_role: frontend-web
-    status: pending
+    status: merged
     depends_on: [T-SH-CONFIG-MODEL, T-PB-ENTITLEMENTS]
     parallel_safe_with: []
     provides: [shareables:themes]
     owns_paths: [apps/web/app/c/themes/]
     task_file: tasks/08-shareables/T-SH-THEMES.md
     est_effort: M
-    stub: true
 
   # ============================================================
   # PHASE 9 — OFFLINE / SYNC
