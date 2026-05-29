@@ -11,6 +11,7 @@ import {
   handleAddCollectionItem,
   handleBulkUpdateCollection,
   handleDeleteCollectionItem,
+  handleGetCollectionItem,
   handleListCollection,
   handleUpdateCollectionItem,
 } from './handlers/collection.ts';
@@ -24,6 +25,7 @@ import {
   handleCreateCustomCollection,
   handleDeleteCustomCollection,
   handleGetCustomCollection,
+  handleGetCustomCollectionItem,
   handleGetSmartCollectionRule,
   handleListCustomCollectionItems,
   handleListCustomCollections,
@@ -31,6 +33,7 @@ import {
   handleUpdateCustomCollection,
   handleUpdateSmartCollectionExpression,
 } from './handlers/customCollections.ts';
+import { handleSubmitCommunitySubmission } from './handlers/communitySubmissions.ts';
 import { handleRecomputeSetCompletion } from './handlers/recomputeSetCompletion.ts';
 
 import type { CorsConfig } from './cors.ts';
@@ -92,6 +95,12 @@ export const ROUTES: readonly ContextualRoute[] = [
   entry('POST', '/me/collection/bulk', handleBulkUpdateCollection),
   entry('POST', '/me/collection/recompute-set-completion', handleRecomputeSetCompletion),
   entry('GET', '/me/collection/completion', handleGetCollectionCompletion),
+  // NOTE: `/me/collection/:id` must come AFTER the literal
+  // `/me/collection/completion` route — both match a 3-segment GET, and
+  // the dispatcher takes the first matching entry, so the literal must
+  // win for `completion`. A real collection_item id is a uuid, so it
+  // never collides with the literal segment.
+  entry('GET', '/me/collection/:id', handleGetCollectionItem),
   entry('PATCH', '/me/collection/:id', handleUpdateCollectionItem),
   entry('DELETE', '/me/collection/:id', handleDeleteCollectionItem),
 
@@ -105,6 +114,11 @@ export const ROUTES: readonly ContextualRoute[] = [
   // ---- custom_collection_item ----
   entry('GET', '/me/custom-collections/:id/items', handleListCustomCollectionItems),
   entry('POST', '/me/custom-collections/:id/items', handleAddPrintingToCustomCollection),
+  entry(
+    'GET',
+    '/me/custom-collections/:id/items/:printingId',
+    handleGetCustomCollectionItem,
+  ),
   entry(
     'DELETE',
     '/me/custom-collections/:id/items/:printingId',
@@ -126,4 +140,7 @@ export const ROUTES: readonly ContextualRoute[] = [
 
   // ---- entitlements — unified RC read path (T-PB-ENTITLEMENTS) ----
   entry('GET', '/me/entitlements', handleGetMyEntitlements),
+
+  // ---- community submissions — pro-gated flywheel write (#FU-55) ----
+  entry('POST', '/me/community-submissions', handleSubmitCommunitySubmission),
 ];

@@ -1132,14 +1132,14 @@ tasks:
     stage: 11-deployment
     title: EAS Build + Submit for iOS/Android
     agent_role: devops
-    status: pending
+    status: merged
     depends_on: [T-M-SHELL]
     parallel_safe_with: []
     provides: [deploy:eas]
     owns_paths: [apps/mobile/eas.json, .github/workflows/deploy-mobile.yml]
     task_file: tasks/11-deployment/T-DP-EAS.md
     est_effort: M
-    stub: true
+    stub: false
 
   - id: T-DP-MONITORING
     stage: 11-deployment

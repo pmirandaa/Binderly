@@ -994,9 +994,64 @@ both `FLY_API_TOKEN` and the entrypoint exist.
 
 **Pablo's answer:** _(empty until answered)_
 
-## Q-022 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
 
-**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-57)
+---
+
+## Q-022 — Mobile release cadence + OTA (EAS Update) strategy not yet decided
+
+**Raised:** 2026-05-29 (iter 35, by the T-DP-EAS / Stage 11 deployment worker)
+**Blocking:** Nothing. The EAS build/submit scaffolding (`apps/mobile/eas.json`
++ `deploy-mobile.yml`) ships and is inert until `EXPO_TOKEN` is provisioned.
+This is a forward-looking process/topology decision, not a blocker.
+
+**Context:**
+
+The EAS scaffolding deliberately makes two choices that are reversible but
+worth confirming before go-live:
+
+1. **Build cadence = manual dispatch only.** Unlike `deploy-web` /
+   `deploy-fly` / `deploy-db` (which auto-run on push to `main`), the mobile
+   workflow is `workflow_dispatch`-only and store submission is an opt-in
+   input. Native EAS builds consume metered build minutes and store releases
+   have review/cadence implications, so auto-building every `apps/mobile/**`
+   push seemed wrong. The trade-off is there's no automatic
+   build-on-merge signal for mobile.
+2. **No OTA (`expo-updates`) runtime is wired.** `eas.json` declares
+   `development`/`preview`/`production` **channels** so EAS Update can be
+   layered on later, but the app has no `expo-updates` dependency or runtime
+   config today, so JS-only hotfixes still require a full store build. Wiring
+   OTA is an application-code change (adds `expo-updates`, runtime version
+   policy, update-check UX) owned by the mobile track, not deploy config.
+
+Also note `extra.eas.projectId` is intentionally absent from `app.json` — it's
+written by `eas init` against Pablo's real Expo account (first-run setup in
+`infra/eas/README.md`), so it can't be committed by this scaffolding task.
+
+**Options:**
+
+1. **Keep manual-dispatch builds + add OTA later.** Ship as scaffolded; wire
+   `expo-updates` + `eas update` as a follow-up (#FU-58) once an Expo account
+   exists. — Recommended; lowest cost now, matches the "inert until secrets"
+   posture and avoids burning build minutes pre-launch.
+2. **Auto-build a `preview` profile on merge to `main`.** Gives a continuous
+   internal-QA build per merge. — Costs build minutes continuously; revisit
+   post-launch if the team wants nightly internal builds.
+3. **Wire OTA now (mock/dev only).** Add `expo-updates` immediately so the
+   channel wiring is exercised end-to-end. — More invasive app-code change for
+   no pre-account benefit; better as the #FU-58 follow-up.
+
+**Recommendation:** Option 1. The build/submit config is correct and inert; the
+OTA wiring + any auto-build cadence are best decided once Pablo has an Expo
+account and a launch timeline. Logged as Stage 11 go-live (#FU-53) for the
+account/token, with the OTA wiring tracked separately as #FU-58.
+
+**Pablo's answer:** _(empty until answered)_
+
+---
+
+## Q-023 — Public share payload does not expose the owner's tier, blocking server-side free-tier theme enforcement (T-SH-THEMES)
+
+**Status:** open — interim shipped, follow-up logged (T-BE-SHAREABLE-OWNER-TIER, #FU-60)
 
 **Context.** T-SH-THEMES must force-render the `default` theme on the
 public page `/c/{handle}/{slug}` when the shareable's owner is NOT pro
@@ -1027,9 +1082,12 @@ so once the payload carries the tier, flipping `null → ownerIsPro`
 enforces the downgrade with no further change to the theme system.
 
 **Recommendation.** Option 1, tracked by **T-BE-SHAREABLE-OWNER-TIER**
-(#FU-57). Settings-side gating (persisting a non-default theme) is
+(#FU-60). Settings-side gating (persisting a non-default theme) is
 already enforced via the `shareable_themes` gate, so the only gap is the
 public-render downgrade for an already-persisted theme after a
-downgrade.
+downgrade. (Numbering: this question was authored as Q-022 but renumbered
+to **Q-023** at merge — Q-022 + #FU-58 were claimed by T-DP-EAS and
+#FU-59 by T-BE-READS-WRITES at iter 35; the OG-theming wire-up is
+**#FU-61**, T-SH-OG-THEME-WIRE.)
 
-> **Q-022 numbering correction:** the follow-up tracked here is **#FU-58** (T-BE-SHAREABLE-OWNER-TIER), not #FU-57 — #FU-57 was claimed by T-PB-GATING (continuous stack-scanner gate) at its merge. The OG-theming wire-up is #FU-59 (T-SH-OG-THEME-WIRE).
+**Pablo's answer:** _(empty until answered)_

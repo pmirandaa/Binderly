@@ -6,6 +6,7 @@ import {
   isProEntitlementActive,
   readEntitlement,
   REVENUECAT_API_BASE_URL,
+  type EntitlementFallbackSignal,
   type RevenueCatFetch,
 } from './revenuecat-client.js';
 
@@ -319,6 +320,98 @@ describe('isProEntitlementActive (unit)', () => {
   it('false when pro is not an object', () => {
     const payload = { subscriber: { entitlements: { pro: 'active' } } };
     expect(isProEntitlementActive(payload, NOW_MS)).toBe(false);
+  });
+});
+
+describe('readEntitlement — fallback observability (#FU-54)', () => {
+  it('fires the onFallback hook on a network error with a structured signal', async () => {
+    const signals: EntitlementFallbackSignal[] = [];
+    const result = await readEntitlement({
+      apiKey: API_KEY,
+      appUserId: APP_USER_ID,
+      fetch: throwingFetch('ECONNRESET'),
+      now: fixedNow,
+      onFallback: (signal) => signals.push(signal),
+    });
+    expect(result.source).toBe('fallback');
+    expect(signals).toHaveLength(1);
+    expect(signals[0]).toEqual({
+      event: 'entitlements.fallback',
+      reason: expect.stringMatching(/ECONNRESET/),
+      appUserId: APP_USER_ID,
+      checkedAt: '2026-05-29T12:00:00.000Z',
+    });
+  });
+
+  it('fires the hook on a non-200 from RC', async () => {
+    const signals: EntitlementFallbackSignal[] = [];
+    await readEntitlement({
+      apiKey: API_KEY,
+      appUserId: APP_USER_ID,
+      fetch: jsonFetch({ message: 'bad key' }, 401),
+      now: fixedNow,
+      onFallback: (signal) => signals.push(signal),
+    });
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.reason).toMatch(/401/);
+  });
+
+  it('fires the hook (appUserId empty string) when the key is unconfigured', async () => {
+    const signals: EntitlementFallbackSignal[] = [];
+    await readEntitlement({
+      apiKey: '',
+      appUserId: APP_USER_ID,
+      now: fixedNow,
+      onFallback: (signal) => signals.push(signal),
+    });
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.reason).toMatch(/not configured/i);
+  });
+
+  it('does NOT fire the hook on a successful RC read', async () => {
+    const signals: EntitlementFallbackSignal[] = [];
+    const result = await readEntitlement({
+      apiKey: API_KEY,
+      appUserId: APP_USER_ID,
+      fetch: jsonFetch(subscriberWithPro(null)),
+      now: fixedNow,
+      onFallback: (signal) => signals.push(signal),
+    });
+    expect(result.source).toBe('revenuecat');
+    expect(signals).toHaveLength(0);
+  });
+
+  it('defaults to a structured console.warn sink when no hook is provided', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await readEntitlement({
+        apiKey: API_KEY,
+        appUserId: APP_USER_ID,
+        fetch: throwingFetch('ECONNRESET'),
+        now: fixedNow,
+      });
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const logged = warnSpy.mock.calls[0]![0] as string;
+      const parsed = JSON.parse(logged) as EntitlementFallbackSignal;
+      expect(parsed.event).toBe('entitlements.fallback');
+      expect(parsed.appUserId).toBe(APP_USER_ID);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it('a throwing hook never breaks the fail-closed read', async () => {
+    const result = await readEntitlement({
+      apiKey: API_KEY,
+      appUserId: APP_USER_ID,
+      fetch: throwingFetch('ECONNRESET'),
+      now: fixedNow,
+      onFallback: () => {
+        throw new Error('telemetry sink exploded');
+      },
+    });
+    expect(result.tier).toBe('free');
+    expect(result.source).toBe('fallback');
   });
 });
 
