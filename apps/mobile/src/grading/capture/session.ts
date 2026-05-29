@@ -1,7 +1,8 @@
 // Capture session reducer — pure, testable.
 //
-// The session is a tiny state machine over the four-step capture
-// flow. Operations are pure (state in, state out) so the hook layer
+// The session is a tiny state machine over the guided capture
+// flow (one step per shot in CAPTURE_STEPS — the full PROJECT.md
+// § 12 set). Operations are pure (state in, state out) so the hook layer
 // can drive them with a `useReducer` and the tests can pin
 // progression behaviour without rendering React.
 //
@@ -102,7 +103,7 @@ export function reduceCaptureSession(
       const nextShots: CaptureSessionState['shots'] = { ...state.shots };
       delete nextShots[action.kind];
       // Walk back to the earliest missing step so we always re-take
-      // in order. CAPTURE_KINDS is fixed-length 4; the scan is O(n).
+      // in order. The scan is O(n) over the fixed CAPTURE_KINDS list.
       let walkbackIndex = state.stepIndex;
       for (let i = 0; i < CAPTURE_KINDS.length; i += 1) {
         if (nextShots[CAPTURE_KINDS[i] as GradingShotKind] === undefined) {
@@ -157,12 +158,23 @@ export function buildEmittedSession(
   completedAt: number = Date.now(),
 ): GradingCaptureSession | null {
   if (!state.isComplete) return null;
-  const { frontFull, backFull, frontCorner, backCorner } = state.shots;
+  const {
+    frontFull,
+    backFull,
+    frontCorner,
+    backCorner,
+    bottomLeftCorner,
+    bottomRightCorner,
+    surface,
+  } = state.shots;
   if (
     frontFull === undefined ||
     backFull === undefined ||
     frontCorner === undefined ||
-    backCorner === undefined
+    backCorner === undefined ||
+    bottomLeftCorner === undefined ||
+    bottomRightCorner === undefined ||
+    surface === undefined
   ) {
     return null;
   }
@@ -171,6 +183,9 @@ export function buildEmittedSession(
     backFull,
     frontCorner,
     backCorner,
+    bottomLeftCorner,
+    bottomRightCorner,
+    surface,
     id: state.id,
     startedAt: state.startedAt,
     completedAt,

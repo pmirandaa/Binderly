@@ -1,4 +1,5 @@
-// `<GradingCaptureScreen>` — the guided four-shot capture flow.
+// `<GradingCaptureScreen>` — the guided multi-shot capture flow
+// (the full PROJECT.md § 12 set: front, back, four corners, surface).
 //
 // Composes the smaller pieces in this tree:
 //
@@ -36,11 +37,14 @@ import { Button, Text, XStack, YStack } from '@binderly/ui';
 
 import { storeSession } from '../../../grading/centering/session-store.js';
 import { CameraPermissionPrompt } from '../../../scanner/camera/index.js';
+import { deriveCaptureButtonState } from '../capture-button.js';
 import { CaptureControls } from '../components/CaptureControls.js';
 import { CaptureFeedbackBanner } from '../components/CaptureFeedbackBanner.js';
 import { CaptureReviewModal } from '../components/CaptureReviewModal.js';
 import { CaptureStepIndicator } from '../components/CaptureStepIndicator.js';
 import { GradingCameraSurface } from '../components/GradingCameraSurface.js';
+import { createCaptureQualitySink, useCaptureFrameProcessor } from '../frame-processor.js';
+import { gateOptionsForStep } from '../quality.js';
 import {
   useCameraPermissionFlow,
   useCaptureSession,
@@ -48,7 +52,13 @@ import {
   type CaptureAttemptInput,
 } from '../use-capture-session.js';
 
-import type { GradingCaptureSession, GradingShot, GradingShotKind } from '../types.js';
+import type { QualityEvaluationOptions } from '../quality.js';
+import type {
+  CaptureQualityResult,
+  GradingCaptureSession,
+  GradingShot,
+  GradingShotKind,
+} from '../types.js';
 import type { Camera } from 'react-native-vision-camera';
 
 /** The centering route path — the destination after a completed capture. */
@@ -118,6 +128,35 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
     () => new Set<GradingShotKind>(Object.keys(session.state.shots) as GradingShotKind[]),
     [session.state.shots],
   );
+
+  // --- live quality (#FU-33) ----------------------------------------
+  // A JS-side bus the optional frame-processor worklet feeds. In tests
+  // / no-camera runtimes the worklet never fires, so `liveQuality`
+  // stays null and the capture button keeps its tap-driven behaviour.
+  const captureQualitySink = useMemo(() => createCaptureQualitySink(), []);
+  const activeGate = useMemo<QualityEvaluationOptions>(
+    () => gateOptionsForStep(session.step ?? session.steps[0]!),
+    [session.step, session.steps],
+  );
+  const frameProcessor = useCaptureFrameProcessor({
+    sink: captureQualitySink,
+    gate: activeGate,
+  });
+  const [liveQuality, setLiveQuality] = useState<CaptureQualityResult | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = captureQualitySink.subscribe((event): void => {
+      setLiveQuality(event.quality);
+    });
+    return unsubscribe;
+  }, [captureQualitySink]);
+
+  // Drop a stale live sample when the step advances so the previous
+  // shot's quality doesn't bleed into the next step's button state.
+  useEffect((): void => {
+    captureQualitySink.clear();
+    setLiveQuality(null);
+  }, [captureQualitySink, session.state.stepIndex]);
 
   const handleCapture = useCallback(async (): Promise<void> => {
     if (busy) return;
@@ -204,6 +243,11 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
 
   const activeStep = session.step;
   const showReset = Object.keys(session.state.shots).length > 0 && !session.state.isComplete;
+  const buttonState = deriveCaptureButtonState({
+    liveQuality,
+    sessionComplete: activeStep === null,
+    busy,
+  });
 
   return (
     <YStack
@@ -234,7 +278,7 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
         ) : (
           <YStack alignItems="center" gap="$1" testID="capture-complete-banner">
             <Text variant="subtitle" tone="success">
-              All four shots captured
+              All shots captured
             </Text>
             <Text variant="bodySmall" tone="muted">
               Preparing the grading review…
@@ -249,6 +293,7 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
           cameraRef={cameraRef}
           overlayKind={activeStep.overlay}
           overlayHint={activeStep.title}
+          frameProcessor={frameProcessor}
         />
       ) : (
         <YStack
@@ -271,12 +316,12 @@ export function GradingCaptureScreen(props: GradingCaptureScreenProps): ReactNod
         testID="capture-bottom-bar"
       >
         <CaptureFeedbackBanner
-          reason={session.state.lastReason}
+          reason={session.state.lastReason ?? buttonState.liveReason}
           defaultsToReady
         />
         <CaptureControls
-          captureLabel={activeStep === null ? 'Done' : 'Capture'}
-          captureDisabled={activeStep === null}
+          captureLabel={buttonState.label}
+          captureDisabled={buttonState.disabled}
           captureBusy={busy}
           onCapture={handleCapture}
           onCancel={handleCancel}

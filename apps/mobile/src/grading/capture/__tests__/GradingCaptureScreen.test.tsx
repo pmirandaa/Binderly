@@ -145,8 +145,9 @@ describe('<GradingCaptureScreen> — close button', () => {
 });
 
 describe('<GradingCaptureScreen> — capture flow', () => {
-  it('renders the step indicator with all 4 dots', () => {
+  it('renders the step indicator with one dot per shot', () => {
     const view = renderWithProvider(<GradingCaptureScreen />);
+    expect(CAPTURE_KINDS.length).toBe(7);
     for (const kind of CAPTURE_KINDS) {
       expect(view.queryByTestId(`capture-step-dot-${kind}`)).not.toBeNull();
     }
@@ -172,7 +173,7 @@ describe('<GradingCaptureScreen> — capture flow', () => {
     expect(banner.getAttribute('data-reason')).toBe('too_dark');
     expect(view.container.textContent).toContain('Too dark');
     // Still on step 1 — step indicator shows "Step 1 of 4".
-    expect(view.container.textContent).toContain('Step 1 of 4');
+    expect(view.container.textContent).toContain('Step 1 of 7');
     // Review modal is NOT visible.
     expect(view.queryByTestId('capture-review-modal')).toBeNull();
   });
@@ -189,7 +190,7 @@ describe('<GradingCaptureScreen> — capture flow', () => {
       expect(view.queryByTestId('capture-review-modal')).not.toBeNull();
     });
     // Still on step 1 until the user accepts the pending shot.
-    expect(view.container.textContent).toContain('Step 1 of 4');
+    expect(view.container.textContent).toContain('Step 1 of 7');
   });
 
   it('advances to step 2 once the pending shot is accepted', async () => {
@@ -207,7 +208,7 @@ describe('<GradingCaptureScreen> — capture flow', () => {
       fireEvent.click(view.getByTestId('capture-review-accept'));
     });
     await waitFor(() => {
-      expect(view.container.textContent).toContain('Step 2 of 4');
+      expect(view.container.textContent).toContain('Step 2 of 7');
     });
     expect(view.queryByTestId('capture-review-modal')).toBeNull();
   });
@@ -227,10 +228,10 @@ describe('<GradingCaptureScreen> — capture flow', () => {
       fireEvent.click(view.getByTestId('capture-review-retake'));
     });
     expect(view.queryByTestId('capture-review-modal')).toBeNull();
-    expect(view.container.textContent).toContain('Step 1 of 4');
+    expect(view.container.textContent).toContain('Step 1 of 7');
   });
 
-  it('emits a complete session + navigates to the review route on the 4th accept', async () => {
+  it('emits a complete session + navigates to the review route on the final accept', async () => {
     const sequence: CaptureAttemptInput[] = CAPTURE_KINDS.map((kind, idx) =>
       makeAcceptedAttempt(kind, idx + 1),
     );
@@ -266,6 +267,9 @@ describe('<GradingCaptureScreen> — capture flow', () => {
     expect(emitted.backFull.uri).toBe('file:///shot-backFull-2.jpg');
     expect(emitted.frontCorner.uri).toBe('file:///shot-frontCorner-3.jpg');
     expect(emitted.backCorner.uri).toBe('file:///shot-backCorner-4.jpg');
+    expect(emitted.bottomLeftCorner.uri).toBe('file:///shot-bottomLeftCorner-5.jpg');
+    expect(emitted.bottomRightCorner.uri).toBe('file:///shot-bottomRightCorner-6.jpg');
+    expect(emitted.surface.uri).toBe('file:///shot-surface-7.jpg');
   });
 
   it('shows the "Start over" button after the first accepted shot', async () => {
@@ -297,13 +301,13 @@ describe('<GradingCaptureScreen> — capture flow', () => {
       fireEvent.click(view.getByTestId('capture-review-accept'));
     });
     await waitFor(() => {
-      expect(view.container.textContent).toContain('Step 2 of 4');
+      expect(view.container.textContent).toContain('Step 2 of 7');
     });
     act(() => {
       fireEvent.click(view.getByTestId('capture-reset'));
     });
     await waitFor(() => {
-      expect(view.container.textContent).toContain('Step 1 of 4');
+      expect(view.container.textContent).toContain('Step 1 of 7');
     });
   });
 
@@ -352,11 +356,11 @@ describe('<GradingCaptureScreen> — re-entry preserves progress within the moun
       fireEvent.click(view.getByTestId('capture-review-accept'));
     });
     await waitFor(() => {
-      expect(view.container.textContent).toContain('Step 2 of 4');
+      expect(view.container.textContent).toContain('Step 2 of 7');
     });
     // Re-render with the same attempt mock — state must persist.
     view.rerender(<GradingCaptureScreen attemptCapture={attempt} />);
-    expect(view.container.textContent).toContain('Step 2 of 4');
+    expect(view.container.textContent).toContain('Step 2 of 7');
   });
 
   it('drops state when the screen is unmounted + re-mounted', async () => {
@@ -371,10 +375,10 @@ describe('<GradingCaptureScreen> — re-entry preserves progress within the moun
       fireEvent.click(view.getByTestId('capture-review-accept'));
     });
     await waitFor(() => {
-      expect(view.container.textContent).toContain('Step 2 of 4');
+      expect(view.container.textContent).toContain('Step 2 of 7');
     });
     view.unmount();
     const fresh = renderWithProvider(<GradingCaptureScreen attemptCapture={attempt} />);
-    expect(fresh.container.textContent).toContain('Step 1 of 4');
+    expect(fresh.container.textContent).toContain('Step 1 of 7');
   });
 });

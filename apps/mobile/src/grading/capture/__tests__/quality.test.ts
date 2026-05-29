@@ -11,10 +11,14 @@ import {
   CAPTURE_CORNER_COVERAGE_MIN,
   CAPTURE_FULL_COVERAGE_MIN,
   CAPTURE_SHARPNESS_MIN,
+  CAPTURE_STEPS,
+  CAPTURE_SURFACE_BRIGHTNESS_MIN,
 } from '../constants.js';
 import {
   evaluateCaptureQuality,
   evaluateCaptureQualityForKind,
+  evaluateCaptureQualityForStep,
+  gateOptionsForStep,
   CAPTURE_FEEDBACK_COPY,
 } from '../quality.js';
 import {
@@ -26,6 +30,14 @@ import {
   makeSharpCardBuffer,
   makeUniformBuffer,
 } from './fixtures.js';
+
+import type { CaptureStepDefinition } from '../types.js';
+
+function stepFor(kind: CaptureStepDefinition['kind']): CaptureStepDefinition {
+  const step = CAPTURE_STEPS.find((s) => s.kind === kind);
+  if (step === undefined) throw new Error(`no step for ${kind}`);
+  return step;
+}
 
 describe('evaluateCaptureQuality', () => {
   it('accepts a sharp, well-exposed, well-framed full-card buffer', () => {
@@ -171,20 +183,73 @@ describe('evaluateCaptureQualityForKind', () => {
       height: 256,
       cardCoverage: 0.5,
     });
-    const fullKindResult = evaluateCaptureQualityForKind(pixels, 192, 256, 'frontFull', {
+    const coverageMinByKind = {
       frontFull: 0.95,
       backFull: 0.95,
       frontCorner: 0.05,
       backCorner: 0.05,
-    });
+      bottomLeftCorner: 0.05,
+      bottomRightCorner: 0.05,
+      surface: 0.95,
+    } as const;
+    const fullKindResult = evaluateCaptureQualityForKind(
+      pixels,
+      192,
+      256,
+      'frontFull',
+      coverageMinByKind,
+    );
     expect(fullKindResult.coverageOK).toBe(false);
-    const cornerKindResult = evaluateCaptureQualityForKind(pixels, 192, 256, 'frontCorner', {
-      frontFull: 0.95,
-      backFull: 0.95,
-      frontCorner: 0.05,
-      backCorner: 0.05,
-    });
+    const cornerKindResult = evaluateCaptureQualityForKind(
+      pixels,
+      192,
+      256,
+      'bottomRightCorner',
+      coverageMinByKind,
+    );
     expect(cornerKindResult.coverageOK).toBe(true);
+  });
+});
+
+describe('gateOptionsForStep + evaluateCaptureQualityForStep', () => {
+  it('folds in no overrides for a plain full-portrait step', () => {
+    const gate = gateOptionsForStep(stepFor('frontFull'));
+    expect(gate.coverageMin).toBe(CAPTURE_FULL_COVERAGE_MIN);
+    expect(gate.brightnessMin).toBeUndefined();
+    expect(gate.brightnessMax).toBeUndefined();
+    expect(gate.sharpnessMin).toBeUndefined();
+  });
+
+  it('uses the corner coverage floor for a corner step', () => {
+    const gate = gateOptionsForStep(stepFor('bottomLeftCorner'));
+    expect(gate.coverageMin).toBe(CAPTURE_CORNER_COVERAGE_MIN);
+  });
+
+  it('relaxes the brightness floor for the raking-light surface step', () => {
+    const gate = gateOptionsForStep(stepFor('surface'));
+    expect(gate.brightnessMin).toBe(CAPTURE_SURFACE_BRIGHTNESS_MIN);
+    expect(gate.brightnessMin).toBeLessThan(CAPTURE_BRIGHTNESS_MIN);
+  });
+
+  it('accepts a dim raking-light frame under the surface gate that the default gate would reject', () => {
+    // A card lit at a low angle: darker than the default 0.18 floor
+    // but above the relaxed surface floor. background/card luminance
+    // chosen to land mean brightness in (surfaceMin, defaultMin).
+    const pixels = makeSharpCardBuffer({
+      width: 192,
+      height: 256,
+      background: [20, 20, 20],
+      card: [44, 44, 44],
+      cardCoverage: 0.85,
+      bandCount: 8,
+    });
+    const surfaceResult = evaluateCaptureQualityForStep(pixels, 192, 256, stepFor('surface'));
+    const frontResult = evaluateCaptureQualityForStep(pixels, 192, 256, stepFor('frontFull'));
+    // The dim frame is too dark for a flat front shot…
+    expect(frontResult.brightnessOK).toBe(false);
+    expect(frontResult.reason).toBe('too_dark');
+    // …but passes the relaxed surface brightness floor.
+    expect(surfaceResult.brightnessOK).toBe(true);
   });
 });
 

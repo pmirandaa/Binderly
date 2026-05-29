@@ -51,7 +51,7 @@ export function GradingCaptureReviewScreen(
           No capture session
         </Text>
         <Text variant="body" tone="muted">
-          Start a new four-shot capture from the grading tab.
+          Start a new guided capture from the grading tab.
         </Text>
         <Button
           variant="primary"
@@ -75,6 +75,9 @@ export function GradingCaptureReviewScreen(
     session.backFull,
     session.frontCorner,
     session.backCorner,
+    session.bottomLeftCorner,
+    session.bottomRightCorner,
+    session.surface,
   ];
 
   return (

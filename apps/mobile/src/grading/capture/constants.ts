@@ -59,6 +59,18 @@ export const CAPTURE_FULL_COVERAGE_MIN = 0.08;
 export const CAPTURE_CORNER_COVERAGE_MIN = 0.04;
 
 /**
+ * Lower brightness bound for the **raking-light surface shot**. The
+ * surface step is captured under deliberately angled, low light to
+ * throw whitening / scratches into relief, so its frame mean sits
+ * well below a flat full-card shot. We relax the floor (vs the
+ * {@link CAPTURE_BRIGHTNESS_MIN} = 0.18 default) so a correctly-lit
+ * raking shot isn't rejected as `too_dark`, while still catching a
+ * lens-cap-on / pitch-black frame. The upper bound is unchanged —
+ * raking light should never be bright enough to wash out detail.
+ */
+export const CAPTURE_SURFACE_BRIGHTNESS_MIN = 0.08;
+
+/**
  * Analysis-grid the quality evaluator downsamples to before
  * computing gradients. Same posture as scanner-side
  * (`DETECT_GRID_WIDTH × DETECT_GRID_HEIGHT = 96 × 128`) but kept
@@ -76,11 +88,15 @@ export const CAPTURE_GRID_HEIGHT = 128;
 export const CAPTURE_COVERAGE_ACTIVITY_RATIO = 0.25;
 
 /**
- * The four shots, in capture order. The order is the **user-facing
- * step order** (1..4) and the keys are the emitted-session keys.
- * Adding a fifth shot (e.g. surface raking light, follow-up
- * `FU-T-GR-CAPTURE-FULL-SCHEMA`) is an append + matching test
- * update — no other code changes.
+ * The full PROJECT.md § 12 shot set, in capture order. The order is
+ * the **user-facing step order** and the keys are the emitted-session
+ * keys: full front, full back, the four corner close-ups
+ * (top-left → top-right → bottom-left → bottom-right, mapping to
+ * `cornerUrls[0..3]`), then the raking-light surface shot.
+ *
+ * The reducer + UI are length-agnostic — they derive everything from
+ * this array — so adding or reordering shots is an edit here plus a
+ * matching test update, no other code changes.
  */
 export const CAPTURE_STEPS: ReadonlyArray<CaptureStepDefinition> = [
   {
@@ -104,20 +120,48 @@ export const CAPTURE_STEPS: ReadonlyArray<CaptureStepDefinition> = [
   {
     kind: 'frontCorner',
     index: 2,
-    title: 'Front corner close-up',
+    title: 'Top-left corner',
     instruction:
-      'Zoom in on the top-left front corner. Fill the small square with just the corner.',
+      'Zoom in on the top-left corner. Fill the small square with just the corner.',
     overlay: 'corner-top-left',
     coverageMin: CAPTURE_CORNER_COVERAGE_MIN,
   },
   {
     kind: 'backCorner',
     index: 3,
-    title: 'Back corner close-up',
+    title: 'Top-right corner',
     instruction:
-      'Flip the card. Zoom in on the top-right back corner. Fill the small square with just the corner.',
+      'Zoom in on the top-right corner. Fill the small square with just the corner.',
     overlay: 'corner-top-right',
     coverageMin: CAPTURE_CORNER_COVERAGE_MIN,
+  },
+  {
+    kind: 'bottomLeftCorner',
+    index: 4,
+    title: 'Bottom-left corner',
+    instruction:
+      'Zoom in on the bottom-left corner. Fill the small square with just the corner.',
+    overlay: 'corner-bottom-left',
+    coverageMin: CAPTURE_CORNER_COVERAGE_MIN,
+  },
+  {
+    kind: 'bottomRightCorner',
+    index: 5,
+    title: 'Bottom-right corner',
+    instruction:
+      'Zoom in on the bottom-right corner. Fill the small square with just the corner.',
+    overlay: 'corner-bottom-right',
+    coverageMin: CAPTURE_CORNER_COVERAGE_MIN,
+  },
+  {
+    kind: 'surface',
+    index: 6,
+    title: 'Surface (raking light)',
+    instruction:
+      'Tilt the phone so light rakes across the front at a low angle, then fill the rectangle. This reveals whitening and scratches.',
+    overlay: 'surface-raking',
+    coverageMin: CAPTURE_FULL_COVERAGE_MIN,
+    brightnessMin: CAPTURE_SURFACE_BRIGHTNESS_MIN,
   },
 ];
 
@@ -128,6 +172,22 @@ export const CAPTURE_STEP_COUNT: number = CAPTURE_STEPS.length;
 export const CAPTURE_KINDS: ReadonlyArray<GradingShotKind> = CAPTURE_STEPS.map(
   (step) => step.kind,
 );
+
+/**
+ * Per-kind coverage floor, derived from {@link CAPTURE_STEPS}. The
+ * live frame-processor + the screen look up the active step's gate
+ * here without re-deriving it. Source of truth stays the step list.
+ */
+export const CAPTURE_COVERAGE_MIN_BY_KIND: Readonly<Record<GradingShotKind, number>> =
+  Object.freeze(
+    CAPTURE_STEPS.reduce(
+      (acc, step) => {
+        acc[step.kind] = step.coverageMin;
+        return acc;
+      },
+      {} as Record<GradingShotKind, number>,
+    ),
+  );
 
 /**
  * Route the screen pushes after the fourth accepted shot. Today's

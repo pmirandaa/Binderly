@@ -5,11 +5,12 @@
 // `<Camera>` with `isActive`, and render a "no device" fallback
 // when the device list is empty (emulator, sandbox).
 //
-// Unlike scanner, we do NOT mount a frame processor by default —
-// the capture flow is event-driven via `takePhoto()`. A
-// frame-processor for live quality feedback is on the roadmap
-// (so the capture CTA can light up / dim based on live preview)
-// but ships as a follow-up — out of scope this iteration.
+// The capture flow is primarily event-driven via `takePhoto()`, but
+// an **optional** live quality frame-processor can be passed via the
+// `frameProcessor` prop (#FU-33) so the capture CTA reflects real-time
+// quality before the user taps. It's optional on purpose: where the
+// native frame processor isn't available (tests, unsupported devices)
+// the prop is simply omitted and `<Camera>` runs without it.
 //
 // The `cameraRef` is forwarded to the screen via `cameraRef` prop
 // (not via React's `forwardRef`) so the screen can call
@@ -29,6 +30,7 @@ import { Text, YStack } from '@binderly/ui';
 import { CaptureFramingOverlay } from './CaptureFramingOverlay.js';
 
 import type { CaptureOverlayKind } from '../types.js';
+import type { ReadonlyFrameProcessor } from 'react-native-vision-camera';
 
 export interface GradingCameraSurfaceProps {
   /** Whether the camera should hold a capture session. */
@@ -45,6 +47,13 @@ export interface GradingCameraSurfaceProps {
   readonly overlayKind: CaptureOverlayKind;
   /** Optional hint string rendered inside the overlay frame. */
   readonly overlayHint?: string;
+  /**
+   * Optional live quality frame-processor (#FU-33). When provided,
+   * it's mounted on `<Camera>` so the worklet can sample quality in
+   * real time. Omitted ⇒ the camera runs photo-only (the historical
+   * behaviour + the test/no-camera fallback).
+   */
+  readonly frameProcessor?: ReadonlyFrameProcessor;
   /** Override the test id (defaults to `'grading-camera-preview'`). */
   readonly testID?: string;
 }
@@ -88,6 +97,7 @@ export function GradingCameraSurface(props: GradingCameraSurfaceProps): ReactNod
         device={device}
         isActive={props.isActive}
         photo
+        frameProcessor={props.frameProcessor}
       />
       <CaptureFramingOverlay kind={props.overlayKind} hint={props.overlayHint} />
     </YStack>

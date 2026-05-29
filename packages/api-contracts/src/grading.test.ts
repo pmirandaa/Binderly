@@ -6,6 +6,11 @@ import { describe, expect, it } from 'vitest';
 import {
   actualGradeSchema,
   attachActualGradeRequest,
+  GRADING_CAPTURE_CORNER_SHOT_ORDER,
+  GRADING_CAPTURE_SHOT_KINDS,
+  gradingCaptureCornerUris,
+  gradingCaptureShotKindSchema,
+  gradingCaptureShotSetSchema,
   gradingSubmissionDto,
   gradingSubmissionStatusSchema,
   predictedScoresSchema,
@@ -190,5 +195,73 @@ describe('updateGradingSubmissionStatusRequest', () => {
     expect(updateGradingSubmissionStatusRequest.safeParse({ status: 'graded' }).success).toBe(
       false,
     );
+  });
+});
+
+describe('grading capture shot-set', () => {
+  const VALID_SHOT_SET = {
+    frontFull: 'file:///tmp/front.jpg',
+    backFull: 'file:///tmp/back.jpg',
+    frontCorner: 'file:///tmp/tl.jpg',
+    backCorner: 'file:///tmp/tr.jpg',
+    bottomLeftCorner: 'file:///tmp/bl.jpg',
+    bottomRightCorner: 'file:///tmp/br.jpg',
+    surface: 'file:///tmp/surface.jpg',
+  };
+
+  it('enumerates the full seven-shot PROJECT.md §12 set in capture order', () => {
+    expect(GRADING_CAPTURE_SHOT_KINDS).toEqual([
+      'frontFull',
+      'backFull',
+      'frontCorner',
+      'backCorner',
+      'bottomLeftCorner',
+      'bottomRightCorner',
+      'surface',
+    ]);
+  });
+
+  it('orders the four corner kinds as [TL, TR, BL, BR]', () => {
+    expect(GRADING_CAPTURE_CORNER_SHOT_ORDER).toEqual([
+      'frontCorner',
+      'backCorner',
+      'bottomLeftCorner',
+      'bottomRightCorner',
+    ]);
+  });
+
+  it('accepts the four new shot kinds in the enum', () => {
+    expect(gradingCaptureShotKindSchema.parse('bottomLeftCorner')).toBe('bottomLeftCorner');
+    expect(gradingCaptureShotKindSchema.parse('bottomRightCorner')).toBe('bottomRightCorner');
+    expect(gradingCaptureShotKindSchema.parse('surface')).toBe('surface');
+  });
+
+  it('rejects an unknown shot kind', () => {
+    expect(gradingCaptureShotKindSchema.safeParse('leftEdge').success).toBe(false);
+  });
+
+  it('parses a full local-URI shot set', () => {
+    expect(gradingCaptureShotSetSchema.parse(VALID_SHOT_SET).surface).toBe('file:///tmp/surface.jpg');
+  });
+
+  it('rejects a shot set missing the raking-light surface shot', () => {
+    const { surface, ...without } = VALID_SHOT_SET;
+    void surface;
+    expect(gradingCaptureShotSetSchema.safeParse(without).success).toBe(false);
+  });
+
+  it('rejects an empty URI string', () => {
+    expect(gradingCaptureShotSetSchema.safeParse({ ...VALID_SHOT_SET, surface: '' }).success).toBe(
+      false,
+    );
+  });
+
+  it('maps corner URIs into canonical [TL, TR, BL, BR] order', () => {
+    expect(gradingCaptureCornerUris(VALID_SHOT_SET)).toEqual([
+      'file:///tmp/tl.jpg',
+      'file:///tmp/tr.jpg',
+      'file:///tmp/bl.jpg',
+      'file:///tmp/br.jpg',
+    ]);
   });
 });

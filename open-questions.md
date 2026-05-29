@@ -1315,4 +1315,49 @@ owner) `anon`/`authenticated` ALL grants. Now SELECT-only and matching intent;
 card detail; decide whether to flip `freshness` to `lastObservationAt`) is
 tracked as **#FU-66 (T-SP-PRICING-DISPLAY-TRENDS)**.
 
+---
+
+## Q-029 — Pixel format vision-camera delivers to the live capture frame-processor; is a CPU-side decode needed before quality eval? (T-GR-CAPTURE-FULL / #FU-33)
+
+**Raised:** 2026-05-29 (iter 37, by the grading-capture worker; authored as Q-028, renumbered to **Q-029** at rebase — a sibling T-DL-PRICING-CURRENT-VIEW-V2 claimed Q-028 + #FU-66, so this follow-up is **#FU-67**)
+**Blocking:** none (scaffolded behind a graceful no-op; on-device validation tracked as **#FU-67**)
+
+**Context.** #FU-33 wires a live vision-camera frame-processor so the
+capture button reflects real-time quality (sharpness/brightness/aspect/
+centered) before the user taps, reusing the existing
+`evaluateCaptureQuality` gate. The worklet reads frame bytes via
+`frame.toArrayBuffer()` and feeds an **HWC-RGB `Uint8Array`** (3 bytes/px)
+straight into the gate — mirroring the scanner detect worklet's
+assumption (`scanner/detect/frame-processor.ts`, which notes the camera
+"pins format such that this is RGB").
+
+The open question is whether that assumption holds across our target
+device classes. vision-camera v4 can hand the worklet YUV / BGRA / RGB
+depending on platform + `pixelFormat` config, and the original
+T-GR-CAPTURE-UX note explicitly deferred this to "once a CPU-side JPEG
+decoder is bundled." If the device delivers a non-RGB layout, the gate
+would mis-measure (or, with our length guard, simply no-op).
+
+**Current behaviour (safe default).** The worklet **gracefully no-ops**
+when `toArrayBuffer` is absent or the buffer length ≠ `w·h·3`, so a
+wrong/again-unsupported pixel format degrades to today's tap-driven
+capture rather than producing bogus live feedback. No crash, no false
+"hold steady".
+
+**Options:**
+1. Pin `pixelFormat="rgb"` on `<Camera>` for the capture screen and rely
+   on `toArrayBuffer()` returning RGB — pro: zero per-frame decode cost;
+   con: not all devices honour the request, needs device-matrix
+   validation (#FU-67).
+2. Bundle a CPU-side YUV/BGRA→RGB (or JPEG) decode step in the worklet
+   before the gate — pro: format-agnostic; con: per-frame cost on the
+   ~10 FPS hot path, a new native/JSI dependency.
+3. Reuse whatever the scanner detect path settles on (the two should
+   share one frame→RGB helper eventually).
+
+**Recommendation:** Option 1 + #FU-67 — pin RGB, validate on Pablo's
+device matrix, and only add a decode (Option 2/3) if a target device
+won't deliver RGB. The graceful no-op makes shipping the scaffold safe
+in the meantime.
+
 **Pablo's answer:** _(empty until answered)_

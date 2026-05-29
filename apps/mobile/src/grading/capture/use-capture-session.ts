@@ -84,7 +84,7 @@ export interface UseCaptureSessionOptions {
    */
   readonly attemptCapture: () => Promise<CaptureAttemptInput>;
   /**
-   * Called exactly once when the fourth shot is accepted, with
+   * Called exactly once when the final shot is accepted, with
    * the emitted {@link GradingCaptureSession}. Production wires
    * this to `router.push(CAPTURE_REVIEW_ROUTE)` after stashing
    * the session on the placeholder global ref.
