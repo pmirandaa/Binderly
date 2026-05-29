@@ -199,6 +199,12 @@ importers:
       '@binderly/api-contracts':
         specifier: workspace:*
         version: link:../../packages/api-contracts
+      '@binderly/entitlements':
+        specifier: workspace:*
+        version: link:../../packages/entitlements
+      '@binderly/feature-flags':
+        specifier: workspace:*
+        version: link:../../packages/feature-flags
       '@binderly/pricing-display':
         specifier: workspace:*
         version: link:../../packages/pricing-display
