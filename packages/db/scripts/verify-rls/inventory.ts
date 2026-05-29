@@ -10,6 +10,7 @@
 //                                     fx_rate
 //   - 0015_data_conflict_rls.sql    → data_conflict (service-role-only)
 //   - 0024_paddle_webhook_log_rls.sql → paddle_webhook_log (service-role-only)
+//   - 0026_community_submission_rls.sql → community_submission (owner CRUD)
 //   - 0016_admin_debug_views.sql    → v_data_conflict_top, v_data_conflict_by_source,
 //                                     v_image_pipeline_coverage_gaps,
 //                                     v_fx_rate_freshness,
@@ -78,6 +79,7 @@ export const EXPECTED_TABLES: readonly ExpectedTable[] = [
     tablename: 'paddle_webhook_log',
     note: 'paywall — service_role only (no permissive policy)',
   },
+  { tablename: 'community_submission', note: 'grading flywheel — owner CRUD' },
 ] as const;
 
 /**
@@ -158,6 +160,9 @@ export const EXPECTED_POLICIES: readonly ExpectedPolicy[] = [
   ...ownerCrud('grading_submission'),
   // grading_training_sample: intentionally no policies; covered by
   // NO_PERMISSIVE_POLICY_TABLES above.
+
+  // 0026_community_submission_rls.sql -------------------------------------
+  ...ownerCrud('community_submission'),
 
   // 0009_pricing_rls.sql --------------------------------------------------
   {

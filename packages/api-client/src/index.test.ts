@@ -33,6 +33,7 @@ describe('createClient', () => {
     expect(client.auth).toBeDefined();
     expect(client.smartCollections).toBeDefined();
     expect(client.entitlements).toBeDefined();
+    expect(client.communitySubmissions).toBeDefined();
     expect(client.http).toBeInstanceOf(HttpClient);
   });
 
