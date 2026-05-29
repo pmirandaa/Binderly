@@ -7,6 +7,7 @@
 
 import { vi } from 'vitest';
 
+import { ApiNotFoundError } from '@binderly/api-client';
 import type {
   CardDto,
   CardWithPrintingsDto,
@@ -199,6 +200,7 @@ export interface FakeBrowseApiOptions {
 export interface FakeBrowseApi extends BrowseApi {
   listAllSets: ReturnType<typeof vi.fn>;
   getSet: ReturnType<typeof vi.fn>;
+  getSetBySlug: ReturnType<typeof vi.fn>;
   listPrintingsInSet: ReturnType<typeof vi.fn>;
   getPrintingDetail: ReturnType<typeof vi.fn>;
   getCurrentPrice: ReturnType<typeof vi.fn>;
@@ -216,9 +218,25 @@ export function createFakeBrowseApi(options: FakeBrowseApiOptions = {}): FakeBro
   });
   const getSet = vi.fn(async (id: string) => {
     if (options.rejectAll !== undefined) throw options.rejectAll;
-    const found = sets.find((s) => s.id === id);
+    const found =
+      sets.find((s) => s.id === id) ?? setsBySetId[id]?.set;
     if (found === undefined) {
-      throw new Error(`set ${id} not found in fixture`);
+      throw new ApiNotFoundError(`set ${id} not found in fixture`);
+    }
+    return found;
+  });
+  // Resolve a slug → set the way the real `cards.getSetBySlug` does:
+  // match on `canonicalKey`. As a test convenience we also accept the
+  // `setsBySetId` map key (a set id) so existing per-set fixtures keyed
+  // by id resolve without restating their canonicalKey.
+  const getSetBySlug = vi.fn(async (slug: string) => {
+    if (options.rejectAll !== undefined) throw options.rejectAll;
+    const found =
+      sets.find((s) => s.canonicalKey === slug) ??
+      Object.values(setsBySetId).find((d) => d.set.canonicalKey === slug)?.set ??
+      setsBySetId[slug]?.set;
+    if (found === undefined) {
+      throw new ApiNotFoundError(`set with slug ${slug} not found in fixture`);
     }
     return found;
   });
@@ -243,5 +261,12 @@ export function createFakeBrowseApi(options: FakeBrowseApiOptions = {}): FakeBro
     return currentPricesByPrintingId[printingId] ?? null;
   });
 
-  return { listAllSets, getSet, listPrintingsInSet, getPrintingDetail, getCurrentPrice };
+  return {
+    listAllSets,
+    getSet,
+    getSetBySlug,
+    listPrintingsInSet,
+    getPrintingDetail,
+    getCurrentPrice,
+  };
 }

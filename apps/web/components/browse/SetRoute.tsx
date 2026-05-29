@@ -1,6 +1,6 @@
 'use client';
 
-// Glue component for `/sets/[id]`. Lazily constructs the
+// Glue component for `/sets/[slug]`. Lazily constructs the
 // api-client and wires `notFound()` into <SetView>'s
 // `onNotFound` callback.
 
@@ -13,10 +13,11 @@ import { apiToBrowseApi, type BrowseApi } from '../../lib/browse/api';
 import { PageLoading } from '../loading/PageLoading';
 
 export interface SetRouteProps {
-  setId: string;
+  /** The set's `canonicalKey` slug (e.g. `en-base1`), or a legacy set UUID. */
+  slug: string;
 }
 
-export function SetRoute({ setId }: SetRouteProps): React.ReactNode {
+export function SetRoute({ slug }: SetRouteProps): React.ReactNode {
   const [api, setApi] = useState<BrowseApi | null>(null);
 
   useEffect(() => {
@@ -27,5 +28,5 @@ export function SetRoute({ setId }: SetRouteProps): React.ReactNode {
     return <PageLoading label="Loading set…" />;
   }
 
-  return <SetView api={api} setId={setId} onNotFound={notFound} />;
+  return <SetView api={api} slug={slug} onNotFound={notFound} />;
 }

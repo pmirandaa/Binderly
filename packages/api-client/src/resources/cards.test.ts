@@ -101,6 +101,55 @@ describe('cards.getSet', () => {
   });
 });
 
+describe('cards.getSetBySlug', () => {
+  it('resolves a set by canonicalKey on the first page', async () => {
+    const { cards } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PAGE([VALID_SET])) }),
+    );
+    const set = await cards.getSetBySlug({ slug: 'en-swsh9' });
+    expect(set.id).toBe(FIXTURE_IDS.setId);
+    expect(set.canonicalKey).toBe('en-swsh9');
+  });
+
+  it('hits GET /v1/sets to scan the catalog', async () => {
+    const { fetch, cards } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope(VALID_PAGE([VALID_SET])) }),
+    );
+    await cards.getSetBySlug({ slug: 'en-swsh9' });
+    const url = fetch.mock.calls[0]?.[0] as string;
+    expect(url).toContain('/v1/sets');
+    expect(fetch.mock.calls[0]?.[1]?.method).toBe('GET');
+  });
+
+  it('walks pages via the cursor until it finds the slug', async () => {
+    const target = {
+      ...VALID_SET,
+      id: 'aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa',
+      canonicalKey: 'en-target',
+    };
+    const { fetch, cards } = makeResource(
+      mockFetch(
+        { status: 200, body: okEnvelope({ items: [VALID_SET], nextCursor: 'cur1' }) },
+        { status: 200, body: okEnvelope({ items: [target], nextCursor: null }) },
+      ),
+    );
+    const set = await cards.getSetBySlug({ slug: 'en-target' });
+    expect(set.canonicalKey).toBe('en-target');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    const secondUrl = fetch.mock.calls[1]?.[0] as string;
+    expect(secondUrl).toContain('cursor=cur1');
+  });
+
+  it('throws ApiNotFoundError when no set matches the slug', async () => {
+    const { cards } = makeResource(
+      mockFetch({ status: 200, body: okEnvelope({ items: [VALID_SET], nextCursor: null }) }),
+    );
+    await expect(cards.getSetBySlug({ slug: 'en-nonexistent' })).rejects.toBeInstanceOf(
+      ApiNotFoundError,
+    );
+  });
+});
+
 describe('cards.listCardsInSet', () => {
   it('returns a paginated list on happy path', async () => {
     const { cards } = makeResource(

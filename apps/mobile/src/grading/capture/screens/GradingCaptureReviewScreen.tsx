@@ -1,32 +1,32 @@
-// `<GradingCaptureReviewScreen>` — placeholder review surface for
-// the T-GR-CENTERING hand-off.
+// `<GradingCaptureReviewScreen>` — read-only review surface for
+// the capture → grading hand-off.
 //
-// Today this screen reads the last-emitted
-// {@link GradingCaptureSession} via the module-scoped placeholder
-// ref in `GradingCaptureScreen.tsx` and renders a static summary
-// (one row per shot, with quality metrics + truncated URI). When
-// T-GR-CENTERING ships, this screen is replaced by the real
-// centering view; the placeholder ref is replaced by a real
-// router-param strategy.
+// The screen resolves its {@link GradingCaptureSession} the same
+// way the real centering screen does (#FU-32): it reads the
+// `?sessionId=<id>` router param and looks the session up in the
+// module-scoped session store (`grading/centering/session-store`).
+// Only the lightweight id travels through the route; the captured
+// stills stay in-memory keyed by that id.
 //
 // The screen is intentionally read-only: there are no buttons
-// that mutate the captured session. The "Start a new capture"
-// CTA navigates back to the capture tab; the "Looks good →
-// next" CTA is wired to a stub route that will become the real
-// downstream screen.
+// that mutate the captured session. The "Back" CTA navigates back
+// to the capture tab; the "Continue" CTA pushes the centering
+// route, preserving the session id.
 
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 
 import { Button, Text, XStack, YStack } from '@binderly/ui';
 
-import { __getLastEmittedSession } from './GradingCaptureScreen.js';
+import { getSession } from '../../centering/session-store.js';
 
 import type { GradingCaptureSession, GradingShot } from '../types.js';
 
 export interface GradingCaptureReviewScreenProps {
-  /** Inject the session directly (testing). Falls back to the placeholder ref. */
+  /** Inject the session directly (testing). Overrides the store lookup. */
   readonly session?: GradingCaptureSession | null;
+  /** Override the session id (testing — bypasses `useLocalSearchParams`). */
+  readonly sessionIdOverride?: string;
   readonly testID?: string;
 }
 
@@ -34,7 +34,10 @@ export function GradingCaptureReviewScreen(
   props: GradingCaptureReviewScreenProps,
 ): ReactNode {
   const router = useRouter();
-  const session = props.session ?? __getLastEmittedSession();
+  const params = useLocalSearchParams<{ sessionId?: string }>();
+  const sessionId = props.sessionIdOverride ?? params.sessionId;
+  const session =
+    props.session ?? (sessionId !== undefined ? getSession(sessionId) ?? null : null);
 
   if (session === null || session === undefined) {
     return (
@@ -113,7 +116,7 @@ export function GradingCaptureReviewScreen(
         <Button
           variant="primary"
           onPress={(): void => {
-            router.push('/grading/centering');
+            router.push(`/grading/centering?sessionId=${encodeURIComponent(session.id)}`);
           }}
           testID="grading-capture-review-continue"
         >

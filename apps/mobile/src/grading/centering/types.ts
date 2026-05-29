@@ -116,9 +116,9 @@ export function isCenteringError(
 // ── Session-store types ───────────────────────────────────────────────
 
 /**
- * The in-process session store contract.  Replaces the deprecated
- * `__getLastEmittedSession` / `__setLastEmittedSession` hand-off from
- * `T-GR-CAPTURE-UX`.
+ * The in-process session store contract.  The router-param hand-off that
+ * replaced the removed `__getLastEmittedSession` / `__setLastEmittedSession`
+ * ref from `T-GR-CAPTURE-UX` (#FU-32).
  *
  * The store is keyed by `session.id` (a `gcs-<ts>-<rand>` string generated
  * by `createInitialSessionState()`).  Future sibling grading tasks

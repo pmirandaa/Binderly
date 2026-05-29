@@ -6,12 +6,9 @@ import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProvider } from '../../../test-utils/render.js';
+import { __resetSessionStore, storeSession } from '../../centering/session-store.js';
 import { CAPTURE_KINDS } from '../constants.js';
 import { GradingCaptureReviewScreen } from '../screens/GradingCaptureReviewScreen.js';
-import {
-  __setLastEmittedSession,
-  GradingCaptureScreen,
-} from '../screens/GradingCaptureScreen.js';
 
 import type {
   CaptureQualityResult,
@@ -19,8 +16,6 @@ import type {
   GradingShot,
   GradingShotKind,
 } from '../types.js';
-
-void GradingCaptureScreen; // imported to keep the placeholder ref alive.
 
 const { routerMocks } = vi.hoisted(() => ({
   routerMocks: {
@@ -98,11 +93,11 @@ beforeEach(() => {
   routerMocks.back.mockClear();
   routerMocks.canGoBack.mockClear();
   routerMocks.canGoBack.mockReturnValue(true);
-  __setLastEmittedSession(null);
+  __resetSessionStore();
 });
 
 afterEach(() => {
-  __setLastEmittedSession(null);
+  __resetSessionStore();
 });
 
 describe('<GradingCaptureReviewScreen>', () => {
@@ -112,16 +107,18 @@ describe('<GradingCaptureReviewScreen>', () => {
     expect(view.container.textContent).toContain('No capture session');
   });
 
-  it('renders one row per shot when a session is present', () => {
-    __setLastEmittedSession(makeSession());
-    const view = renderWithProvider(<GradingCaptureReviewScreen />);
+  it('resolves the session from the store via the sessionId param', () => {
+    storeSession(makeSession());
+    const view = renderWithProvider(
+      <GradingCaptureReviewScreen sessionIdOverride="session-abc" />,
+    );
     expect(view.queryByTestId('grading-capture-review')).not.toBeNull();
     for (const kind of CAPTURE_KINDS) {
       expect(view.queryByTestId(`grading-capture-review-shot-${kind}`)).not.toBeNull();
     }
   });
 
-  it('honours the explicit session prop over the placeholder ref', () => {
+  it('honours the explicit session prop over the store lookup', () => {
     const override = makeSession();
     const view = renderWithProvider(
       <GradingCaptureReviewScreen session={override} />,
@@ -132,23 +129,29 @@ describe('<GradingCaptureReviewScreen>', () => {
   });
 
   it('renders metrics for each shot row', () => {
-    __setLastEmittedSession(makeSession());
-    const view = renderWithProvider(<GradingCaptureReviewScreen />);
+    storeSession(makeSession());
+    const view = renderWithProvider(
+      <GradingCaptureReviewScreen sessionIdOverride="session-abc" />,
+    );
     expect(view.container.textContent).toContain('1080×1440px');
     expect(view.container.textContent).toContain('sharpness 14.2');
   });
 
   it('Back routes back when canGoBack', () => {
-    __setLastEmittedSession(makeSession());
-    const view = renderWithProvider(<GradingCaptureReviewScreen />);
+    storeSession(makeSession());
+    const view = renderWithProvider(
+      <GradingCaptureReviewScreen sessionIdOverride="session-abc" />,
+    );
     fireEvent.click(view.getByTestId('grading-capture-review-back'));
     expect(routerMocks.back).toHaveBeenCalledTimes(1);
   });
 
-  it('Continue pushes the centering route', () => {
-    __setLastEmittedSession(makeSession());
-    const view = renderWithProvider(<GradingCaptureReviewScreen />);
+  it('Continue pushes the centering route, preserving the session id', () => {
+    storeSession(makeSession());
+    const view = renderWithProvider(
+      <GradingCaptureReviewScreen sessionIdOverride="session-abc" />,
+    );
     fireEvent.click(view.getByTestId('grading-capture-review-continue'));
-    expect(routerMocks.push).toHaveBeenCalledWith('/grading/centering');
+    expect(routerMocks.push).toHaveBeenCalledWith('/grading/centering?sessionId=session-abc');
   });
 });

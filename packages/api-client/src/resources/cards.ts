@@ -27,6 +27,8 @@ import {
   type SetDto,
 } from '@binderly/api-contracts';
 
+import { ApiNotFoundError } from '../error.js';
+
 import type { HttpClient } from '../client.js';
 
 export interface ListPageOptions {
@@ -48,12 +50,27 @@ export interface ListPrintingsForCardOptions {
   readonly signal?: AbortSignal;
 }
 
+export interface GetSetBySlugOptions {
+  /** The set's `canonical_key` slug (e.g. `en-base1`). */
+  readonly slug: string;
+  readonly signal?: AbortSignal;
+}
+
 export interface CardsResource {
   readonly listSets: (options?: ListSetsOptions) => Promise<PaginatedResponse<SetDto>>;
   readonly getSet: (options: {
     readonly id: string;
     readonly signal?: AbortSignal;
   }) => Promise<SetDto>;
+  /**
+   * Resolve a set by its `canonical_key` slug (e.g. `en-base1`). The
+   * catalog exposes `/v1/sets/:id` by UUID only — there is no by-slug
+   * endpoint — so this scans the (bounded) `/v1/sets` list and matches
+   * on `canonicalKey`, which is unique. Throws {@link ApiNotFoundError}
+   * when no set matches. Shared by the web + mobile `/sets/[slug]`
+   * routes so both platforms resolve slugs the same way (#FU-64).
+   */
+  readonly getSetBySlug: (options: GetSetBySlugOptions) => Promise<SetDto>;
   readonly listCardsInSet: (options: ListCardsInSetOptions) => Promise<PaginatedResponse<CardDto>>;
   readonly getCard: (options: {
     readonly id: string;
@@ -67,6 +84,11 @@ export interface CardsResource {
 }
 
 const setListSchema = paginatedResponseSchema(setDto);
+// Upper bound on pages walked while resolving a slug → set. EN + JP
+// sets total well under 1000 rows; at 100/page this cap (100 pages =
+// 10k rows) is a safety valve against a backend pagination regression,
+// never reached in practice.
+const MAX_SET_SCAN_PAGES = 100;
 const cardListSchema = paginatedResponseSchema(cardDto);
 // Listing printings for a card is bounded (a card has at most a
 // couple dozen printings) so the endpoint returns the array
@@ -100,6 +122,26 @@ export function makeCardsResource(http: HttpClient): CardsResource {
         },
         setDto,
       );
+    },
+
+    async getSetBySlug({ slug, signal }): Promise<SetDto> {
+      let cursor: string | undefined;
+      for (let page = 0; page < MAX_SET_SCAN_PAGES; page += 1) {
+        const res = await http.request(
+          {
+            path: '/v1/sets',
+            method: 'GET',
+            query: { cursor, limit: 100 },
+            ...(signal !== undefined ? { signal } : {}),
+          },
+          setListSchema,
+        );
+        const match = res.items.find((set) => set.canonicalKey === slug);
+        if (match !== undefined) return match;
+        if (res.nextCursor === null) break;
+        cursor = res.nextCursor;
+      }
+      throw new ApiNotFoundError(`No set found with canonical key "${slug}".`);
     },
 
     async listCardsInSet({ setId, cursor, limit, signal }): Promise<PaginatedResponse<CardDto>> {

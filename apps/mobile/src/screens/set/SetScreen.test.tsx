@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { ApiNotFoundError } from '@binderly/api-client';
 import type { BinderlyClient } from '@binderly/api-client';
 import type { CardDto, PaginatedResponse, SetDto } from '@binderly/api-contracts';
 
@@ -106,6 +107,7 @@ interface FakeClient {
   cards: {
     listSets: ReturnType<typeof vi.fn>;
     getSet: ReturnType<typeof vi.fn>;
+    getSetBySlug: ReturnType<typeof vi.fn>;
     listCardsInSet: ReturnType<typeof vi.fn>;
     getCard: ReturnType<typeof vi.fn>;
     listPrintingsForCard: ReturnType<typeof vi.fn>;
@@ -114,10 +116,24 @@ interface FakeClient {
 }
 
 function buildClient(): FakeClient {
+  const listSets = vi.fn();
+  // Default `getSetBySlug` mirrors the real api-client method: scan
+  // the `listSets` page and match on `canonicalKey`, throwing
+  // `ApiNotFoundError` on a miss. Tests seed the catalog via
+  // `listSets.mockResolvedValue(...)` as before.
+  const getSetBySlug = vi.fn(async ({ slug }: { slug: string }): Promise<SetDto> => {
+    const page = (await listSets({ limit: 100 })) as PaginatedResponse<SetDto>;
+    const match = page.items.find((set) => set.canonicalKey === slug);
+    if (match === undefined) {
+      throw new ApiNotFoundError(`No set found with canonical key "${slug}".`);
+    }
+    return match;
+  });
   return {
     cards: {
-      listSets: vi.fn(),
+      listSets,
       getSet: vi.fn(),
+      getSetBySlug,
       listCardsInSet: vi.fn(),
       getCard: vi.fn(),
       listPrintingsForCard: vi.fn(),

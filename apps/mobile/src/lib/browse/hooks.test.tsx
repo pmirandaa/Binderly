@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { ApiNotFoundError } from '@binderly/api-client';
 import type { BinderlyClient } from '@binderly/api-client';
 import type {
   CardDto,
@@ -86,6 +87,7 @@ interface FakeClient {
   cards: {
     listSets: ReturnType<typeof vi.fn>;
     getSet: ReturnType<typeof vi.fn>;
+    getSetBySlug: ReturnType<typeof vi.fn>;
     listCardsInSet: ReturnType<typeof vi.fn>;
     getCard: ReturnType<typeof vi.fn>;
     listPrintingsForCard: ReturnType<typeof vi.fn>;
@@ -98,6 +100,7 @@ function buildClient(): FakeClient {
     cards: {
       listSets: vi.fn(),
       getSet: vi.fn(),
+      getSetBySlug: vi.fn(),
       listCardsInSet: vi.fn(),
       getCard: vi.fn(),
       listPrintingsForCard: vi.fn(),
@@ -153,21 +156,20 @@ describe('useSetsQuery', () => {
 });
 
 describe('useSetBySlugQuery', () => {
-  it('finds a set by canonicalKey in the listSets payload', async () => {
+  it('resolves a set via cards.getSetBySlug', async () => {
     const client = buildClient();
-    const sets: SetDto[] = [
-      makeSet({ id: 'a', canonicalKey: 'en-base1' }),
-      makeSet({ id: 'b', canonicalKey: 'en-base2' }),
-    ];
-    client.cards.listSets.mockResolvedValue({ items: sets, nextCursor: null });
+    client.cards.getSetBySlug.mockResolvedValue(makeSet({ id: 'b', canonicalKey: 'en-base2' }));
     const { result } = renderHook(() => useSetBySlugQuery('en-base2'), { wrapper: makeWrapper(client) });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data?.id).toBe('b');
+    expect(client.cards.getSetBySlug).toHaveBeenCalledWith({ slug: 'en-base2' });
   });
 
-  it('resolves to null when no set matches the slug', async () => {
+  it('maps an ApiNotFoundError miss to null', async () => {
     const client = buildClient();
-    client.cards.listSets.mockResolvedValue({ items: [], nextCursor: null });
+    client.cards.getSetBySlug.mockRejectedValue(
+      new ApiNotFoundError('no set', { status: 404 }),
+    );
     const { result } = renderHook(() => useSetBySlugQuery('en-unknown'), { wrapper: makeWrapper(client) });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toBeNull();
@@ -176,7 +178,7 @@ describe('useSetBySlugQuery', () => {
   it('does not fire the query when the slug is undefined', () => {
     const client = buildClient();
     renderHook(() => useSetBySlugQuery(undefined), { wrapper: makeWrapper(client) });
-    expect(client.cards.listSets).not.toHaveBeenCalled();
+    expect(client.cards.getSetBySlug).not.toHaveBeenCalled();
   });
 });
 

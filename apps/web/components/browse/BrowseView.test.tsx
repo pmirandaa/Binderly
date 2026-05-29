@@ -62,7 +62,7 @@ describe('BrowseView — list rendering', () => {
     ]);
   });
 
-  it('routes set cards to /sets/[id]', async () => {
+  it('routes set cards to /sets/[slug] using the canonicalKey', async () => {
     const api = createFakeBrowseApi({ sets: SAMPLE_SETS });
     renderBrowse(api);
     await waitFor(() => {
@@ -70,8 +70,8 @@ describe('BrowseView — list rendering', () => {
     });
     const links = screen.getAllByTestId('set-card-link');
     const hrefs = links.map((a) => a.getAttribute('href'));
-    expect(hrefs).toContain('/sets/set-new');
-    expect(hrefs).toContain('/sets/set-jp');
+    expect(hrefs).toContain('/sets/en-sv5');
+    expect(hrefs).toContain('/sets/jp-svv');
   });
 
   it('renders the headline + helper copy', async () => {
