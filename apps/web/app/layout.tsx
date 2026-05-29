@@ -13,6 +13,7 @@ import { ErrorBoundary } from '../components/error/ErrorBoundary';
 import { AuthProvider } from '../components/providers/AuthProvider';
 import { QueryProvider } from '../components/providers/QueryProvider';
 import { THEME_STORAGE_KEY, UIProvider } from '../components/providers/UIProvider';
+import { ObservabilityInit } from '../lib/observability/ObservabilityInit';
 
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: ReactNode }): React
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
       </head>
       <body>
+        <ObservabilityInit />
         <UIProvider>
           <QueryProvider>
             <AuthProvider>
