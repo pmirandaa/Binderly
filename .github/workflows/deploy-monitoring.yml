@@ -1,0 +1,83 @@
+# Sentry release tracking for Binderly (web + mobile + python).
+#
+# SCAFFOLDING MODE (Stage 11, T-DP-MONITORING): this workflow creates a
+# Sentry release on every push to `main` and associates the commits, so
+# errors are attributed to the deploy that introduced them and source
+# maps (uploaded by the per-app deploy at go-live) bind to a release.
+#
+# Like every other Stage 11 deploy workflow, the live step is GUARDED on
+# the presence of a secret — here `SENTRY_AUTH_TOKEN`. Until Pablo
+# provisions the Sentry org + auth token (see infra/DEPLOYMENT_SECRETS.md
+# §6 + infra/monitoring/README.md), the `release` job is SKIPPED — never
+# failed — so this workflow is inert and green. The moment the Sentry
+# secrets are added, release tracking goes live with no YAML change.
+#
+# This complements (does not replace) the runtime Sentry SDK init wired
+# in apps/web, apps/mobile, and apps/api-python (also inert until a DSN
+# is set). Error *ingestion* needs only the DSN; this workflow adds the
+# release/commit metadata layer on top.
+
+name: Deploy / Monitoring (Sentry release)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "apps/mobile/**"
+      - "apps/api-python/**"
+      - "packages/**"
+      - ".github/workflows/deploy-monitoring.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-monitoring-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate: emit `enabled=true` only when the Sentry auth token is present.
+  # Secrets can't be referenced in a job-level `if:` directly, so we read
+  # the secret into a step env var and surface a boolean output the
+  # release job depends on. Absent secret -> enabled=false -> skipped.
+  guard:
+    name: guard (secret presence)
+    runs-on: ubuntu-latest
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "SENTRY_AUTH_TOKEN present — Sentry release tracking will run."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::SENTRY_AUTH_TOKEN not set — skipping Sentry release (Stage 11 scaffolding mode). See infra/DEPLOYMENT_SECRETS.md §6 + infra/monitoring/README.md."
+          fi
+
+  release:
+    name: create Sentry release
+    needs: guard
+    if: needs.guard.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Sentry needs full history to associate commits with the release.
+          fetch-depth: 0
+      - name: Create Sentry release + associate commits
+        # Pinned to a major tag per the repo action-pinning policy (ci.yml).
+        uses: getsentry/action-release@v1
+        with:
+          version: ${{ github.sha }}
+          set_commits: auto

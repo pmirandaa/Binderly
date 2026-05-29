@@ -69,8 +69,8 @@ binderly-backfill-printing-match = "grading.matching.backfill:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["embeddings*", "ann*", "grading*", "grading.scrapers*", "grading.ml_common*", "grading.corners*", "grading.flywheel*"]
-exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrapers.*.tests*"]
+include = ["embeddings*", "ann*", "grading*", "grading.scrapers*", "grading.ml_common*", "grading.corners*", "grading.flywheel*", "observability*"]
+exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrapers.*.tests*", "observability.tests*"]
 
 [tool.setuptools.package-data]
 "embeddings" = ["py.typed"]
@@ -90,11 +90,13 @@ exclude = ["embeddings.tests*", "ann.tests*", "grading.*.tests*", "grading.scrap
 "grading.aggregate" = ["py.typed"]
 "grading.matching" = ["py.typed", "fixtures/*.json"]
 "grading.calibration" = ["py.typed"]
+"observability" = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = [
   "embeddings/tests",
   "ann/tests",
+  "observability/tests",
   "grading/centering/tests",
   "grading/ml_common/tests",
   "grading/corners/tests",
