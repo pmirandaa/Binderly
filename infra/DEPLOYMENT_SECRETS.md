@@ -118,6 +118,53 @@ public bucket for user uploads.
 
 ---
 
+## 5. Expo Application Services — mobile (`deploy-mobile.yml`, `apps/mobile/eas.json`)
+
+Native iOS/Android builds + store submits run on [EAS](https://expo.dev). The
+`build` job is guarded on `EXPO_TOKEN`; the **submit** path additionally needs
+the per-store credentials below. The workflow is **manual-dispatch only**
+(native builds cost EAS build minutes) and store submission is **opt-in** via
+the dispatch `submit` input — a build never auto-pushes to a store.
+
+Full first-run flow (Expo account, `eas build:configure`, credential upload):
+`infra/eas/README.md`.
+
+### Required for any EAS build
+
+| Secret | ⬜ | What it's for | Where to get it |
+| --- | --- | --- | --- |
+| `EXPO_TOKEN` | ⬜ | Auth for the EAS CLI in CI (`eas build` / `eas submit`). | expo.dev → Account → **Settings → Access tokens** → Create. |
+
+### Additionally required to **submit** (iOS → App Store Connect)
+
+Use an **App Store Connect API key** (`.p8`) — no Apple ID / app-specific
+password, no hardcoded Team ID. `apps/mobile/eas.json` reads these via env.
+
+| Secret | ⬜ | What it's for | Where to get it |
+| --- | --- | --- | --- |
+| `ASC_API_KEY_P8` | ⬜ | The ASC API private key (`.p8` file contents). CI writes it to a temp file and exports `ASC_API_KEY_PATH`. | App Store Connect → **Users and Access → Integrations → App Store Connect API** → Generate key (Admin/App Manager). Downloadable once. |
+| `ASC_API_KEY_ID` | ⬜ | The key ID for the `.p8` above. | Shown next to the key in ASC. |
+| `ASC_API_KEY_ISSUER_ID` | ⬜ | The issuer ID for the ASC API. | ASC → Integrations → App Store Connect API (top of page). |
+
+### Additionally required to **submit** (Android → Google Play)
+
+| Secret | ⬜ | What it's for | Where to get it |
+| --- | --- | --- | --- |
+| `GOOGLE_SERVICE_ACCOUNT_KEY_JSON` | ⬜ | Google Play service-account JSON (full file contents). CI writes it to a temp file and exports `GOOGLE_SERVICE_ACCOUNT_KEY_PATH`. | Google Play Console → **Setup → API access** → create/link a service account in Google Cloud → grant **Release** permissions → create a JSON key. |
+
+**Signing credentials (managed by EAS, NOT GitHub secrets):** the iOS
+distribution certificate + provisioning profile and the Android upload keystore
+are uploaded once via `eas credentials` and stored on EAS. They are never
+committed and never put in GitHub. See `infra/eas/README.md`.
+
+**One-time project setup (Pablo):** sign in to Expo, run `eas init` in
+`apps/mobile` to link the project (writes an `extra.eas.projectId` into the app
+config), then `eas build:configure` and upload signing credentials. Bundle id
+`app.binderly.binderly` (iOS) / package `app.binderly.binderly` (Android) are
+already set in `apps/mobile/app.json`.
+
+---
+
 ## Go-live order (recommended)
 
 1. **R2** buckets + custom domain + keys → set web `NEXT_PUBLIC_R2_PUBLIC_BASE_URL`.
@@ -125,7 +172,11 @@ public bucket for user uploads.
    `deploy-db` once (`workflow_dispatch`) to apply all migrations.
 3. **Vercel** project + 3 secrets + env vars → run `deploy-web` once.
 4. **Fly** app + `FLY_API_TOKEN` — **after** the Q-021 HTTP entrypoint lands.
-5. Run each deploy workflow once via `workflow_dispatch` to verify, then let
-   merge-to-`main` drive subsequent deploys (the Stage 11 go-live follow-up).
+5. **EAS** Expo account + `EXPO_TOKEN` + `eas init` / `build:configure` +
+   signing credentials → run `deploy-mobile` (`workflow_dispatch`) to build;
+   add the ASC/Play submit secrets before the first store submission.
+6. Run each deploy workflow once via `workflow_dispatch` to verify, then let
+   merge-to-`main` drive subsequent web/db deploys (the Stage 11 go-live
+   follow-up). Mobile stays manual-dispatch (build minutes / store cadence).
 
 Per `rules/11-deployment.md`: **migrations run before app deploys.**
