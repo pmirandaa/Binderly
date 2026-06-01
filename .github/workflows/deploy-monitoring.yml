@@ -77,7 +77,7 @@ jobs:
           fetch-depth: 0
       - name: Create Sentry release + associate commits
         # Pinned to a major tag per the repo action-pinning policy (ci.yml).
-        uses: getsentry/action-release@v1
+        uses: getsentry/action-release@v3
         with:
           version: ${{ github.sha }}
           set_commits: auto
