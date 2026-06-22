@@ -71,7 +71,7 @@ jobs:
       SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
       SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Sentry needs full history to associate commits with the release.
           fetch-depth: 0
