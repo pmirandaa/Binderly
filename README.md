@@ -4,63 +4,56 @@ A Pokémon TCG collection tracker that's collection-first, not portfolio-first.
 Mobile + web, fast stack scanning, BGS-style grading prediction, smart
 collections, shareable public pages.
 
-This repository is in the **specification stage**. No application code exists
-yet. The contents of this repo are the implementation plan, ground rules, and
-task graph that an AI coding agent (Cursor + Claude Opus 4.7) will execute to
-build the actual product.
+Unofficial fan project. Not affiliated with The Pokémon Company or Nintendo.
 
-## If you are an AI agent
+## Status
 
-Read these in order, then stop:
+**Feature-complete build, never deployed, no longer in active development.**
 
-1. `PROJECT.md` — the product spec (the north star)
-2. `AGENT_ORCHESTRATOR.md` — how the build is run (orchestrator vs sub-agent)
-3. The rules file for the stage you are in (`rules/0X-*.md`)
-4. The specific task file you were dispatched to work on (`tasks/0X-*/T-*.md`)
-5. Only the context files (`context/*.md`) that your task explicitly references
+All 86 planned tasks across 11 build stages are merged: data layer, backend,
+shared packages, web, mobile, card scanner, grading, shareable pages,
+offline sync, billing and deployment scaffolding. Web, mobile and the Python
+services all build, lint and typecheck. Roughly 100k lines of TypeScript and
+Python with around 480 test files.
 
-Do **not** load the entire repo into context. Tasks are designed to be
-self-contained when read alongside their declared dependencies.
+What never happened: production go-live (deploy paths are wired but inert
+until real secrets are added) and real model training for grading, which
+needs a labelled dataset. See `status.md` for the full record.
 
-If you are the orchestrator agent, you are the only one allowed to read
-`dependencies.yaml`, `status.md`, and `open-questions.md`. Sub-agents do not
-read these — they only read what their task file points them at.
+## Stack
 
-## If you are the human (Pablo)
+- **Web:** Next.js, React, TanStack Query
+- **Mobile:** Expo / React Native, SQLite offline store with a sync queue
+- **Backend:** Supabase (Postgres, row-level security, Edge Functions), Drizzle migrations
+- **Python services:** grading models, embeddings and ANN search for the scanner, ingestion
+- **Data pipeline:** multi-source card ingestion, image pipeline, pricing rollups
+- **Monorepo:** pnpm workspaces + Turborepo
 
-The intended workflow:
+A good place to start reading is `packages/smart-collection-dsl`: a small,
+pure rule language (parser, evaluator, SQL compiler, explainer) with 212 tests.
 
-1. Push this repo to GitHub (`git init`, `git remote add origin`, push).
-2. Open the repo in Cursor.
-3. Start a new chat with Opus 4.7 and tell it: *"Read README.md and
-   AGENT_ORCHESTRATOR.md and act as the orchestrator. Begin Phase 0."*
-4. Approve PRs as they land. Answer questions in `open-questions.md` when the
-   orchestrator escalates. Repeat until shipped.
+## How it was built
 
-## Repo layout
+Binderly was built by coding agents working from a written plan rather than
+ad-hoc prompts. The product spec and ground rules were drafted by an agent
+working adversarially with me, before any code was written. An orchestrator
+agent then dispatched small, self-contained tasks from a dependency graph to
+sub-agents. My role was direction: answering the escalations the orchestrator
+raised and making the product decisions (`open-questions.md` has the trail).
+
+The planning artifacts are all in the repo:
 
 ```
 PROJECT.md              Product spec
 AGENT_ORCHESTRATOR.md   Orchestrator playbook
 dependencies.yaml       Build graph (machine-readable)
-status.md               Current build state (orchestrator updates this)
-open-questions.md       Escalations awaiting human decision
-context/                Shared knowledge (referenced by tasks)
+status.md               Build log, updated by the orchestrator each iteration
+open-questions.md       Escalations that needed a human decision
+context/                Shared knowledge referenced by tasks
 rules/                  Per-stage ground rules
 tasks/                  PR-sized work units, grouped by stage
 scripts/                Orchestrator helpers (worktree management, etc.)
 ```
-
-## State of this scaffold
-
-| Area | State |
-|---|---|
-| Orchestration files | Complete |
-| Context files | Complete |
-| Rules files (all 12 stages) | Complete |
-| Phase 0 (foundation) tasks | Fully written |
-| Phase 1 (data layer) tasks | Fully written |
-| Phase 2–11 tasks | Stubbed; orchestrator elaborates them when their stage becomes ready (see `AGENT_ORCHESTRATOR.md` § Stub Elaboration) |
 
 ## Getting started
 
@@ -108,6 +101,3 @@ apps/*           # user-facing apps (web, mobile, api-python, …)
 packages/*       # shared TypeScript packages
 data-pipeline    # ingestion + standardization layer (single workspace)
 ```
-
-Phase-0 lands the empty skeleton only — actual apps and packages are
-created by their respective foundation, data-layer, and feature tasks.
